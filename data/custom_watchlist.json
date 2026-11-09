@@ -1,0 +1,38 @@
+[
+  {
+    "key": "NIFTY_24550_CE",
+    "display_name": "NIFTY 50 24,550 CE",
+    "category": "CALL",
+    "exchange": "NSE",
+    "tv_symbol": "NSE:NIFTY_24550_CE",
+    "yfinance_symbol": "NIFTY_24550_CE.NS",
+    "lot_size": 65,
+    "strike_step": 50,
+    "expiry_day_name": "Monthly",
+    "baseline_price": 149.75
+  },
+  {
+    "key": "TATAMOTORS",
+    "display_name": "Tata Motors Ltd",
+    "category": "STOCK",
+    "exchange": "NSE",
+    "tv_symbol": "NSE:TATAMOTORS",
+    "yfinance_symbol": "TATAMOTORS.NS",
+    "lot_size": 700,
+    "strike_step": 10,
+    "expiry_day_name": "Monthly",
+    "baseline_price": 820.0
+  },
+  {
+    "key": "TATASTEEL",
+    "display_name": "Tata Steel Ltd",
+    "category": "STOCK",
+    "exchange": "NSE",
+    "tv_symbol": "NSE:TATASTEEL",
+    "yfinance_symbol": "TATASTEEL.NS",
+    "lot_size": 5500,
+    "strike_step": 2,
+    "expiry_day_name": "Monthly",
+    "baseline_price": 155.0
+  }
+]

@@ -1,0 +1,1793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Vijay Sai's Dhan Algo{% endblock %}</title>
+    <!-- Tailwind CSS (Tailwind 3 CDN for modern JIT support & arbitrary values) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome 6 Pro / Free -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js for High-Performance Native Charting -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Lightweight Charts (Native Financial Candlestick Engine - Zero Popups, Zero Fallbacks) -->
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+
+    <style>
+        :root {
+            --apple-canvas: #f5f5f7;
+            --apple-surface: #ffffff;
+            --apple-surface-secondary: #fbfbfd;
+            --apple-border: rgba(0, 0, 0, 0.06);
+            --apple-text: #1d1d1f;
+            --apple-muted: #86868b;
+            --apple-blue: #0071e3;
+            --apple-green: #34c759;
+            --apple-red: #ff3b30;
+            --apple-amber: #ff9500;
+        }
+
+        body {
+            background-color: var(--apple-canvas);
+            color: var(--apple-text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Text', "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+            letter-spacing: -0.011em;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', -apple-system-ui-monospace, monospace;
+        }
+
+        /* Apple High-End Minimalist Card Standard (No heavy borders) */
+        .apple-box {
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            border-radius: 1.15rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02), 0 1px 3px rgba(0, 0, 0, 0.01);
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .apple-box:hover {
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.04);
+        }
+
+        /* Apple Segmented Controls */
+        .apple-seg-btn {
+            background: transparent;
+            color: #6e6e73;
+            border-radius: 0.75rem;
+            transition: all 0.18s ease;
+        }
+        .apple-seg-btn:hover {
+            color: #1d1d1f;
+        }
+        .apple-seg-btn.active {
+            background: #ffffff;
+            color: #1d1d1f;
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+        }
+
+        /* Subtle Pills */
+        .apple-pill-subtle {
+            background: #eef1f5;
+            color: #48484a;
+            border: 1px solid rgba(0, 0, 0, 0.03);
+            transition: all 0.15s ease;
+        }
+        .apple-pill-subtle:hover {
+            background: #e2e6eb;
+            color: #1d1d1f;
+        }
+        .apple-pill-subtle.active {
+            background: #1d1d1f;
+            color: #ffffff;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+        }
+
+        /* Tick flash */
+        @keyframes tick-up {
+            0% { background-color: rgba(52, 199, 89, 0.25); }
+            100% { background-color: transparent; }
+        }
+        @keyframes tick-down {
+            0% { background-color: rgba(255, 59, 48, 0.25); }
+            100% { background-color: transparent; }
+        }
+        .flash-up { animation: tick-up 0.7s ease-out; }
+        .flash-down { animation: tick-down 0.7s ease-out; }
+
+        /* Sleek scrollbar */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #f5f5f7; }
+        ::-webkit-scrollbar-thumb { background: #d2d2d7; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #86868b; }
+        /* Solid Apple Header Guarantee */
+        header {
+            background-color: #ffffff !important;
+            z-index: 1000 !important;
+        }
+    </style>
+</head>
+<body class="flex flex-col selection:bg-blue-600 selection:text-white bg-[#f5f5f7]">
+
+    <!-- Grand Apple Solid Header (Sleek, Minimal, Zero Collision) -->
+    <header class="sticky top-0 z-50 px-4 md:px-8 py-3 bg-white border-b border-gray-200/80 shadow-xs" style="background-color: #ffffff !important; z-index: 1000;">
+        <div class="max-w-7xl mx-auto flex justify-between items-center relative z-20">
+            <!-- Brand & Tagline with Sacred Sarva Dharma Logo of Bhagawan Sri Sathya Sai Baba -->
+            <div class="flex items-center space-x-3">
+                <!-- Authentic Sri Sathya Sai Sarva Dharma Page Logo -->
+                <div class="relative group cursor-pointer flex-shrink-0" onclick="playDeityChant('SAIBABA')" 
+                    title="Sacred Sarva Dharma Symbol of Bhagawan Sri Sathya Sai Baba (Sarva Dharma Samanvaya — Unity of All Faiths, Truth & Universal Love). Click to play Bhagawan's Divine Chants.">
+                    <div class="w-10 h-10 md:w-11 md:h-11 rounded-full p-[2px] bg-gradient-to-tr from-amber-400 via-yellow-200 to-orange-500 shadow-md hover:scale-105 transition-transform duration-200 flex items-center justify-center">
+                        <img src="/static/images/sarva_dharma_icon.png" alt="Sathya Sai Sarva Dharma Emblem" class="w-full h-full rounded-full object-contain bg-white shadow-2xs">
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-base md:text-lg tracking-tight text-slate-900 flex items-center space-x-1">
+                            <span>Vijay Sai's Dhan Algo</span>
+                        </span>
+                        <!-- Live Trading Mode Pill -->
+                        <span id="nav-mode-badge" class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider font-mono {% if config.trading_mode == 'LIVE' %}bg-rose-50 text-rose-600 border border-rose-200{% else %}bg-emerald-50 text-emerald-700 border border-emerald-200{% endif %}">
+                            {{ config.trading_mode }}
+                        </span>
+                        <!-- Dhan API Connection Status Pill (Server Ground-Truth) -->
+                        {% if is_dhan_connected %}
+                        <button onclick="openDhanTokenModal()" id="nav-dhan-badge" class="text-[10px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 hover:border-emerald-300 transition flex items-center space-x-1.5 shadow-2xs" title="Click to manage or refresh your Dhan API session">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" id="nav-dhan-dot"></span>
+                            <span id="nav-dhan-text">Dhan Connected</span>
+                        </button>
+                        {% else %}
+                        <button onclick="openDhanTokenModal()" id="nav-dhan-badge" class="text-[10px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider font-mono bg-amber-50 text-amber-700 border border-amber-200 hover:border-amber-300 transition flex items-center space-x-1.5 shadow-2xs" title="Click to manage or refresh your Dhan API session">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" id="nav-dhan-dot"></span>
+                            <span id="nav-dhan-text">Check Token</span>
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clean Minimal Nav Links -->
+            <nav class="hidden md:flex items-center space-x-1 text-xs font-semibold text-slate-600">
+                <a href="/" class="px-3 py-1.5 rounded-lg text-slate-900 bg-slate-100 font-bold flex items-center space-x-1.5">
+                    <i class="fa-solid fa-layer-group text-blue-600 text-[11px]"></i><span>Desk</span>
+                </a>
+                <a href="/journal" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-book-bookmark text-slate-400 text-[11px]"></i><span>Journal & Taxes</span>
+                </a>
+                <a href="/webhook-guide" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-satellite-dish text-slate-400 text-[11px]"></i><span>Webhooks</span>
+                </a>
+                <a href="/settings" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-sliders text-slate-400 text-[11px]"></i><span>Settings</span>
+                </a>
+            </nav>
+
+            <!-- Quick Push Alert, Auspicious Bell, Daily Mantra & Account ID -->
+            <div class="flex items-center space-x-1.5 md:space-x-2">
+                <!-- Auspicious Temple Bell Chime -->
+                <button onclick="ringTempleBell(true)" id="btn-temple-bell" 
+                    class="px-2.5 py-1 rounded-xl text-xs font-semibold text-amber-900 bg-gradient-to-r from-amber-50 to-yellow-100 hover:from-amber-100 hover:to-yellow-200 border border-amber-300 shadow-2xs hover:shadow-xs transition flex items-center space-x-1.5 active:scale-95" 
+                    title="Ring Auspicious Temple Bell (Ghanta Nada) for clarity & divine blessings. Rings automatically at 09:00 (MCX) and 09:15 (NSE).">
+                    <span class="text-sm">🔔</span>
+                    <span class="hidden xl:inline font-bold">Temple Bell</span>
+                </button>
+
+                <!-- Daily Sacred Vedic Mantra Pill -->
+                <button onclick="openDevotionalModal()" id="btn-daily-mantra" 
+                    class="px-2.5 py-1 rounded-xl text-xs font-semibold text-orange-950 bg-gradient-to-r from-orange-50 via-amber-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100 border border-amber-300 shadow-2xs hover:shadow-xs transition flex items-center space-x-1.5 active:scale-95" 
+                    title="Today's Vedic Mantra & Divine Trading Wisdom. Click to read and hear sacred chants.">
+                    <span class="text-sm">🕉️</span>
+                    <span id="nav-mantra-title" class="hidden sm:inline font-bold">Daily Mantra</span>
+                </button>
+
+                <!-- Live Dhan Real Cash Balance -->
+                <div class="hidden sm:flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-slate-100 border border-black/[0.04] text-xs font-mono" title="Live cash balance in your Dhan broker trading account. Reflects wallet deposits/top-ups in real-time.">
+                    <span class="text-[10px] font-sans font-bold text-slate-500 uppercase tracking-tight">Dhan Cash:</span>
+                    <span id="nav-dhan-cash" class="font-black text-slate-900">₹{{"%.2f"|format(real_cash_balance|default(0.0))}}</span>
+                    <button onclick="syncDhanFunds(this)" title="Sync live Dhan wallet balance" class="text-slate-400 hover:text-blue-600 transition ml-0.5">
+                        <i id="nav-funds-sync-icon" class="fa-solid fa-arrows-rotate text-[10px]"></i>
+                    </button>
+                </div>
+
+                <!-- Live 1-Second Net P&L Stream (Realized + Unrealized) -->
+                <div id="nav-live-net-pnl-pill" class="flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-slate-100 border border-black/[0.04] text-xs font-mono transition-colors duration-200" title="Real-time Net P&L updating second-by-second (Realized + Open Position).">
+                    <div id="nav-pnl-dot" class="w-2 h-2 rounded-full bg-slate-400"></div>
+                    <span class="text-[10px] font-sans font-bold text-slate-500 uppercase tracking-tight">Net P&L:</span>
+                    <span id="nav-live-net-pnl-val" class="font-black text-slate-700">₹0.00</span>
+                </div>
+
+                <button onclick="clearSystemCache(this)" title="Instantly clear in-memory feed caches and free system memory" 
+                    class="px-2 py-1 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition flex items-center space-x-1 cursor-pointer">
+                    <i class="fa-solid fa-broom text-amber-600 text-[11px]" id="clear-cache-icon"></i>
+                    <span class="hidden xl:inline">Clear Cache</span>
+                </button>
+                <button onclick="triggerQuickPush()" title="Send Push Notification to paired phone" 
+                    class="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition flex items-center space-x-1">
+                    <i class="fa-solid fa-mobile-screen-button text-blue-600 text-[11px]"></i>
+                    <span class="hidden sm:inline">Push Alert</span>
+                </button>
+                <!-- Mobile Access Link & QR Code Button -->
+                <button onclick="openMobileAccessModal()" title="Access dashboard on iPhone, Android or iPad over Wi-Fi or 4G/5G" 
+                    class="px-2.5 py-1 rounded-lg text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition flex items-center space-x-1 shadow-2xs active:scale-95">
+                    <i class="fa-solid fa-mobile-screen text-blue-600 text-[11px]"></i>
+                    <span class="hidden sm:inline font-bold">Mobile Link</span>
+                </button>
+                <div class="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-100 text-xs text-slate-600 font-mono">
+                    <span class="text-slate-400">ID:</span>
+                    <span class="font-bold text-slate-900">{{ config.client_id }}</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Canvas -->
+    <main class="flex-1 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full relative">
+        <!-- HTML5 Persistent Background Sacred Audio Player (Non-intrusive) -->
+        <audio id="sacred-background-audio" preload="none" loop></audio>
+
+        <!-- TOP 4 EQUAL PARTS: SACRED BLESSINGS & CONTINUOUS BACKGROUND CHANTS BAR -->
+        <section class="mb-4 space-y-2.5">
+            <!-- Non-intrusive Sacred Background Audio Controller Ribbon -->
+            <div class="px-4 py-2.5 rounded-2xl bg-white border border-amber-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
+                <div class="flex items-center space-x-2.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" id="bg-audio-indicator"></span>
+                    <span class="font-bold text-amber-950 font-mono text-[11px] uppercase tracking-wide flex items-center space-x-1.5">
+                        <span class="text-sm">🕉️</span>
+                        <span>Sacred Vedic Chants (Continuous Background Audio):</span>
+                    </span>
+                    <span id="bg-chant-current-badge" class="font-bold text-xs text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-200">
+                        🐘 1. Sri Ganesha Atharvashirsha
+                    </span>
+                </div>
+
+                <!-- Live Audio Controls -->
+                <div class="flex flex-wrap items-center gap-2 text-xs">
+                    <!-- Sacred Chant Dropdown -->
+                    <select id="bg-chant-select" onchange="switchSacredChant(this.value)" class="px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-400 cursor-pointer shadow-2xs">
+                        <option value="GANESHA">🐘 1. Sri Ganesha Atharvashirsha (Beginning)</option>
+                        <option value="LAKSHMI">🌸 2. Sri Mahalakshmi Sthuthi & Kanakadhara</option>
+                        <option value="HANUMAN">🚩 3. Sri Hanuman Chalisa (Sankat Mochan)</option>
+                        <option value="KUBERA">🪙 4. Sri Kubera Dhana Prapti Mantra</option>
+                        <option value="SAIBABA">🧡 5. Bhagawan Sri Sathya Sai Bhajan & Gayatri</option>
+                        <option value="VENKATESWARA">🪷 6. Sri Venkateswara Suprabhatam (Balaji)</option>
+                        <option value="VISHNU">📿 7. Sri Vishnu Sahasranamam (M.S. Subbulakshmi)</option>
+                    </select>
+
+                    <!-- Play / Pause Button -->
+                    <button onclick="toggleSacredBackgroundAudio()" id="btn-bg-audio-play" class="px-3.5 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold transition shadow-2xs flex items-center space-x-1.5 active:scale-95">
+                        <i class="fa-solid fa-play text-[11px]" id="bg-audio-play-icon"></i>
+                        <span id="bg-audio-play-text">Play Background Chants</span>
+                    </button>
+
+                    <!-- Volume Slider -->
+                    <div class="flex items-center space-x-1.5 px-2.5 py-0.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 font-mono text-[10px]">
+                        <i class="fa-solid fa-volume-low text-amber-600"></i>
+                        <input type="range" id="bg-audio-volume" min="0" max="1" step="0.05" value="0.35" oninput="setSacredAudioVolume(this.value)" class="w-16 h-1 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-500" title="Adjust Sacred Chant Volume">
+                        <span id="bg-volume-label" class="w-6 text-right font-bold text-slate-700">35%</span>
+                    </div>
+
+                    <!-- Temple Bell Chime -->
+                    <button onclick="ringTempleBell(true)" class="px-2.5 py-1 rounded-xl bg-amber-100/90 hover:bg-amber-200 text-amber-950 border border-amber-300 font-bold transition flex items-center space-x-1 active:scale-95" title="Ring Auspicious Temple Bell (Ghanta Nada)">
+                        <span>🔔</span>
+                        <span class="hidden sm:inline">Temple Bell</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4 EQUAL PARTS: GODS EQUALLY SPREAD ACROSS TOP (REAL PHOTOS & BLESSINGS) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <!-- PART 1: Lord Ganesha (At the Beginning) & Goddess Lakshmi Devi -->
+                <div class="p-3 rounded-2xl bg-white border border-amber-200/90 shadow-2xs hover:shadow-xs transition flex items-center justify-between group">
+                    <div class="flex items-center space-x-2.5">
+                        <!-- Real Photo: Lord Ganesha (At the Beginning) -->
+                        <div class="relative cursor-pointer group-hover:scale-105 transition" onclick="playDeityChant('GANESHA')" title="🐘 1. Lord Ganesha: Auspicious Beginnings & Remover of Obstacles. Click to play Atharvashirsha.">
+                            <img src="/static/images/deities/ganesha_icon.jpg" alt="Lord Ganesha" class="w-10 h-10 rounded-full object-cover ring-2 ring-amber-400 shadow-2xs">
+                            <span class="absolute -bottom-1 -right-0.5 text-[10px]">🐘</span>
+                        </div>
+                        <!-- Real Photo: Goddess Lakshmi Devi -->
+                        <div class="relative cursor-pointer group-hover:scale-105 transition" onclick="playDeityChant('LAKSHMI')" title="🌸 2. Goddess Mahalakshmi Devi: Prosperity & Infinite Abundance. Click to play Mahalakshmi Sthuthi.">
+                            <img src="/static/images/deities/lakshmi_icon.jpg" alt="Goddess Lakshmi" class="w-10 h-10 rounded-full object-cover ring-2 ring-rose-400 shadow-2xs">
+                            <span class="absolute -bottom-1 -right-0.5 text-[10px]">🌸</span>
+                        </div>
+                        <div>
+                            <div class="font-bold text-xs text-slate-900 leading-tight">1. Ganesha & Lakshmi</div>
+                            <div class="text-[10px] text-amber-800 font-medium">Beginnings & Wealth</div>
+                        </div>
+                    </div>
+                    <button onclick="playDeityChant('GANESHA')" class="w-7 h-7 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 flex items-center justify-center text-xs transition active:scale-90" title="Play Ganesha & Lakshmi Chants">
+                        <i class="fa-solid fa-music text-[10px]"></i>
+                    </button>
+                </div>
+
+                <!-- PART 2: Lord Hanuman & Lord Kubera -->
+                <div class="p-3 rounded-2xl bg-white border border-amber-200/90 shadow-2xs hover:shadow-xs transition flex items-center justify-between group">
+                    <div class="flex items-center space-x-2.5">
+                        <!-- Real Photo: Lord Hanuman -->
+                        <div class="relative cursor-pointer group-hover:scale-105 transition" onclick="playDeityChant('HANUMAN')" title="🚩 3. Lord Hanuman Swamy: Courage & Ruthless Risk Discipline. Click to play Hanuman Chalisa.">
+                            <img src="/static/images/deities/hanuman_icon.jpg" alt="Lord Hanuman" class="w-10 h-10 rounded-full object-cover ring-2 ring-orange-500 shadow-2xs">
+                            <span class="absolute -bottom-1 -right-0.5 text-[10px]">🚩</span>
+                        </div>
+                        <!-- Real Photo: Lord Kubera -->
+                        <div class="relative cursor-pointer group-hover:scale-105 transition" onclick="playDeityChant('KUBERA')" title="🪙 4. Lord Kubera Swamy: Treasurer of the Gods & Capital Guardian. Click to play Kubera Mantra.">
+                            <img src="/static/images/deities/kubera_icon.jpg" alt="Lord Kubera" class="w-10 h-10 rounded-full object-cover ring-2 ring-yellow-500 shadow-2xs">
+                            <span class="absolute -bottom-1 -right-0.5 text-[10px]">🪙</span>
+                        </div>
+                        <div>
+                            <div class="font-bold text-xs text-slate-900 leading-tight">2. Hanuman & Kubera</div>
+                            <div class="text-[10px] text-amber-800 font-medium">Courage & Treasury Guard</div>
+                        </div>
+                    </div>
+                    <button onclick="playDeityChant('HANUMAN')" class="w-7 h-7 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 flex items-center justify-center text-xs transition active:scale-90" title="Play Hanuman & Kubera Chants">
+                        <i class="fa-solid fa-music text-[10px]"></i>
+                    </button>
+                </div>
+
+                <!-- PART 3: Bhagawan Sri Sathya Sai Baba -->
+                <div class="p-3 rounded-2xl bg-white border border-amber-200/90 shadow-2xs hover:shadow-xs transition flex items-center justify-between group">
+                    <div class="flex items-center space-x-2.5">
+                        <!-- Real Photo: Bhagawan Sri Sathya Sai Baba -->
+                        <div class="relative cursor-pointer group-hover:scale-105 transition" onclick="playDeityChant('SAIBABA')" title="🧡 5. Bhagawan Sri Sathya Sai Baba: Divine Love, Calm Mind & Saburi (Patience). Click to play Sai Bhajans & Gayatri.">
+                            <img src="/static/images/deities/saibaba_icon.jpg" alt="Bhagawan Sri Sathya Sai Baba" class="w-10 h-10 rounded-full object-cover ring-2 ring-orange-500 shadow-2xs">
+                            <span class="absolute -bottom-1 -right-0.5 text-[10px]">🧡</span>
+                        </div>
+                        <div>
+                            <div class="font-bold text-xs text-slate-900 leading-tight">3. Sri Sathya Sai Baba</div>
+                            <div class="text-[10px] text-orange-800 font-medium">Love All &bull; Saburi (Patience)</div>
+                        </div>
+                    </div>
+                    <button onclick="playDeityChant('SAIBABA')" class="w-7 h-7 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-800 border border-orange-200 flex items-center justify-center text-xs transition active:scale-90" title="Play Sai Baba Chants">
+                        <i class="fa-solid fa-music text-[10px]"></i>
+                    </button>
+                </div>
+
+                <!-- PART 4: Lord Sri Venkateswara & Lord Sri Vishnu -->
+                <div class="p-3 rounded-2xl bg-white border border-amber-200/90 shadow-2xs hover:shadow-xs transition flex items-center justify-between group">
+                    <div class="flex items-center space-x-2.5">
+                        <!-- Real Photo: Lord Venkateswara -->
+                        <div class="relative cursor-pointer group-hover:scale-105 transition" onclick="playDeityChant('VENKATESWARA')" title="🪷 6. Lord Sri Venkateswara (Balaji): Divine Protection & Sovereign Grace. Click to play Venkateswara Suprabhatam.">
+                            <img src="/static/images/deities/venkateswara_icon.jpg" alt="Lord Venkateswara" class="w-10 h-10 rounded-full object-cover ring-2 ring-indigo-500 shadow-2xs">
+                            <span class="absolute -bottom-1 -right-0.5 text-[10px]">🪷</span>
+                        </div>
+                        <!-- Real Photo: Lord Vishnu -->
+                        <div class="relative cursor-pointer group-hover:scale-105 transition" onclick="playDeityChant('VISHNU')" title="📿 7. Lord Sri Maha Vishnu: Cosmic Sustainer & Universal Equilibrium. Click to play Vishnu Sahasranamam.">
+                            <img src="/static/images/deities/vishnu_icon.jpg" alt="Lord Vishnu" class="w-10 h-10 rounded-full object-cover ring-2 ring-blue-500 shadow-2xs">
+                            <span class="absolute -bottom-1 -right-0.5 text-[10px]">📿</span>
+                        </div>
+                        <div>
+                            <div class="font-bold text-xs text-slate-900 leading-tight">4. Venkateswara & Vishnu</div>
+                            <div class="text-[10px] text-indigo-800 font-medium">Protection & Cosmic Order</div>
+                        </div>
+                    </div>
+                    <button onclick="playDeityChant('VENKATESWARA')" class="w-7 h-7 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 flex items-center justify-center text-xs transition active:scale-90" title="Play Venkateswara & Vishnu Chants">
+                        <i class="fa-solid fa-music text-[10px]"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Dhan Session & Token Management Modal (Apple Minimalist Standard) -->
+    <div id="dhan-token-modal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-black/[0.08] relative transform transition-all max-h-[92vh] overflow-y-auto">
+            <button onclick="closeDhanTokenModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition">
+                <i class="fa-solid fa-xmark text-base"></i>
+            </button>
+            
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg shadow-2xs">
+                    <i class="fa-solid fa-key"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">Connect to Dhan & API Token Setup</h3>
+                    <p class="text-xs text-slate-500">Access tokens enable live tick feeds, order flow analytics, and automated execution.</p>
+                </div>
+            </div>
+
+            <!-- TWO CLEAR OPTIONS AS REQUESTED BY USER -->
+            <div class="space-y-4">
+                <!-- OPTION 1: 1-CLICK DIRECT NAVIGATION TO EXACT TOKEN GENERATOR -->
+                <div class="p-3.5 rounded-xl bg-gradient-to-r from-blue-50/70 to-indigo-50/40 border border-blue-200/80">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+                            <span class="text-xs font-black text-blue-950 uppercase font-mono">Option 1: Direct 1-Click to Exact Dhan Token Page</span>
+                        </div>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded font-bold font-mono bg-blue-100 text-blue-800 border border-blue-200">OFFICIAL PORTAL</span>
+                    </div>
+                    <p class="text-[11px] text-slate-600 mb-3 leading-relaxed">
+                        Click below to jump directly to Dhan's exact API key and token generation page in a new tab:
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2.5">
+                        <a href="https://web.dhan.co/#/profile/dhan-hq" target="_blank"
+                            class="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold font-mono transition shadow-2xs flex items-center justify-center space-x-1.5 text-center">
+                            <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                            <span>web.dhan.co (Trading APIs)</span>
+                        </a>
+                        <a href="https://dhanhq.co/" target="_blank"
+                            class="px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-blue-200 text-blue-700 text-xs font-bold font-mono transition shadow-2xs flex items-center justify-center space-x-1.5 text-center">
+                            <i class="fa-solid fa-code text-[10px]"></i>
+                            <span>dhanhq.co (Developer Portal)</span>
+                        </a>
+                    </div>
+                    <div class="text-[10px] text-slate-500 font-mono space-y-0.5 bg-white/70 p-2 rounded-lg border border-blue-100">
+                        <div>1. Click button above to open <strong>Profile &gt; DhanHQ Trading APIs</strong>.</div>
+                        <div>2. Click <strong>"Generate Access Token"</strong>. (Choose <em>30-Day Extended Token</em> or <em>Daily Token</em>).</div>
+                        <div>3. Copy the token and paste it into Option 2 below.</div>
+                    </div>
+                </div>
+
+                <!-- OPTION 2: ENTER TOKEN, STORE PERMANENTLY & ENTER TRADING MODE -->
+                <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90">
+                    <div class="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-200/60">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span class="text-xs font-black text-slate-900 uppercase font-mono">Option 2: Save Token & Enter Trading Mode</span>
+                        </div>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded font-bold font-mono bg-emerald-100 text-emerald-800 border border-emerald-200">PERMANENT / DAILY</span>
+                    </div>
+
+                    <div class="space-y-3 text-xs">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 mb-1 font-mono uppercase">Dhan Client ID</label>
+                            <input type="text" id="modal-dhan-client-id" value="{{ config.client_id }}" 
+                                class="w-full px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono text-xs focus:outline-none focus:border-blue-500 shadow-2xs">
+                        </div>
+
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-[11px] font-bold text-slate-700 font-mono uppercase">Paste Dhan Access Token (JWT)</label>
+                                <button type="button" onclick="clearDhanTokenField()" class="text-[10px] text-rose-600 hover:text-rose-700 font-bold font-mono transition">
+                                    <i class="fa-solid fa-trash-can mr-1"></i>Clear & Re-Paste
+                                </button>
+                            </div>
+                            <textarea id="modal-dhan-access-token" rows="3" oninput="validateTokenStructure()" placeholder="Paste your 24-hour or 30-day permanent token here (starts with eyJ...)"
+                                class="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 font-mono text-xs focus:outline-none focus:border-blue-500 resize-none shadow-2xs"></textarea>
+                        </div>
+
+                        <!-- Target Trading Mode Selection -->
+                        <div class="p-2.5 rounded-xl bg-white border border-slate-200">
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase font-mono mb-1.5">Activate Target Trading Mode Upon Verification:</label>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <label class="flex items-center space-x-2 p-2 rounded-lg border border-emerald-200 bg-emerald-50/40 cursor-pointer hover:bg-emerald-50 transition">
+                                    <input type="radio" name="modal_trading_mode" value="PAPER" checked class="text-emerald-600 focus:ring-0">
+                                    <div>
+                                        <div class="font-bold text-emerald-900 text-xs">🟢 PAPER Simulation</div>
+                                        <div class="text-[9px] text-slate-500">Live prices, simulated zero-risk budget</div>
+                                    </div>
+                                </label>
+                                <label class="flex items-center space-x-2 p-2 rounded-lg border border-rose-200 bg-rose-50/40 cursor-pointer hover:bg-rose-50 transition">
+                                    <input type="radio" name="modal_trading_mode" value="LIVE" class="text-rose-600 focus:ring-0">
+                                    <div>
+                                        <div class="font-bold text-rose-900 text-xs">🔴 LIVE Real Trading</div>
+                                        <div class="text-[9px] text-slate-500">Dispatches real orders via Dhan wallet</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Permanent Persistence Checkbox -->
+                        <label class="flex items-start space-x-2 text-[11px] text-slate-600 cursor-pointer pt-0.5">
+                            <input type="checkbox" id="modal-dhan-persist" checked class="rounded text-blue-600 focus:ring-0 mt-0.5">
+                            <span>Save as <strong>Permanent Token</strong> in <code>.env</code> file (Auto-loads on server startup without daily re-entry).</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="modal-dhan-alert" class="p-3 rounded-xl text-xs font-medium hidden"></div>
+
+                <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <button type="button" onclick="closeDhanTokenModal()" 
+                        class="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 text-xs font-bold transition">
+                        Cancel
+                    </button>
+                    <button type="button" onclick="submitDhanToken()" id="btn-submit-dhan-token"
+                        class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs flex items-center space-x-1.5 font-mono">
+                        <i class="fa-solid fa-link text-xs"></i>
+                        <span>Verify, Save Token & Enter Mode</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Access & Multi-Mobile Push Notification Pairing Modal -->
+    <div id="mobile-access-modal" class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-xl w-full p-5 sm:p-6 shadow-2xl border border-slate-200 relative transform transition-all max-h-[92vh] overflow-y-auto">
+            <button onclick="closeMobileAccessModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+
+            <!-- Modal Header -->
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-lg shadow-xs">
+                    <i class="fa-solid fa-mobile-screen"></i>
+                </div>
+                <div>
+                    <h3 class="text-base sm:text-lg font-black text-slate-900 tracking-tight">Mobile Command & Push Alert Center</h3>
+                    <p class="text-xs text-slate-500">Access dashboard on mobile or push live trade alerts to multiple phones simultaneously</p>
+                </div>
+            </div>
+
+            <!-- Tab Switcher -->
+            <div class="flex p-1 bg-slate-100 rounded-2xl text-xs font-mono font-bold mb-4">
+                <button type="button" id="tab-btn-mobile-push" onclick="switchMobileModalTab('push')" 
+                    class="flex-1 py-1.5 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 bg-white text-blue-700 shadow-2xs">
+                    <i class="fa-solid fa-bell text-blue-600"></i>
+                    <span>Multi-Mobile Push (Alerts)</span>
+                </button>
+                <button type="button" id="tab-btn-mobile-access" onclick="switchMobileModalTab('access')" 
+                    class="flex-1 py-1.5 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 text-slate-600 hover:text-slate-900">
+                    <i class="fa-solid fa-globe text-slate-500"></i>
+                    <span>Remote Terminal Link</span>
+                </button>
+            </div>
+
+            <!-- PANEL 1: MULTI-MOBILE PUSH ALERTS -->
+            <div id="panel-mobile-push" class="space-y-4">
+                <!-- Explainer & Broadcast Test Bar -->
+                <div class="p-3.5 rounded-2xl bg-gradient-to-r from-blue-50/90 to-indigo-50/80 border border-blue-200 flex flex-wrap items-center justify-between gap-2.5">
+                    <div>
+                        <div class="text-xs font-bold text-blue-950 flex items-center space-x-1.5">
+                            <i class="fa-solid fa-tower-broadcast text-blue-600"></i>
+                            <span>Instant Push to 1 or Multiple Mobile Phones</span>
+                        </div>
+                        <div class="text-[11px] text-blue-700/80 mt-0.5">
+                            Real-time lockscreen alerts on trade entries, exits, profit targets & SL breaches.
+                        </div>
+                    </div>
+                    <button type="button" onclick="triggerBroadcastTest()" id="btn-broadcast-test" 
+                        class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold font-mono transition shadow-2xs flex items-center space-x-1 cursor-pointer active:scale-95">
+                        <i class="fa-solid fa-paper-plane text-[10px]"></i>
+                        <span>Test Push to All Mobiles</span>
+                    </button>
+                </div>
+
+                <!-- 1-Tap Subscription Link & QR -->
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 text-center space-y-2.5">
+                    <div class="text-xs font-bold text-slate-800">
+                        📱 Instant Multi-Mobile Pairing (0 Signup Needed)
+                    </div>
+                    <p class="text-[11px] text-slate-500 max-w-md mx-auto">
+                        Any mobile phone can receive alerts immediately! Open the link on your phone browser or scan in the free <strong>ntfy</strong> app (Google Play / Apple App Store):
+                    </p>
+                    <div class="flex items-center justify-center space-x-2">
+                        <input type="text" id="primary-push-sub-url" value="https://ntfy.sh/sai-nifty-trades-9422" readonly 
+                            class="px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-xs font-mono font-bold text-slate-800 w-full max-w-xs text-center select-all shadow-2xs">
+                        <a id="btn-open-push-channel" href="https://ntfy.sh/sai-nifty-trades-9422" target="_blank" 
+                            class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold font-mono transition shadow-2xs shrink-0 flex items-center space-x-1">
+                            <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                            <span>Open Channel</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Active Connected Mobile Devices Table -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="font-bold text-slate-700 uppercase font-mono">Paired Mobile Channels (<span id="mobile-devices-count">1</span>):</span>
+                        <span class="text-[10px] text-slate-400 font-mono">Parallel Low-Latency Delivery</span>
+                    </div>
+                    <div id="mobile-devices-list" class="space-y-1.5 max-h-48 overflow-y-auto">
+                        <!-- Loaded dynamically via JS -->
+                        <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between font-mono text-xs">
+                            <div class="flex items-center space-x-2">
+                                <i class="fa-solid fa-mobile-screen-button text-blue-600"></i>
+                                <span class="font-bold text-slate-900">Primary Trading Mobile</span>
+                                <span class="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded font-sans font-bold">Master</span>
+                            </div>
+                            <span class="text-[10px] text-slate-500 font-mono">sai-nifty-trades-9422</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Extra Mobile Phone Channel Accordion/Form -->
+                <div class="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200 space-y-2.5 text-xs">
+                    <div class="font-bold text-slate-800 flex items-center justify-between">
+                        <span>➕ Register Another Device or Custom Channel</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase font-mono mb-1">Mobile Name / Label</label>
+                            <input type="text" id="add-device-name" placeholder="e.g. iPhone 15 Pro, iPad Desk" 
+                                class="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-medium focus:outline-none focus:border-blue-500 shadow-2xs">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase font-mono mb-1">Custom Topic (Optional)</label>
+                            <input type="text" id="add-device-topic" placeholder="e.g. sai-trades-phone2" 
+                                class="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-medium focus:outline-none focus:border-blue-500 shadow-2xs">
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between pt-1">
+                        <span id="add-device-status-msg" class="text-[11px] font-mono text-slate-500"></span>
+                        <button type="button" onclick="submitAddMobileDevice()" 
+                            class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold font-mono transition shadow-2xs flex items-center space-x-1 cursor-pointer">
+                            <i class="fa-solid fa-plus text-[10px]"></i>
+                            <span>Add Mobile Channel</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANEL 2: REMOTE TERMINAL WEB LINK -->
+            <div id="panel-mobile-access" class="space-y-4 hidden">
+                <!-- QR Code Card & Live Link -->
+                <div class="p-4 rounded-2xl bg-gradient-to-b from-blue-50/60 to-indigo-50/40 border border-blue-200/90 text-center space-y-3">
+                    <div class="inline-block p-2 bg-white rounded-2xl shadow-md border border-slate-200">
+                        <img src="/static/images/mobile_qr.png" alt="Scan to open on mobile" class="w-40 h-40 mx-auto rounded-xl">
+                    </div>
+                    <div>
+                        <div class="text-[11px] font-bold text-slate-500 uppercase font-mono">Point phone camera to open full dashboard</div>
+                        <div class="mt-2 flex items-center justify-center space-x-1.5">
+                            <input type="text" id="mobile-public-url-input" value="https://causing-treat-surge-seen.trycloudflare.com" readonly 
+                                class="px-3 py-1.5 rounded-xl bg-white border border-blue-200 text-xs font-mono font-bold text-blue-950 w-full max-w-xs text-center select-all shadow-2xs">
+                            <button onclick="copyMobileUrl()" id="btn-copy-mobile-url" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold font-mono transition shadow-2xs shrink-0 flex items-center space-x-1 cursor-pointer">
+                                <i class="fa-solid fa-copy text-[10px]"></i>
+                                <span id="copy-btn-text">Copy</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Two Access Methods Explanation -->
+                <div class="space-y-2.5 text-xs">
+                    <!-- Method 1: Cloudflare Tunnel (Everywhere) -->
+                    <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-start space-x-2.5">
+                        <span class="text-base">🌐</span>
+                        <div>
+                            <div class="font-bold text-slate-900">Worldwide Secure HTTPS (4G / 5G / Wi-Fi)</div>
+                            <div class="text-[11px] text-slate-500 leading-relaxed">
+                                Works on any mobile network anywhere in the world with encrypted live charts, audio chants, and controls.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Method 2: Home Wi-Fi Direct -->
+                    <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-start space-x-2.5">
+                        <span class="text-base">📶</span>
+                        <div>
+                            <div class="font-bold text-slate-900">Home Wi-Fi Direct: <code class="text-blue-600 bg-white px-1.5 py-0.5 rounded border border-slate-200">http://192.168.1.20:5000</code></div>
+                            <div class="text-[11px] text-slate-500 leading-relaxed">
+                                If connected to the same Wi-Fi network as this PC, open the local IP directly in mobile Safari or Chrome.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Devotional Mantra & Auspicious Blessings Modal -->
+    <div id="devotional-mantra-modal" class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 hidden">
+        <div class="bg-gradient-to-b from-amber-50/90 via-white to-amber-50/40 rounded-3xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl border border-amber-200/90 relative transform transition-all max-h-[92vh] overflow-y-auto">
+            <!-- Close Button -->
+            <button onclick="closeDevotionalModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+
+            <!-- Divine Header -->
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 via-orange-400 to-yellow-300 text-white flex items-center justify-center text-xl shadow-xs border border-amber-300">
+                    🕉️
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <h3 class="text-base sm:text-lg font-black text-amber-950 tracking-tight">Divine Blessings & Daily Vedic Mantras</h3>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-900 border border-amber-300 uppercase font-mono" id="modal-today-pill">Today's Sacred Deity</span>
+                    </div>
+                    <p class="text-xs text-amber-800/80">Stay centered in divine peace, disciplined risk, and righteous conduct (Dharma).</p>
+                </div>
+            </div>
+
+            <!-- Auspicious Action Bar: Temple Bell Chime & Tanpura Drone -->
+            <div class="p-3 rounded-2xl bg-gradient-to-r from-amber-100/70 via-yellow-100/60 to-orange-100/70 border border-amber-300/80 flex flex-wrap items-center justify-between gap-2.5 mb-4 shadow-2xs">
+                <div class="flex items-center space-x-2">
+                    <button onclick="ringTempleBell(true)" class="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-2xs hover:shadow-xs transition flex items-center space-x-1.5 active:scale-95">
+                        <span>🔔</span>
+                        <span>Ring Temple Bell (Ghanta)</span>
+                    </button>
+                    <button onclick="toggleDrone()" id="btn-drone-toggle" class="px-3 py-1.5 rounded-xl bg-white hover:bg-amber-50 border border-amber-300 text-amber-950 text-xs font-bold shadow-2xs transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-play text-[11px] text-amber-600"></i>
+                        <span>Play Om Drone</span>
+                    </button>
+                </div>
+                <div class="text-[10px] font-mono text-amber-900/90 flex items-center space-x-1 bg-white/70 px-2.5 py-1 rounded-lg border border-amber-200">
+                    <i class="fa-solid fa-bell text-amber-600"></i>
+                    <span>Market Bell: 09:00 (MCX) &bull; 09:15 (NSE)</span>
+                </div>
+            </div>
+
+            <!-- Deity Selection Tabs -->
+            <div class="flex items-center space-x-1.5 overflow-x-auto pb-2 scrollbar-none mb-3 text-xs font-semibold" id="deity-tabs-container">
+                <button onclick="selectDevotionalTab('LAKSHMI')" id="tab-btn-LAKSHMI" class="px-3 py-1.5 rounded-xl transition flex items-center space-x-1 shrink-0 bg-white hover:bg-amber-100/60 text-slate-700 border border-amber-200">
+                    <span>🌸</span><span>Goddess Lakshmi</span>
+                </button>
+                <button onclick="selectDevotionalTab('VENKATESWARA')" id="tab-btn-VENKATESWARA" class="px-3 py-1.5 rounded-xl transition flex items-center space-x-1 shrink-0 bg-white hover:bg-amber-100/60 text-slate-700 border border-amber-200">
+                    <span>🪷</span><span>Lord Venkateswara</span>
+                </button>
+                <button onclick="selectDevotionalTab('KUBERA')" id="tab-btn-KUBERA" class="px-3 py-1.5 rounded-xl transition flex items-center space-x-1 shrink-0 bg-white hover:bg-amber-100/60 text-slate-700 border border-amber-200">
+                    <span>🪙</span><span>Lord Kubera</span>
+                </button>
+                <button onclick="selectDevotionalTab('SAIBABA')" id="tab-btn-SAIBABA" class="px-3 py-1.5 rounded-xl transition flex items-center space-x-1 shrink-0 bg-white hover:bg-amber-100/60 text-slate-700 border border-amber-200">
+                    <span>🧡</span><span>Sathya Sai Baba</span>
+                </button>
+                <button onclick="selectDevotionalTab('HANUMAN')" id="tab-btn-HANUMAN" class="px-3 py-1.5 rounded-xl transition flex items-center space-x-1 shrink-0 bg-white hover:bg-amber-100/60 text-slate-700 border border-amber-200">
+                    <span>🚩</span><span>Lord Hanuman</span>
+                </button>
+                <button onclick="selectDevotionalTab('GANESHA')" id="tab-btn-GANESHA" class="px-3 py-1.5 rounded-xl transition flex items-center space-x-1 shrink-0 bg-white hover:bg-amber-100/60 text-slate-700 border border-amber-200">
+                    <span>🐘</span><span>Lord Ganesha</span>
+                </button>
+                <button onclick="selectDevotionalTab('VISHNU')" id="tab-btn-VISHNU" class="px-3 py-1.5 rounded-xl transition flex items-center space-x-1 shrink-0 bg-white hover:bg-amber-100/60 text-slate-700 border border-amber-200">
+                    <span>📿</span><span>Lord Vishnu</span>
+                </button>
+            </div>
+
+            <!-- Dynamic Mantra Card -->
+            <div id="devotional-card" class="bg-white rounded-2xl p-4 sm:p-5 border border-amber-200/90 shadow-xs space-y-4">
+                <!-- Populated dynamically via renderDevotionalCard() -->
+            </div>
+
+            <!-- Divine Principle Footer -->
+            <div class="mt-4 pt-3 border-t border-amber-200/70 flex flex-col sm:flex-row items-center justify-between text-[11px] text-amber-900/80 gap-2">
+                <span class="italic">"Duty is God, Work is Worship. Preserve capital, trade with righteousness."</span>
+                <span class="font-mono font-bold text-amber-800">ॐ शान्तिः शान्तिः शान्तिः</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Real-Time Trading & Desk Execution Toast (High-Elevation Header Clearance Z-Index 99999) -->
+    <div id="trading-toast" class="fixed right-4 md:right-8 max-w-sm sm:max-w-md w-full bg-slate-900/95 backdrop-blur-md text-white p-4 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center space-x-3 transition-all duration-300 transform -translate-y-6 opacity-0 pointer-events-none" style="top: 90px !important; z-index: 99999 !important;">
+        <div id="trading-toast-icon-wrapper" class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-sm flex-shrink-0 shadow-sm">
+            <i id="trading-toast-icon" class="fa-solid fa-bolt"></i>
+        </div>
+        <div class="flex-1 min-w-0 text-xs">
+            <div class="font-bold text-white text-[13px] truncate tracking-tight" id="trading-toast-title">Trade Dispatched</div>
+            <div class="text-slate-300 text-[11px] font-mono leading-snug mt-0.5" id="trading-toast-body">Order executed successfully.</div>
+        </div>
+        <button type="button" onclick="hideTradingToast()" class="text-slate-400 hover:text-white transition p-1.5 rounded-lg hover:bg-slate-800 cursor-pointer">
+            <i class="fa-solid fa-xmark text-xs"></i>
+        </button>
+    </div>
+
+    <!-- Auspicious Toast Notification Banner -->
+    <div id="devotional-toast" class="fixed bottom-6 right-6 z-50 max-w-md bg-amber-950 text-amber-100 px-4 py-3 rounded-2xl shadow-2xl border border-amber-400 flex items-center space-x-3 transition-all duration-300 transform translate-y-16 opacity-0 pointer-events-none">
+        <span class="text-xl">🔔</span>
+        <div class="text-xs">
+            <div class="font-bold text-white text-[13px]" id="toast-title">Auspicious Notification</div>
+            <div class="text-amber-200" id="toast-body">Temple Bell reverberates with positive energy.</div>
+        </div>
+    </div>
+
+    <!-- Clean Apple Footer -->
+    <footer class="py-4 px-6 border-t border-black/[0.04] bg-white text-center text-xs text-slate-400">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
+            <span class="text-slate-600 font-medium">
+                Vijay Sai's Dhan Algo &bull; Automated Indian Stock Derivatives Engine
+            </span>
+            <span>Connected to DhanHQ API &bull; Multi-Strategy Discipline</span>
+        </div>
+    </footer>
+
+    <script>
+        // Mobile Access & Remote Sharing Handlers
+        function openMobileAccessModal(initialTab = 'push') {
+            const modal = document.getElementById('mobile-access-modal');
+            if (modal) modal.classList.remove('hidden');
+            switchMobileModalTab(initialTab);
+            loadNotificationDevices();
+        }
+
+        function closeMobileAccessModal() {
+            const modal = document.getElementById('mobile-access-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function switchMobileModalTab(tab) {
+            const btnPush = document.getElementById('tab-btn-mobile-push');
+            const btnAccess = document.getElementById('tab-btn-mobile-access');
+            const panelPush = document.getElementById('panel-mobile-push');
+            const panelAccess = document.getElementById('panel-mobile-access');
+
+            if (tab === 'push') {
+                if (btnPush) btnPush.className = "flex-1 py-1.5 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 bg-white text-blue-700 shadow-2xs font-bold";
+                if (btnAccess) btnAccess.className = "flex-1 py-1.5 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 text-slate-600 hover:text-slate-900";
+                if (panelPush) panelPush.classList.remove('hidden');
+                if (panelAccess) panelAccess.classList.add('hidden');
+            } else {
+                if (btnAccess) btnAccess.className = "flex-1 py-1.5 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 bg-white text-blue-700 shadow-2xs font-bold";
+                if (btnPush) btnPush.className = "flex-1 py-1.5 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 text-slate-600 hover:text-slate-900";
+                if (panelAccess) panelAccess.classList.remove('hidden');
+                if (panelPush) panelPush.classList.add('hidden');
+            }
+        }
+
+        async function loadNotificationDevices() {
+            const container = document.getElementById('mobile-devices-list');
+            const countBadge = document.getElementById('mobile-devices-count');
+            const urlInput = document.getElementById('primary-push-sub-url');
+            const openLink = document.getElementById('btn-open-push-channel');
+            if (!container) return;
+
+            try {
+                const res = await fetch('/api/notifications/devices');
+                const data = await res.json();
+                if (data.success && data.devices) {
+                    if (countBadge) countBadge.innerText = data.devices.length;
+                    if (urlInput) urlInput.value = data.subscribe_url;
+                    if (openLink) openLink.href = data.subscribe_url;
+
+                    container.innerHTML = data.devices.map(d => `
+                        <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/90 flex items-center justify-between font-mono text-xs hover:bg-white transition">
+                            <div class="flex items-center space-x-2">
+                                <i class="fa-solid fa-mobile-screen-button ${d.is_primary ? 'text-blue-600' : 'text-emerald-600'}"></i>
+                                <div>
+                                    <div class="font-bold text-slate-900 flex items-center space-x-1.5">
+                                        <span>${d.name}</span>
+                                        ${d.is_primary ? '<span class="text-[9px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded font-sans font-bold">Master</span>' : ''}
+                                    </div>
+                                    <div class="text-[10px] text-slate-500 font-mono">Topic: ${d.topic}</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-1.5">
+                                <a href="${d.subscribe_url}" target="_blank" class="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] transition" title="Open Channel on Mobile">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                </a>
+                                ${!d.is_primary ? `
+                                    <button type="button" onclick="removeNotificationDevice('${d.id}')" class="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10px] transition cursor-pointer" title="Remove Device">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (err) {
+                console.error("Error loading notification devices:", err);
+            }
+        }
+
+        async function submitAddMobileDevice() {
+            const nameInput = document.getElementById('add-device-name');
+            const topicInput = document.getElementById('add-device-topic');
+            const statusMsg = document.getElementById('add-device-status-msg');
+            if (!nameInput) return;
+
+            const name = nameInput.value.trim();
+            const topic = topicInput ? topicInput.value.trim() : '';
+            if (!name) {
+                if (statusMsg) {
+                    statusMsg.className = "text-[11px] font-mono text-rose-600";
+                    statusMsg.innerText = "Please enter a mobile label / name.";
+                }
+                return;
+            }
+
+            try {
+                if (statusMsg) {
+                    statusMsg.className = "text-[11px] font-mono text-blue-600";
+                    statusMsg.innerText = "Registering device...";
+                }
+                const res = await fetch('/api/notifications/devices', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, topic: topic })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    if (statusMsg) {
+                        statusMsg.className = "text-[11px] font-mono text-emerald-600 font-bold";
+                        statusMsg.innerText = `✓ Added ${name}!`;
+                    }
+                    nameInput.value = '';
+                    if (topicInput) topicInput.value = '';
+                    await loadNotificationDevices();
+                } else {
+                    if (statusMsg) {
+                        statusMsg.className = "text-[11px] font-mono text-rose-600";
+                        statusMsg.innerText = data.error || "Failed to add device.";
+                    }
+                }
+            } catch (e) {
+                if (statusMsg) {
+                    statusMsg.className = "text-[11px] font-mono text-rose-600";
+                    statusMsg.innerText = "Network error: " + e.message;
+                }
+            }
+        }
+
+        async function removeNotificationDevice(deviceId) {
+            if (!confirm("Remove this mobile device from push notifications?")) return;
+            try {
+                const res = await fetch('/api/notifications/devices', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: deviceId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await loadNotificationDevices();
+                } else {
+                    alert(data.error || "Could not remove device.");
+                }
+            } catch (e) {
+                alert("Error removing device: " + e.message);
+            }
+        }
+
+        async function triggerBroadcastTest() {
+            const btn = document.getElementById('btn-broadcast-test');
+            const originalHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Broadcasting...';
+            }
+
+            try {
+                const res = await fetch('/api/notifications/broadcast', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: "⚡ Vijay Sai Dhan Algo Alert",
+                        message: "🔔 Multi-Mobile Verification: All paired devices active and receiving live signals!"
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`✅ Push alert successfully broadcasted to ${data.devices_tested || 1} mobile device(s)! Check your phones.`);
+                } else {
+                    alert("Notification notice: " + (data.error || "Broadcast completed"));
+                }
+            } catch (err) {
+                alert("Broadcast error: " + err.message);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            }
+        }
+
+        function copyMobileUrl() {
+            const input = document.getElementById('mobile-public-url-input');
+            const text = document.getElementById('copy-btn-text');
+            if (!input) return;
+            
+            navigator.clipboard.writeText(input.value).then(() => {
+                if (text) text.innerText = "Copied! ✓";
+                setTimeout(() => { if (text) text.innerText = "Copy"; }, 2000);
+            }).catch(() => {
+                input.select();
+                document.execCommand('copy');
+                if (text) text.innerText = "Copied! ✓";
+                setTimeout(() => { if (text) text.innerText = "Copy"; }, 2000);
+            });
+        }
+
+        function openDhanTokenModal() {
+            const modal = document.getElementById('dhan-token-modal');
+            const alertBox = document.getElementById('modal-dhan-alert');
+            if (alertBox) alertBox.classList.add('hidden');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeDhanTokenModal() {
+            const modal = document.getElementById('dhan-token-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function clearDhanTokenField() {
+            const tokenInput = document.getElementById('modal-dhan-access-token');
+            if (tokenInput) {
+                tokenInput.value = '';
+                tokenInput.focus();
+            }
+            const alertBox = document.getElementById('modal-dhan-alert');
+            if (alertBox) alertBox.className = "p-3 rounded-xl text-xs font-semibold hidden";
+        }
+
+        function validateTokenStructure() {
+            const tokenInput = document.getElementById('modal-dhan-access-token');
+            const alertBox = document.getElementById('modal-dhan-alert');
+            let token = tokenInput ? tokenInput.value.trim() : '';
+            token = token.replace(/^["']|["']$/g, '').replace(/[\r\n\s]/g, '');
+            if (!token) {
+                alertBox.className = "p-3 rounded-xl text-xs font-semibold hidden";
+                return;
+            }
+            const parts = token.split('.');
+            if (parts.length !== 3) {
+                alertBox.className = "p-3 rounded-xl text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-300 block";
+                alertBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1 text-amber-600"></i><strong>Malformed Token (${parts.length} sections found):</strong> A valid Dhan token has exactly 3 parts separated by dots (<code>header.payload.signature</code>). Two tokens may have been pasted together. Click <strong>'Clear & Re-Paste'</strong> to paste cleanly.`;
+            } else {
+                alertBox.className = "p-3 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 block";
+                alertBox.innerHTML = `<i class="fa-solid fa-check mr-1 text-emerald-600"></i><strong>Valid Format:</strong> 3-part Dhan JWT token recognized. Click 'Verify, Save Token & Enter Mode' to authenticate.`;
+            }
+        }
+
+        async function submitDhanToken() {
+            const clientIdInput = document.getElementById('modal-dhan-client-id');
+            const tokenInput = document.getElementById('modal-dhan-access-token');
+            const btn = document.getElementById('btn-submit-dhan-token');
+            const alertBox = document.getElementById('modal-dhan-alert');
+            const modeEl = document.querySelector('input[name="modal_trading_mode"]:checked');
+            const tradingMode = modeEl ? modeEl.value : 'PAPER';
+            const persistCheck = document.getElementById('modal-dhan-persist');
+            const persist = persistCheck ? persistCheck.checked : true;
+
+            let clientId = clientIdInput ? clientIdInput.value.trim() : '';
+            let token = tokenInput ? tokenInput.value.trim() : '';
+
+            // Clean any accidental quotes, spaces, or linebreaks from copy-paste
+            token = token.replace(/^["']|["']$/g, '').replace(/[\r\n\s]/g, '');
+            clientId = clientId.replace(/^["']|["']$/g, '').replace(/[\r\n\s]/g, '');
+
+            if (!token) {
+                alertBox.className = "p-3 rounded-xl text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200 block";
+                alertBox.innerText = "Please paste your Dhan access token (copied from web.dhan.co -> DhanHQ Trading APIs).";
+                return;
+            }
+
+            const parts = token.split('.');
+            if (parts.length !== 3) {
+                alertBox.className = "p-3 rounded-xl text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200 block";
+                alertBox.innerHTML = `✗ <strong>Malformed Token (${parts.length} sections found):</strong> A valid Dhan token has exactly 3 sections. Click <strong>'Clear & Re-Paste'</strong> above and paste your freshly copied token.`;
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i> Verifying with DhanHQ...`;
+            alertBox.className = "p-3 rounded-xl text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200 block";
+            alertBox.innerHTML = `<i class="fa-solid fa-satellite-dish mr-1 text-blue-600 animate-pulse"></i> Handshaking with DhanHQ API servers...`;
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+            try {
+                const res = await fetch('/api/update-dhan-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    signal: controller.signal,
+                    body: JSON.stringify({ 
+                        client_id: clientId, 
+                        access_token: token,
+                        trading_mode: tradingMode,
+                        persist: persist
+                    })
+                });
+                clearTimeout(timeoutId);
+                const data = await res.json();
+                if (data.success) {
+                    alertBox.className = "p-3 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 block";
+                    alertBox.innerHTML = `✓ ${data.message} • Real Cash: ₹${Number(data.cash_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+                    syncDhanFunds();
+                    setTimeout(() => {
+                        closeDhanTokenModal();
+                        window.location.reload();
+                    }, 1200);
+                } else {
+                    alertBox.className = "p-3 rounded-xl text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200 block";
+                    alertBox.innerText = `✗ ${data.message || 'Session verification failed'}`;
+                }
+            } catch (e) {
+                clearTimeout(timeoutId);
+                alertBox.className = "p-3 rounded-xl text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200 block";
+                if (e.name === 'AbortError') {
+                    alertBox.innerText = "Verification request timed out after 10s. Please check network connection and retry.";
+                } else {
+                    alertBox.innerText = "Network error connecting to Dhan API: " + (e.message || e);
+                }
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-link text-xs"></i> <span>Verify, Save Token & Enter Mode</span>`;
+            }
+        }
+
+        async function syncDhanFunds(btnEl = null) {
+            const icon = document.getElementById('nav-funds-sync-icon');
+            if (icon) icon.classList.add('fa-spin');
+            try {
+                const res = await fetch('/api/funds');
+                const data = await res.json();
+                
+                // Update Dhan Badge
+                const badge = document.getElementById('nav-dhan-badge');
+                const dot = document.getElementById('nav-dhan-dot');
+                const text = document.getElementById('nav-dhan-text');
+                const cashEl = document.getElementById('nav-dhan-cash');
+
+                if (data.is_connected) {
+                    if (badge) {
+                        badge.className = "text-[10px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 hover:border-emerald-300 transition flex items-center space-x-1.5 shadow-2xs";
+                    }
+                    if (dot) {
+                        dot.className = "w-1.5 h-1.5 rounded-full bg-emerald-500";
+                    }
+                    if (text) {
+                        text.innerText = "Dhan Connected";
+                    }
+                    if (cashEl) {
+                        cashEl.innerText = `₹${data.real_cash_balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    }
+                } else {
+                    if (badge) {
+                        badge.className = "text-[10px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider font-mono bg-amber-50 text-amber-700 border border-amber-300 hover:border-amber-400 transition flex items-center space-x-1.5 shadow-2xs cursor-pointer";
+                    }
+                    if (dot) {
+                        dot.className = "w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse";
+                    }
+                    if (text) {
+                        text.innerText = "Renew Session";
+                    }
+                    if (cashEl) {
+                        cashEl.innerText = "Expired (Click)";
+                    }
+                }
+
+                // Update dashboard elements if present
+                if (typeof updateFundsUI === 'function') {
+                    updateFundsUI(data);
+                }
+            } catch (e) {
+                console.error("Funds sync error:", e);
+            } finally {
+                if (icon) icon.classList.remove('fa-spin');
+            }
+        }
+
+        // Auto sync funds on load
+        document.addEventListener('DOMContentLoaded', () => {
+            syncDhanFunds();
+        });
+
+        async function clearSystemCache(btn = null) {
+            const icon = document.getElementById('clear-cache-icon');
+            if (icon) icon.classList.add('fa-spin');
+            try {
+                const res = await fetch('/api/clear-cache', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    if (typeof showTradingToast === 'function') {
+                        showTradingToast("Cache Cleared", data.message, "success");
+                    } else {
+                        alert(data.message);
+                    }
+                }
+            } catch (e) {
+                console.error("Cache clear error:", e);
+            } finally {
+                if (icon) setTimeout(() => icon.classList.remove('fa-spin'), 600);
+            }
+        }
+
+        async function triggerQuickPush() {
+            try {
+                const res = await fetch('/api/send-push-alert', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: "⚡ Vijay Sai's Dhan Algo Alert",
+                        message: "Live connection verified! Order flow & execution tracking active.",
+                        priority: "high"
+                    })
+                });
+                const data = await res.json();
+                alert(data.message || 'Push alert broadcasted to your paired mobile phones!');
+            } catch (e) {
+                alert('Notification error: ' + e);
+            }
+        }
+
+        // ==========================================
+        // SACRED VEDIC DEVOTIONAL & TEMPLE BELL SYSTEM
+        // ==========================================
+        let audioCtx = null;
+        function getDevotionalAudioContext() {
+            if (!audioCtx) {
+                const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtxClass) {
+                    audioCtx = new AudioCtxClass();
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        // Web Audio API Indian Bronze Temple Bell Synthesizer (Ghanta Nada)
+        function ringTempleBell(userInitiated = false) {
+            try {
+                const ctx = getDevotionalAudioContext();
+                if (!ctx) return;
+                const now = ctx.currentTime;
+                
+                // Authentic resonant bronze bell harmonic profile
+                const partials = [
+                    { freq: 528, gain: 0.40, decay: 4.0 },  // 528 Hz Miraculous Om Fundamental
+                    { freq: 1056, gain: 0.30, decay: 3.2 }, // Octave partial
+                    { freq: 1450, gain: 0.18, decay: 2.5 }, // Metallic bell tier
+                    { freq: 2112, gain: 0.12, decay: 1.8 }, // Bronze inharmonic
+                    { freq: 2750, gain: 0.08, decay: 1.2 }  // High shimmer
+                ];
+
+                const masterGain = ctx.createGain();
+                masterGain.gain.setValueAtTime(0.65, now);
+                masterGain.connect(ctx.destination);
+
+                partials.forEach(p => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(p.freq, now);
+                    // Gentle micro-pitch bend on strike
+                    osc.frequency.exponentialRampToValueAtTime(p.freq * 0.998, now + p.decay);
+
+                    gain.gain.setValueAtTime(0.0001, now);
+                    gain.gain.linearRampToValueAtTime(p.gain, now + 0.012); // Crisp clapper impact
+                    gain.gain.exponentialRampToValueAtTime(0.00001, now + p.decay);
+
+                    osc.connect(gain);
+                    gain.connect(masterGain);
+
+                    osc.start(now);
+                    osc.stop(now + p.decay + 0.1);
+                });
+
+                // Visual button ripple
+                const bellBtn = document.getElementById('btn-temple-bell');
+                if (bellBtn) {
+                    bellBtn.classList.add('ring-2', 'ring-amber-400', 'scale-105');
+                    setTimeout(() => bellBtn.classList.remove('ring-2', 'ring-amber-400', 'scale-105'), 1000);
+                }
+
+                if (userInitiated) {
+                    showDevotionalToast("🔔 Temple Bell reverberates with positive energy & divine focus.", "Auspicious Ghanta Nada");
+                }
+            } catch (e) {
+                console.warn("Temple bell audio synthesis error:", e);
+            }
+        }
+
+        // Meditative Cosmic Om / Tanpura Drone Synthesizer
+        let droneOsc1 = null, droneOsc2 = null, droneGain = null;
+        let isDronePlaying = false;
+
+        function toggleDrone() {
+            try {
+                const ctx = getDevotionalAudioContext();
+                if (!ctx) return;
+                const btn = document.getElementById('btn-drone-toggle');
+
+                if (isDronePlaying) {
+                    if (droneGain) {
+                        droneGain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 1.2);
+                        setTimeout(() => {
+                            try { if (droneOsc1) droneOsc1.stop(); if (droneOsc2) droneOsc2.stop(); } catch(e){}
+                            isDronePlaying = false;
+                            if (btn) btn.innerHTML = `<i class="fa-solid fa-play text-[11px] text-amber-600 mr-1"></i><span>Play Om Drone</span>`;
+                        }, 1200);
+                    }
+                } else {
+                    const now = ctx.currentTime;
+                    droneGain = ctx.createGain();
+                    droneGain.gain.setValueAtTime(0.0001, now);
+                    droneGain.gain.linearRampToValueAtTime(0.12, now + 2.0);
+
+                    droneOsc1 = ctx.createOscillator();
+                    droneOsc2 = ctx.createOscillator();
+
+                    // 136.1 Hz Cosmic Om fundamental (Sadja) + 204.15 Hz (Panchama fifth)
+                    droneOsc1.type = 'sawtooth';
+                    droneOsc1.frequency.setValueAtTime(136.1, now);
+                    
+                    droneOsc2.type = 'sine';
+                    droneOsc2.frequency.setValueAtTime(204.15, now);
+
+                    const filter = ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(420, now);
+
+                    droneOsc1.connect(filter);
+                    droneOsc2.connect(filter);
+                    filter.connect(droneGain);
+                    droneGain.connect(ctx.destination);
+
+                    droneOsc1.start(now);
+                    droneOsc2.start(now);
+                    isDronePlaying = true;
+                    if (btn) btn.innerHTML = `<i class="fa-solid fa-stop text-[11px] text-rose-600 mr-1"></i><span>Stop Om Drone</span>`;
+                    showDevotionalToast("🕉️ Meditative Om Drone playing. Immerse in calm focus.", "Cosmic Harmony Active");
+                }
+            } catch (e) {
+                console.warn("Drone audio error:", e);
+            }
+        }
+
+        // Daily Devotional Deity & Vedic Mantra Encyclopedia
+        const DEVOTIONAL_DATA = {
+            'LAKSHMI': {
+                name: "Goddess Sri Mahalakshmi Devi",
+                day: "Friday (Shukravara)",
+                icon: "🌸",
+                tagline: "Supreme Bestower of Dhana, Dhanya, Saubhagya & Infinite Abundance",
+                title: "Sri Mahalakshmi Sahasranama & Kanakadhara Stotram",
+                sanskrit: `ॐ श्रीं ह्रीं श्रीं कमले कमलालये प्रसीद प्रसीद ।\nॐ श्रीं ह्रीं श्रीं महालक्ष्म्यै नमः ॥\n\nनमस्तेऽस्तु महामाये श्रीपीठे सुरपूजिते ।\nशङ्खचक्रगदाहस्ते महालक्ष्मि नमोऽस्तु ते ॥`,
+                transliteration: "Om Shreem Hreem Shreem Kamale Kamalalaye Praseeda Praseeda |\nOm Shreem Hreem Shreem Mahalakshmyai Namah ||\nNamastestu Mahamaye Shreepithe Surapoojite |\nShankhachakragadahaste Mahalakshmi Namostu Te ||",
+                meaning: "Salutations to Supreme Mother Mahalakshmi, who resides in the pure lotus of divine consciousness, bestower of abundance, beauty, and grace, holder of divine conch, discus, and mace.",
+                discipline: "Dhana Akarshana (Attraction of True Wealth): Wealth is attracted through clean intention, calmness, and rigorous discipline. Never enter trades out of greed or revenge; accept profits with gratitude and protect your principal."
+            },
+            'VENKATESWARA': {
+                name: "Lord Sri Venkateswara Swamy (Tirupati Balaji)",
+                day: "Saturday (Shanivara) & Sunday",
+                icon: "🪷",
+                tagline: "Kaliyuga Varada • Lord of the Seven Hills & Sovereign Protector",
+                title: "Sri Venkateswara Suprabhatam & Govinda Namavali",
+                sanskrit: `कौसल्या सुप्रजा राम पूर्वा सन्ध्या प्रवर्तते ।\nउत्तिष्ठ नरशार्दूल कर्तव्यं दैवं आह्निकम् ॥\n\nश्रियः कान्ताय कल्याणनिधये निधयेऽर्थिनाम् ।\nश्रीवेङ्कटनिवासाय श्रीनिवासाय मङ्गलम् ॥\nगोविन्दा हरि गोविन्दा वेङ्कटरमणा गोविन्दा ॥`,
+                transliteration: "Kausalya Supraja Rama Poorva Sandhya Pravartate |\nUttishtha Narashardoola Kartavyam Daivam Aahnikam ||\nShriyah Kantaya Kalyananidhaye Nidhaye Arthinaam |\nShri Venkatanivasaya Shrinivasaya Mangalam ||\nGovinda Hari Govinda Venkataramana Govinda ||",
+                meaning: "The auspicious dawn awakens the divine self. All glory, auspiciousness, and refuge unto Lord Srinivasa, the reservoir of grace for all who surrender to His sovereign shelter.",
+                discipline: "Sovereign Calm & Nishkama Karma: The market's fluctuations are governed by vast cosmic forces. Your sacred duty is only to execute your edge without attachment to outcome. Stay completely calm during chop."
+            },
+            'KUBERA': {
+                name: "Lord Sri Kubera Swamy",
+                day: "Thursday (Guruvara)",
+                icon: "🪙",
+                tagline: "Guardian of the North • Divine Treasurer & Lord of Navanidhi (Nine Treasuries)",
+                title: "Sri Kubera Dhana Prapti & Lakshmi Kubera Mantra",
+                sanskrit: `ॐ यक्षाय कुबेराय वैश्रवणाय धनधान्याधिपतये ।\nधनधान्य समृद्धिं मे देहि दापय स्वाहा ॥\n\nॐ ह्रीं श्रीं क्रीं श्रीं कुबेराय अष्ट-लक्ष्मी मम गृहे धनं पूरय पूरय नमः ॥`,
+                transliteration: "Om Yakshaya Kuberaya Vaishravanaya Dhanadhanyadhipataye |\nDhanadhanya Samriddhim Me Dehi Dapaya Swaha ||\nOm Hreem Shreem Kleem Shreem Kuberaya Ashta-Lakshmi Mama Grihe Dhanam Pooraya Pooraya Namah ||",
+                meaning: "Salutations to Lord Kubera, son of Vishrava, supreme guardian of divine riches and harvests. Bless our enterprise with sustained prosperity, abundance, and wise stewardship.",
+                discipline: "Treasury Protection (Capital Preservation): Kubera is a guardian, not a reckless gambler. Regard your trading capital as a sacred divine treasury. Enforce the 50% max capital rule and never over-leverage."
+            },
+            'SAIBABA': {
+                name: "Bhagawan Sri Sathya Sai Baba",
+                day: "Monday (Somavara) & Thursday (Guruvara)",
+                icon: "🧡",
+                tagline: "Avatar of Love • Teacher of Truth, Right Action, Peace & Non-Violence",
+                title: "Sri Sathya Sai Gayatri & Sarva Devata Prarthana",
+                sanskrit: `ॐ सायि ईश्वराय विद्महे सत्यदेवाय धीमहि ।\nतन्नः सर्वः प्रचोदयात् ॥\n\nप्रेम स्वरूपाय नमः । सर्वमङ्गलदायकाय नमः ।\nश्रद्धा च सबुरी — सर्वभूतेषु मैत्री ॥`,
+                transliteration: "Om Sayi Ishwaraya Vidmahe Satyadevaya Dheemahi |\nTannah Sarvah Prachodayat ||\nPrema Swaroopaya Namah | Sarvamangaladayakaya Namah |\nShraddha Cha Saburi — Sarvabhuteshu Maitree ||",
+                meaning: "We meditate upon the Divine Lord Sathya Sai, embodiment of Supreme Truth. May He illuminate our intellect and guide us on the path of Dharma, Love, and Patience.",
+                discipline: "Shraddha (Steadfast Faith) & Saburi (Supreme Patience): Wait patiently for the high-conviction setup. Do not chase price. Conquer anger and impatience; trade with pure heart, clear rules, and quiet peace."
+            },
+            'HANUMAN': {
+                name: "Lord Sri Hanuman Swamy (Sankat Mochan)",
+                day: "Tuesday (Mangalavara)",
+                icon: "🚩",
+                tagline: "Embodiment of Courage, Unshakable Strength & Total Devotion",
+                title: "Sri Hanuman Chalisa & Sankat Mochan Stotram",
+                sanskrit: `मनोजवं मारुततुल्यवेगं जितेन्द्रियं बुद्धिमतां वरिष्ठम् ।\nवातात्मजं वानरयूथमुख्यं श्रीरामदूतं शरणं प्रपद्ये ॥\n\nनासै रोग हरै सब पीरा । जपत निरंतर हनुमत बीरा ॥\nसंकट तें हनुमान छुड़ावै । मन क्रम बचन ध्यान जो लावै ॥`,
+                transliteration: "Manojavam Marutatulyavegam Jitendriyam Buddhimatam Varishtham |\nVatatmajam Vanarayuthamukhyam Shriramadutam Sharanam Prapadye ||\nNasai Roga Harai Saba Peera | Japata Nirantara Hanumata Beera ||\nSankata Te Hanuman Chhudavai | Mana Krama Bachana Dhyana Jo Lavai ||",
+                meaning: "I seek refuge in Lord Hanuman, swift as thought, faster than the wind, master of senses, foremost among the wise, who liberates the mind from fear and destroys all obstacles.",
+                discipline: "Courage to Cut Losses (Fearlessness): Emulate Hanuman's decisive, fearless action. When a stop loss is breached, cut the trade instantly with zero ego. Protect your mind and account from doubt."
+            },
+            'GANESHA': {
+                name: "Lord Sri Ganesha (Vighnaharta)",
+                day: "Wednesday (Budhavara)",
+                icon: "🐘",
+                tagline: "Lord of Beginnings, Intellect (Buddhi), Wisdom & Remover of Obstacles",
+                title: "Sri Ganesha Atharvashirsha & Vakratunda Mahakaya",
+                sanskrit: `वक्रतुण्ड महाकाय सूर्यकोटि समप्रभ ।\nनिर्विघ्नं कुरु मे देव सर्वकार्येषु सर्वदा ॥\n\nॐ गं गणपतये नमः ॥\nत्वमेव केवलं कर्तासि । त्वमेव केवलं धर्तासि । त्वमेव केवलं हर्तासि ।\nत्वमेव सर्वं खल्विदं ब्रह्मासि ॥`,
+                transliteration: "Vakratunda Mahakaya Suryakoti Samaprabha |\nNirvighnam Kuru Me Deva Sarvakaryeshu Sarvada ||\nOm Gam Ganapataye Namah ||\nTvameva Kevalam Kartasi | Tvameva Kevalam Dhartasi | Tvameva Kevalam Hartasi |\nTvameva Sarvam Khalvidam Brahmasi ||",
+                meaning: "O Lord Ganesha of radiant brilliance like ten million suns, remove all obstacles from our paths forever. You are the embodiment of discernment, beginning of wisdom, and protector of the pure.",
+                discipline: "Buddhi & Pre-Trade Risk Calculation: Ganesha represents intellect and strategic calculation. Never place an emotional impulse scalp. Confirm the 8-point checklist and calculate exact risk before entering."
+            },
+            'VISHNU': {
+                name: "Lord Sri Maha Vishnu (Cosmic Sustainer)",
+                day: "Sunday (Ravivara)",
+                icon: "📿",
+                tagline: "Preserver of Universal Harmony, Dharma & Supreme Cosmic Order",
+                title: "Sri Vishnu Sahasranamam & Shantakaram",
+                sanskrit: `शान्ताकारं भुजगशयनं पद्मनाभं सुरेशं\nविश्वाधारं गगनसदृशं मेघवर्णं शुभाङ्गम् ।\nलक्ष्मीकान्तं कमलनयनं योगिभिर्ध्यानगम्यं\nवन्दे विष्णुं भवभयहरं सर्वलोकैकनाथम् ॥\n\nॐ नमो भगवते वासुदेवाय ॥`,
+                transliteration: "Shantakaram Bhujagashayanam Padmanabham Suresham\nVishvadharam Gaganasadrisham Meghavarnam Shubhangam |\nLakshmikantam Kamalanayanam Yogibhirdhyanagamyam\nVande Vishnum Bhavabhayaharam Sarvalokaikanatham ||\n\nOm Namo Bhagavate Vasudevaya ||",
+                meaning: "Salutations to Lord Vishnu, of serene tranquil disposition, resting upon the infinite serpent of time, creator and sustainer of the universes, remover of all earthly fear.",
+                discipline: "Long-Term Macro Equilibrium: Markets have cycles of expansion and contraction. Stand above daily noise like Lord Vishnu. Maintain deep emotional equilibrium whether market is roaring or quiet."
+            }
+        };
+
+        const DAY_TO_DEITY = [
+            'VISHNU',       // 0: Sunday
+            'SAIBABA',      // 1: Monday
+            'HANUMAN',      // 2: Tuesday
+            'GANESHA',      // 3: Wednesday
+            'KUBERA',       // 4: Thursday
+            'LAKSHMI',      // 5: Friday
+            'VENKATESWARA'  // 6: Saturday
+        ];
+
+        let activeDeityKey = 'LAKSHMI';
+
+        function getTodayDeityKey() {
+            const dayIdx = new Date().getDay();
+            return DAY_TO_DEITY[dayIdx] || 'LAKSHMI';
+        }
+
+        function openDevotionalModal() {
+            const todayKey = getTodayDeityKey();
+            selectDevotionalTab(todayKey);
+            const modal = document.getElementById('devotional-mantra-modal');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeDevotionalModal() {
+            const modal = document.getElementById('devotional-mantra-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function openDevotionalDeity(deityKey) {
+            selectDevotionalTab(deityKey);
+            const modal = document.getElementById('devotional-mantra-modal');
+            if (modal) modal.classList.remove('hidden');
+            ringTempleBell();
+        }
+
+        function selectDevotionalTab(deityKey) {
+            if (!DEVOTIONAL_DATA[deityKey]) deityKey = 'LAKSHMI';
+            activeDeityKey = deityKey;
+
+            // Highlight Tab Button
+            const allKeys = Object.keys(DEVOTIONAL_DATA);
+            allKeys.forEach(k => {
+                const btn = document.getElementById(`tab-btn-${k}`);
+                if (btn) {
+                    if (k === deityKey) {
+                        btn.className = "px-3 py-1.5 rounded-xl transition flex items-center space-x-1 shrink-0 bg-amber-600 text-white font-bold shadow-2xs";
+                    } else {
+                        btn.className = "px-3 py-1.5 rounded-xl transition flex items-center space-x-1 shrink-0 bg-white hover:bg-amber-100/60 text-slate-700 border border-amber-200 font-semibold";
+                    }
+                }
+            });
+
+            renderDevotionalCard(deityKey);
+        }
+
+        function renderDevotionalCard(key) {
+            const data = DEVOTIONAL_DATA[key];
+            const card = document.getElementById('devotional-card');
+            if (!card || !data) return;
+
+            card.innerHTML = `
+                <div class="flex items-start justify-between pb-3 border-b border-amber-100">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-3xl sm:text-4xl filter drop-shadow-xs">${data.icon}</span>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <h4 class="text-base sm:text-lg font-black text-amber-950">${data.name}</h4>
+                                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-900 border border-amber-300 font-mono">${data.day}</span>
+                            </div>
+                            <p class="text-xs text-amber-800 font-medium">${data.tagline}</p>
+                        </div>
+                    </div>
+                    <button onclick="ringTempleBell(true)" class="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs transition" title="Chime Bell for ${data.name}">
+                        🔔
+                    </button>
+                </div>
+
+                <!-- Sacred Title -->
+                <div class="text-xs font-bold text-amber-900 font-mono flex items-center space-x-1.5 bg-amber-50/70 p-2 rounded-xl border border-amber-200/70">
+                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                    <span>${data.title}</span>
+                </div>
+
+                <!-- Sanskrit Devanagari Shloka -->
+                <div class="p-3.5 rounded-2xl bg-amber-50/50 border border-amber-200/60 text-center">
+                    <div class="text-sm sm:text-base font-serif font-black text-amber-950 leading-relaxed whitespace-pre-line tracking-wide">
+${data.sanskrit}
+                    </div>
+                </div>
+
+                <!-- English Transliteration & Meaning -->
+                <div class="space-y-2 text-xs">
+                    <div class="text-[11px] font-mono text-amber-900/90 italic bg-slate-50 p-2.5 rounded-xl border border-slate-200 leading-relaxed whitespace-pre-line">
+${data.transliteration}
+                    </div>
+                    <div class="text-slate-700 leading-relaxed bg-white p-2.5 rounded-xl border border-amber-100">
+                        <strong class="text-amber-950">Divine Meaning:</strong> ${data.meaning}
+                    </div>
+                </div>
+
+                <!-- Spiritual Discipline for Trading -->
+                <div class="p-3 rounded-2xl bg-gradient-to-r from-orange-50 via-amber-50 to-yellow-50 border border-amber-300/90 text-xs shadow-2xs">
+                    <div class="flex items-center space-x-1.5 font-bold text-amber-950 mb-1 font-mono uppercase text-[11px]">
+                        <span>🛡️</span>
+                        <span>Spiritual Discipline For Vijay Sai's Trading:</span>
+                    </div>
+                    <p class="text-amber-900 leading-relaxed">
+                        ${data.discipline}
+                    </p>
+                </div>
+            `;
+        }
+
+        // Real-Time Trading & Execution Toast Display (Zero-Blocking)
+        function showTradingToast(title, message, type = 'success') {
+            const toast = document.getElementById('trading-toast');
+            const titleEl = document.getElementById('trading-toast-title');
+            const bodyEl = document.getElementById('trading-toast-body');
+            const iconWrapper = document.getElementById('trading-toast-icon-wrapper');
+            const icon = document.getElementById('trading-toast-icon');
+            if (!toast) return;
+
+            if (titleEl) titleEl.innerText = title;
+            if (bodyEl) bodyEl.innerText = message;
+
+            if (type === 'success') {
+                if (iconWrapper) iconWrapper.className = "w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-sm flex-shrink-0";
+                if (icon) icon.className = "fa-solid fa-bolt";
+            } else if (type === 'error') {
+                if (iconWrapper) iconWrapper.className = "w-8 h-8 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center text-sm flex-shrink-0";
+                if (icon) icon.className = "fa-solid fa-triangle-exclamation";
+            } else if (type === 'warning') {
+                if (iconWrapper) iconWrapper.className = "w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center text-sm flex-shrink-0";
+                if (icon) icon.className = "fa-solid fa-circle-exclamation";
+            } else {
+                if (iconWrapper) iconWrapper.className = "w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-sm flex-shrink-0";
+                if (icon) icon.className = "fa-solid fa-info";
+            }
+
+            toast.classList.remove('-translate-y-12', '-translate-y-6', 'opacity-0', 'pointer-events-none');
+            clearTimeout(window.__tradingToastTimer);
+            window.__tradingToastTimer = setTimeout(() => {
+                hideTradingToast();
+            }, 4500);
+        }
+
+        function hideTradingToast() {
+            const toast = document.getElementById('trading-toast');
+            if (toast) toast.classList.add('-translate-y-6', 'opacity-0', 'pointer-events-none');
+        }
+
+        // Auspicious Toast Display
+        function showDevotionalToast(message, title = "Auspicious Notification") {
+            const toast = document.getElementById('devotional-toast');
+            const titleEl = document.getElementById('toast-title');
+            const bodyEl = document.getElementById('toast-body');
+            if (!toast) return;
+
+            if (titleEl) titleEl.innerText = title;
+            if (bodyEl) bodyEl.innerText = message;
+
+            toast.classList.remove('translate-y-16', 'opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('translate-y-16', 'opacity-0', 'pointer-events-none');
+            }, 4500);
+        }
+
+        // ==========================================
+        // CONTINUOUS SACRED CHANTS BACKGROUND AUDIO SYSTEM
+        // ==========================================
+        const SACRED_AUDIO_TRACKS = {
+            'GANESHA': {
+                name: "Sri Ganesha Atharvashirsha",
+                badge: "🐘 1. Sri Ganesha Atharvashirsha (Beginning)",
+                url: "https://archive.org/download/GanapatiAtharvashirsha/GanapatiAtharvashirsha.mp3"
+            },
+            'LAKSHMI': {
+                name: "Sri Mahalakshmi Sthuthi & Kanakadhara",
+                badge: "🌸 2. Sri Mahalakshmi Sthuthi & Kanakadhara",
+                url: "https://archive.org/download/MahalakshmiVrataKathasSlokas2/34%20Sri%20Ashtalakshmi%20Sthuthi.mp3"
+            },
+            'HANUMAN': {
+                name: "Sri Hanuman Chalisa (Sankat Mochan)",
+                badge: "🚩 3. Sri Hanuman Chalisa (Sankat Mochan)",
+                url: "https://archive.org/download/hanuman-chalisa_202405/HanumanChalisa.mp3"
+            },
+            'KUBERA': {
+                name: "Sri Kubera Dhana Prapti Mantra",
+                badge: "🪙 4. Sri Kubera Dhana Prapti Mantra",
+                url: "https://archive.org/download/kuber-mantra/Kuber%20Mantra.mp3"
+            },
+            'SAIBABA': {
+                name: "Bhagawan Sri Sathya Sai Bhajan & Gayatri",
+                badge: "🧡 5. Bhagawan Sri Sathya Sai Bhajan & Gayatri",
+                url: "https://archive.org/download/SathyaSaiBabaBhajans/01SaiBaba-01-PremaMuditha.mp3"
+            },
+            'VENKATESWARA': {
+                name: "Sri Venkateswara Suprabhatam (Balaji)",
+                badge: "🪷 6. Sri Venkateswara Suprabhatam (Balaji)",
+                url: "https://archive.org/download/SriVenkateswaraSuprabhatam/SriVenkateswaraSuprabhatam.mp3"
+            },
+            'VISHNU': {
+                name: "Sri Vishnu Sahasranamam (M.S. Subbulakshmi)",
+                badge: "📿 7. Sri Vishnu Sahasranamam (M.S. Subbulakshmi)",
+                url: "https://archive.org/download/arrvisa/Vishnu%20Sahasranamam%20MS%20Subbulakshmi%20Full%20Version%20ORIGINAL.mp3"
+            }
+        };
+
+        let currentChantKey = 'GANESHA';
+        let isChantAudioPlaying = false;
+
+        function getSacredAudioEl() {
+            return document.getElementById('sacred-background-audio');
+        }
+
+        function playDeityChant(deityKey) {
+            if (!SACRED_AUDIO_TRACKS[deityKey]) deityKey = 'GANESHA';
+            currentChantKey = deityKey;
+
+            // Sync Dropdown & Badge
+            const sel = document.getElementById('bg-chant-select');
+            if (sel) sel.value = deityKey;
+
+            const badge = document.getElementById('bg-chant-current-badge');
+            if (badge) badge.innerText = SACRED_AUDIO_TRACKS[deityKey].badge;
+
+            // Chime Temple Bell softly when switching
+            ringTempleBell();
+
+            // Load and play
+            const audio = getSacredAudioEl();
+            if (!audio) return;
+
+            audio.src = SACRED_AUDIO_TRACKS[deityKey].url;
+            audio.volume = parseFloat(document.getElementById('bg-audio-volume')?.value || 0.35);
+
+            audio.play().then(() => {
+                isChantAudioPlaying = true;
+                updateAudioPlayerUI(true);
+                showDevotionalToast(`🎶 Now Playing in Background: ${SACRED_AUDIO_TRACKS[deityKey].name}`, "Sacred Chants Active");
+            }).catch(e => {
+                console.warn("Autoplay policy or audio fetch:", e);
+                isChantAudioPlaying = false;
+                updateAudioPlayerUI(false);
+                showDevotionalToast(`Click 'Play Background Chants' to start ${SACRED_AUDIO_TRACKS[deityKey].name}`, "Tap to Listen");
+            });
+        }
+
+        function toggleSacredBackgroundAudio() {
+            const audio = getSacredAudioEl();
+            if (!audio) return;
+
+            if (isChantAudioPlaying) {
+                audio.pause();
+                isChantAudioPlaying = false;
+                updateAudioPlayerUI(false);
+            } else {
+                if (!audio.src || audio.src === '' || audio.src === window.location.href) {
+                    audio.src = SACRED_AUDIO_TRACKS[currentChantKey].url;
+                }
+                audio.volume = parseFloat(document.getElementById('bg-audio-volume')?.value || 0.35);
+                audio.play().then(() => {
+                    isChantAudioPlaying = true;
+                    updateAudioPlayerUI(true);
+                    showDevotionalToast(`🎶 Now Playing: ${SACRED_AUDIO_TRACKS[currentChantKey].name}`, "Sacred Vedic Audio Active");
+                }).catch(err => {
+                    console.error("Audio play error:", err);
+                });
+            }
+        }
+
+        function switchSacredChant(deityKey) {
+            playDeityChant(deityKey);
+        }
+
+        function setSacredAudioVolume(val) {
+            const audio = getSacredAudioEl();
+            if (audio) {
+                audio.volume = parseFloat(val);
+            }
+            const label = document.getElementById('bg-volume-label');
+            if (label) {
+                label.innerText = `${Math.round(val * 100)}%`;
+            }
+            try {
+                localStorage.setItem('sacredChantsVolume', val);
+            } catch(e){}
+        }
+
+        function updateAudioPlayerUI(isPlaying) {
+            const btn = document.getElementById('btn-bg-audio-play');
+            const icon = document.getElementById('bg-audio-play-icon');
+            const text = document.getElementById('bg-audio-play-text');
+            const dot = document.getElementById('bg-audio-indicator');
+
+            if (isPlaying) {
+                if (btn) btn.className = "px-3.5 py-1 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold transition shadow-2xs flex items-center space-x-1.5 active:scale-95";
+                if (icon) icon.className = "fa-solid fa-pause text-[11px]";
+                if (text) text.innerText = "Pause Chants";
+                if (dot) dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping";
+            } else {
+                if (btn) btn.className = "px-3.5 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold transition shadow-2xs flex items-center space-x-1.5 active:scale-95";
+                if (icon) icon.className = "fa-solid fa-play text-[11px]";
+                if (text) text.innerText = "Play Background Chants";
+                if (dot) dot.className = "w-2.5 h-2.5 rounded-full bg-slate-400";
+            }
+        }
+
+        // Auto Advance or Loop Next Track when finished
+        document.addEventListener('DOMContentLoaded', () => {
+            const audio = getSacredAudioEl();
+            if (audio) {
+                audio.addEventListener('ended', () => {
+                    // Advance to next chant in sequence
+                    const keys = Object.keys(SACRED_AUDIO_TRACKS);
+                    const idx = keys.indexOf(currentChantKey);
+                    const nextKey = keys[(idx + 1) % keys.length];
+                    playDeityChant(nextKey);
+                });
+            }
+
+            // Restore saved volume preference
+            try {
+                const savedVol = localStorage.getItem('sacredChantsVolume');
+                if (savedVol !== null) {
+                    const slider = document.getElementById('bg-audio-volume');
+                    if (slider) {
+                        slider.value = savedVol;
+                        setSacredAudioVolume(savedVol);
+                    }
+                }
+            } catch(e){}
+        });
+
+        // Automatic Market-Open Bell Chime (09:00 MCX & 09:15 NSE)
+        let mcxBellFiredToday = false;
+        let nseBellFiredToday = false;
+
+        function checkMarketOpenBellSchedule() {
+            try {
+                const now = new Date();
+                // Standardize to IST (UTC + 5:30)
+                const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+                const ist = new Date(utc + (5.5 * 3600000));
+
+                const h = ist.getHours();
+                const m = ist.getMinutes();
+                const s = ist.getSeconds();
+                const day = ist.getDay();
+
+                // Reset daily bell triggers at midnight IST
+                if (h === 0 && m === 0 && s <= 5) {
+                    mcxBellFiredToday = false;
+                    nseBellFiredToday = false;
+                }
+
+                // Check Monday - Friday trading days
+                if (day >= 1 && day <= 5) {
+                    // MCX Commodities Open: 09:00:00 IST
+                    if (h === 9 && m === 0 && s <= 2 && !mcxBellFiredToday) {
+                        mcxBellFiredToday = true;
+                        ringTempleBell();
+                        setTimeout(() => ringTempleBell(), 2000);
+                        showDevotionalToast("🔔 Auspicious MCX Market Open! Divine Blessings for Disciplined Commodity Scalping.", "MCX Commodity Market Open");
+                    }
+
+                    // NSE / BSE Equities Open: 09:15:00 IST
+                    if (h === 9 && m === 15 && s <= 2 && !nseBellFiredToday) {
+                        nseBellFiredToday = true;
+                        ringTempleBell();
+                        setTimeout(() => ringTempleBell(), 2000);
+                        showDevotionalToast("🔔 Auspicious NSE/BSE Market Open! Om Sri Ganeshaya Namah &bull; Flawless Execution & Risk Discipline.", "Indian Equity Market Open");
+                    }
+                }
+            } catch(e) {}
+        }
+        setInterval(checkMarketOpenBellSchedule, 1000);
+
+        // Initialize today's deity pill on navbar & modal
+        document.addEventListener('DOMContentLoaded', () => {
+            const todayKey = getTodayDeityKey();
+            const todayData = DEVOTIONAL_DATA[todayKey];
+            const navTitle = document.getElementById('nav-mantra-title');
+            if (navTitle && todayData) {
+                navTitle.innerText = `${todayData.icon} ${todayData.name.split(' ')[1] || todayData.name}`;
+            }
+            const modalTodayPill = document.getElementById('modal-today-pill');
+            if (modalTodayPill && todayData) {
+                modalTodayPill.innerText = `Today: ${todayData.day}`;
+            }
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

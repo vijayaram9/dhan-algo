@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-5">
+    <div class="term-card p-6">
+        <div class="flex items-center space-x-3 mb-4 pb-3 border-b border-[#1e293b]">
+            <div class="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
+                <i class="fa-solid fa-satellite-dish text-base"></i>
+            </div>
+            <div>
+                <h2 class="text-lg font-black text-white">TradingView Webhook Bridge Guide</h2>
+                <p class="text-xs text-slate-400">Trigger automated Dhan trades directly from your custom TradingView Pine Script alerts</p>
+            </div>
+        </div>
+
+        <div class="space-y-5 text-sm text-slate-300">
+            <!-- Endpoint URL -->
+            <div class="bg-[#0b1120] p-4 rounded-lg border border-[#1e293b]">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Your Local Webhook Endpoint URL</span>
+                <code class="text-blue-400 font-mono text-base font-bold select-all">http://localhost:5000/webhook</code>
+                <p class="text-xs text-slate-500 mt-2">To connect TradingView cloud alerts to your local machine, run <code class="bg-[#1e293b] px-1 py-0.5 rounded text-white">ngrok http 5000</code> or deploy on a VPS.</p>
+            </div>
+
+            <!-- Example 1: Buy Call Option -->
+            <div class="space-y-1.5">
+                <h3 class="font-bold text-white flex items-center space-x-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+                    <span>1. Buy Call Option (Bullish Entry)</span>
+                </h3>
+                <p class="text-xs text-slate-400">Paste this JSON into your TradingView Alert Message box:</p>
+                <pre class="bg-[#0b1120] text-emerald-300 p-3.5 rounded-lg border border-[#1e293b] text-xs font-mono overflow-x-auto">
+{
+  "secret": "dhan_algo_secure_token",
+  "action": "BUY_CE",
+  "symbol": "NIFTY",
+  "strike_offset": 0,
+  "comment": "Bullish 5m Supertrend Breakout"
+}</pre>
+            </div>
+
+            <!-- Example 2: Buy Put Option -->
+            <div class="space-y-1.5">
+                <h3 class="font-bold text-white flex items-center space-x-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span>
+                    <span>2. Buy Put Option (Bearish Entry)</span>
+                </h3>
+                <p class="text-xs text-slate-400">Paste this JSON into your TradingView Alert Message box:</p>
+                <pre class="bg-[#0b1120] text-rose-300 p-3.5 rounded-lg border border-[#1e293b] text-xs font-mono overflow-x-auto">
+{
+  "secret": "dhan_algo_secure_token",
+  "action": "BUY_PE",
+  "symbol": "NIFTY",
+  "strike_offset": 0,
+  "comment": "Bearish EMA Crossover Breakdown"
+}</pre>
+            </div>
+
+            <!-- Example 3: Exit / Square-Off -->
+            <div class="space-y-1.5">
+                <h3 class="font-bold text-white flex items-center space-x-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
+                    <span>3. Exit / Square-Off Position</span>
+                </h3>
+                <pre class="bg-[#0b1120] text-amber-300 p-3.5 rounded-lg border border-[#1e293b] text-xs font-mono overflow-x-auto">
+{
+  "secret": "dhan_algo_secure_token",
+  "action": "SQUARE_OFF",
+  "comment": "Target 2 Reached or Stop Loss Hit"
+}</pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

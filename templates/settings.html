@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <!-- Header Mission Card -->
+    <div class="apple-box p-6 bg-white border border-slate-200/90 shadow-sm">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div class="flex items-center space-x-3.5">
+                <span class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md">
+                    <i class="fa-solid fa-sliders"></i>
+                </span>
+                <div>
+                    <h2 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                        Trading Parameters &amp; Risk Safeguards
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Fine-tune institutional risk limits, DhanHQ execution mode, capital allocation, and automatic kill-switch triggers.
+                    </p>
+                </div>
+            </div>
+            <a href="/" class="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold font-mono transition flex items-center space-x-1.5 border border-slate-200">
+                <i class="fa-solid fa-arrow-left text-[11px]"></i>
+                <span>Back to Trading Desk</span>
+            </a>
+        </div>
+
+        {% if message %}
+        <div class="mt-4 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center space-x-2.5 shadow-sm animate-fade-in">
+            <i class="fa-solid fa-circle-check text-emerald-600 text-base"></i>
+            <span>{{ message }}</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <form method="POST" action="/settings" class="space-y-6 text-sm">
+        <!-- 1. Capital Allocation & Mode -->
+        <div class="apple-box p-6 bg-white border border-slate-200/90 shadow-sm space-y-5">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center space-x-2">
+                    <span class="p-2 rounded-xl bg-blue-50 text-blue-600 text-xs">
+                        <i class="fa-solid fa-wallet"></i>
+                    </span>
+                    <h3 class="font-black text-sm text-slate-900 uppercase tracking-wider font-mono">1. Capital Allocation &amp; Execution Mode</h3>
+                </div>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold">
+                    Safe 50% Exposure Clamped
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <!-- Account Capital Input & Quick Presets -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5 font-mono">
+                        Trading Capital Budget (₹)
+                    </label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 font-bold font-mono text-sm">₹</span>
+                        <input type="number" step="500" name="ACCOUNT_CAPITAL" id="setting-capital-input" value="{{ current_capital }}" 
+                            class="w-full pl-8 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-slate-900 font-mono font-bold text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition shadow-inner">
+                    </div>
+                    
+                    <!-- Quick Presets -->
+                    <div class="flex flex-wrap items-center gap-1.5 mt-2.5">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase font-mono mr-0.5">Quick Presets:</span>
+                        <button type="button" onclick="setCapitalPreset(10000)" class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700 border border-slate-200 transition">₹10k</button>
+                        <button type="button" onclick="setCapitalPreset(15000)" class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700 border border-slate-200 transition">₹15k</button>
+                        <button type="button" onclick="setCapitalPreset(25000)" class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700 border border-slate-200 transition">₹25k</button>
+                        <button type="button" onclick="setCapitalPreset(50000)" class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700 border border-slate-200 transition">₹50k</button>
+                        <button type="button" onclick="setCapitalPreset(100000)" class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700 border border-slate-200 transition">₹1L</button>
+                    </div>
+                    <span class="text-[11px] text-slate-500 mt-1.5 block">
+                        Clamps max trade risk so you never deploy more than 50% of your account capital on a single option scalp.
+                    </span>
+                </div>
+
+                <!-- Execution Mode -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5 font-mono">
+                        Trading Execution Mode
+                    </label>
+                    <select name="TRADING_MODE" class="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-slate-900 font-bold text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition shadow-inner">
+                        <option value="PAPER" {% if config.trading_mode == 'PAPER' %}selected{% endif %}>🧪 PAPER (Zero-risk simulated orders on live NSE ticks)</option>
+                        <option value="LIVE" {% if config.trading_mode == 'LIVE' %}selected{% endif %}>🔥 LIVE (Real capital orders routed directly to DhanHQ broker)</option>
+                    </select>
+                    <div class="mt-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-[11px] text-slate-600 flex items-start space-x-2">
+                        <i class="fa-solid fa-circle-info text-blue-500 mt-0.5 text-xs"></i>
+                        <span>In Paper Mode, orders execute against live exchange ticks without risking real money. Test any strategy stress-free.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Derivatives Cycle & SEBI Lot Sizing -->
+        <div class="apple-box p-6 bg-white border border-slate-200/90 shadow-sm space-y-5">
+            <div class="flex items-center space-x-2 pb-3 border-b border-slate-100">
+                <span class="p-2 rounded-xl bg-indigo-50 text-indigo-600 text-xs">
+                    <i class="fa-solid fa-cubes"></i>
+                </span>
+                <h3 class="font-black text-sm text-slate-900 uppercase tracking-wider font-mono">2. Derivatives Contract Cycle &amp; Sizing</h3>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5 font-mono">
+                        Options Expiry Selection Cycle
+                    </label>
+                    <select name="EXPIRY_TYPE" class="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-slate-900 font-bold text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition shadow-inner">
+                        <option value="CURRENT_WEEK" {% if config.expiry_type == 'CURRENT_WEEK' %}selected{% endif %}>CURRENT_WEEK (Nearest weekly expiry - High Gamma)</option>
+                        <option value="NEXT_WEEK" {% if config.expiry_type == 'NEXT_WEEK' %}selected{% endif %}>NEXT_WEEK (Next week expiry - Lower Theta Decay)</option>
+                        <option value="MONTHLY" {% if config.expiry_type == 'MONTHLY' %}selected{% endif %}>MONTHLY (Last Thursday of the month)</option>
+                    </select>
+                    <span class="text-[11px] text-slate-500 mt-1.5 block">
+                        Near weekly contracts provide maximum gamma velocity for 1-click scalps.
+                    </span>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5 font-mono">
+                        Contract Base Lot Sizing (Units)
+                    </label>
+                    <input type="number" name="LOT_SIZE" value="{{ config.lot_size }}" 
+                        class="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-slate-900 font-mono font-bold text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition shadow-inner">
+                    <span class="text-[11px] text-slate-500 mt-1.5 block">
+                        Auto-calibrated per SEBI specifications: NIFTY 50 = 65 units | BANK NIFTY = 30 units | SENSEX = 20 units.
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Risk Safeguards & Auto Kill-Switch -->
+        <div class="apple-box p-6 bg-white border border-slate-200/90 shadow-sm space-y-5">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center space-x-2">
+                    <span class="p-2 rounded-xl bg-rose-50 text-rose-600 text-xs">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </span>
+                    <h3 class="font-black text-sm text-slate-900 uppercase tracking-wider font-mono">3. RMS Risk Controls &amp; Auto Kill-Switch</h3>
+                </div>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold uppercase">
+                    Capital Preservation Brake
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <!-- Max Daily Loss -->
+                <div>
+                    <label class="block text-xs font-bold text-rose-800 mb-1.5 font-mono flex items-center justify-between">
+                        <span>Max Daily Loss (₹) - Auto Kill-Switch</span>
+                        <span class="text-[10px] text-rose-600 font-bold">Hard Circuit Breaker</span>
+                    </label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-rose-500 font-bold font-mono text-sm">₹</span>
+                        <input type="number" step="100" name="MAX_DAILY_LOSS" id="setting-loss-input" value="{{ config.max_daily_loss }}" 
+                            class="w-full pl-8 pr-4 py-2.5 bg-rose-50/70 hover:bg-rose-50 focus:bg-white border border-rose-200 rounded-xl text-rose-900 font-mono font-black text-sm focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-100 transition shadow-inner">
+                    </div>
+                    <!-- Quick Loss Presets -->
+                    <div class="flex flex-wrap items-center gap-1.5 mt-2">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase font-mono mr-0.5">Quick Presets:</span>
+                        <button type="button" onclick="setLossPreset(500)" class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition">₹500</button>
+                        <button type="button" onclick="setLossPreset(1000)" class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition">₹1,000</button>
+                        <button type="button" onclick="setLossPreset(1500)" class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition">₹1,500</button>
+                        <button type="button" onclick="setLossPreset(2500)" class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition">₹2,500</button>
+                    </div>
+                    <span class="text-[11px] text-rose-700 mt-1.5 block">
+                        If daily realized loss reaches this ceiling, the engine immediately locks execution, squares off trades, and cancels pending orders.
+                    </span>
+                </div>
+
+                <!-- Max Daily Trades Limit -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5 font-mono">
+                        Max Daily Trades Frequency Limit
+                    </label>
+                    <input type="number" name="MAX_TRADES_PER_DAY" value="{{ config.max_trades_per_day }}" 
+                        class="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-slate-900 font-mono font-bold text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition shadow-inner">
+                    <span class="text-[11px] text-slate-500 mt-1.5 block">
+                        Prevents overtrading. Institutional day traders recommend 3 to 5 trades maximum per day to preserve psychological capital.
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Institutional Profit Targets & Trailing Defenses -->
+        <div class="apple-box p-6 bg-white border border-slate-200/90 shadow-sm space-y-5">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center space-x-2">
+                    <span class="p-2 rounded-xl bg-emerald-50 text-emerald-600 text-xs">
+                        <i class="fa-solid fa-crosshairs"></i>
+                    </span>
+                    <h3 class="font-black text-sm text-slate-900 uppercase tracking-wider font-mono">4. Institutional R:R Targets &amp; Breakeven Locks</h3>
+                </div>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
+                    1:2.5 Asymmetrical Edge
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5 font-mono">
+                        Stop Loss (% of premium)
+                    </label>
+                    <div class="relative">
+                        <input type="number" step="0.5" name="SL_PERCENT" value="{{ config.sl_percent }}" 
+                            class="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-slate-900 font-mono font-bold text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition shadow-inner">
+                        <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 font-bold font-mono text-xs">%</span>
+                    </div>
+                    <span class="text-[10px] text-slate-500 mt-1 block">Institutional standard: 8% - 12%</span>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5 font-mono">
+                        Target (% of premium)
+                    </label>
+                    <div class="relative">
+                        <input type="number" step="0.5" name="TARGET_PERCENT" value="{{ config.target_percent }}" 
+                            class="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-slate-900 font-mono font-bold text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition shadow-inner">
+                        <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 font-bold font-mono text-xs">%</span>
+                    </div>
+                    <span class="text-[10px] text-slate-500 mt-1 block">Institutional 1:2.5 R:R: 25% - 35%</span>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5 font-mono">
+                        Dynamic Trailing Step (%)
+                    </label>
+                    <div class="relative">
+                        <input type="number" step="0.5" name="TRAILING_SL_PERCENT" value="{{ config.trailing_sl_percent }}" 
+                            class="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-slate-900 font-mono font-bold text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition shadow-inner">
+                        <span class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 font-bold font-mono text-xs">%</span>
+                    </div>
+                    <span class="text-[10px] text-slate-500 mt-1 block">Ratchets profit floor upward as option surges</span>
+                </div>
+            </div>
+
+            <!-- Safeguard Rules Summary Callout -->
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-1.5">
+                <div class="flex items-center space-x-1.5 font-bold text-slate-900 font-mono text-[11px]">
+                    <i class="fa-solid fa-trophy text-amber-500"></i>
+                    <span>WORLD-CLASS DAY TRADER SAFEGUARDS EMBEDDED IN ENGINE:</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 font-mono text-[10px]">
+                    <div class="p-2 rounded-lg bg-white border border-emerald-200 text-emerald-900">
+                        <strong>🛡️ Tier 1 Breakeven Lock:</strong> Once gain reaches +8 pts (Bank Nifty) or +5 pts (Nifty), stop moves to entry + 1.0 pt. 100% Risk-Free.
+                    </div>
+                    <div class="p-2 rounded-lg bg-white border border-blue-200 text-blue-900">
+                        <strong>🔒 Tier 2 Profit Lock:</strong> Once gain reaches +16 pts, +8 pts minimum profit is permanently locked in.
+                    </div>
+                    <div class="p-2 rounded-lg bg-white border border-indigo-200 text-indigo-900">
+                        <strong>🚀 Tier 3 Runner:</strong> Above +25 pts, dynamic trailing stop follows peak high watermark for maximum runner expansion.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sticky Save Button -->
+        <div class="flex items-center justify-between pt-2">
+            <span class="text-xs text-slate-500 font-mono">
+                Parameters take effect immediately across all live scanners and trade engines.
+            </span>
+            <button type="submit" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-md transition flex items-center space-x-2 text-sm font-sans cursor-pointer active:scale-95">
+                <i class="fa-solid fa-floppy-disk text-sm"></i>
+                <span>Save &amp; Apply Trading Parameters</span>
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function setCapitalPreset(amount) {
+    const input = document.getElementById('setting-capital-input');
+    if (input) {
+        input.value = amount;
+        input.classList.add('ring-4', 'ring-blue-200');
+        setTimeout(() => input.classList.remove('ring-4', 'ring-blue-200'), 400);
+    }
+}
+
+function setLossPreset(amount) {
+    const input = document.getElementById('setting-loss-input');
+    if (input) {
+        input.value = amount;
+        input.classList.add('ring-4', 'ring-rose-200');
+        setTimeout(() => input.classList.remove('ring-4', 'ring-rose-200'), 400);
+    }
+}
+</script>
+{% endblock %}

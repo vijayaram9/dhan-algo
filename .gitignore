@@ -1,0 +1,31 @@
+# Environment & Security
+.env
+.env.*
+*.key
+*.pem
+credentials.json
+
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# Python cache & compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Data, Logs & Binaries
+data/*.db
+data/paper_trading_state.json
+cloudflared.exe
+*.log
+*.sqlite
+*.sqlite3
+
+# OS files
+.DS_Store
+Thumbs.db

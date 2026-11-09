@@ -1,0 +1,783 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header with Segmented Navigation & Live Sync -->
+    <div class="apple-box p-5">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <div class="flex items-center space-x-2">
+                    <span class="p-2 rounded-xl bg-blue-50 text-blue-600 font-bold text-sm">
+                        <i class="fa-solid fa-book-bookmark"></i>
+                    </span>
+                    <h2 class="font-extrabold text-xl text-slate-900 tracking-tight">
+                        Trading Journal & Institutional Account Audit
+                    </h2>
+                </div>
+                <p class="text-xs text-slate-500 mt-1 pl-9">
+                    Audited trade executions, precise DhanHQ taxation impact, capital margin tracking, and mathematical expectancy analytics.
+                </p>
+            </div>
+
+            <!-- Segmented Tab Switcher & Actions -->
+            <div class="flex flex-wrap items-center gap-2">
+                <div class="p-1 bg-slate-100 rounded-xl flex items-center space-x-1 border border-slate-200/80">
+                    <button type="button" onclick="switchJournalTab('ledger')" id="tab-btn-ledger" 
+                        class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-900 bg-white shadow-sm transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-list-check text-blue-600"></i>
+                        <span>Trade Ledger</span>
+                    </button>
+                    <button type="button" onclick="switchJournalTab('insights')" id="tab-btn-insights" 
+                        class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-chart-pie text-indigo-600"></i>
+                        <span>Account Insights & Balances</span>
+                    </button>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <button type="button" onclick="confirmClearTrades()" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-2xs cursor-pointer" title="Reset paper trades & clear execution ledger">
+                        <i class="fa-solid fa-trash-can text-rose-600"></i>
+                        <span>Clear Paper Trades</span>
+                    </button>
+                    <button onclick="location.reload()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border border-slate-200">
+                        <i class="fa-solid fa-rotate text-blue-600"></i>
+                        <span>Sync</span>
+                    </button>
+                    <a href="/download-journal" class="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-sm" title="Export raw trades to CSV spreadsheet">
+                        <i class="fa-solid fa-file-excel"></i>
+                        <span>CSV</span>
+                    </a>
+                    <a href="/download-journal-pdf" target="_blank" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-sm" title="Download Executive PDF Performance Audit">
+                        <i class="fa-solid fa-file-pdf"></i>
+                        <span>Download PDF</span>
+                    </a>
+                    <button onclick="emailJournalPdf()" id="btn-email-journal-pdf" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-sm cursor-pointer" title="Email official PDF journal directly to vijayaram9@gmail.com">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        <span>Email PDF</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Open Position Telemetry (Multi-Trade Concurrent Portfolio HUD) -->
+    <div id="journal-multi-positions-section" class="apple-box p-5 border-2 border-blue-400 bg-gradient-to-r from-blue-50/40 via-white to-indigo-50/30 {% if not active_position and not active_positions %}hidden{% endif %} transition-all duration-300">
+        <!-- Portfolio Header Bar -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 mb-4 border-b border-blue-100">
+            <div class="flex items-center flex-wrap gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 uppercase tracking-wider">
+                    ACTIVE IN-FLIGHT PORTFOLIO
+                </span>
+                <span id="journal-multi-count-pill" class="px-2.5 py-0.5 rounded-full text-xs font-mono font-black bg-blue-100 text-blue-800 border border-blue-200">
+                    <span id="journal-multi-count-num">1</span> Active
+                </span>
+                <span id="journal-multi-paper-pill" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                    0 Paper
+                </span>
+                <span id="journal-multi-live-pill" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                    0 Live
+                </span>
+            </div>
+            <div class="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-end">
+                <div class="flex items-center space-x-1.5 font-mono text-xs">
+                    <span class="text-slate-500 font-sans font-medium">Portfolio Open P&L:</span>
+                    <strong id="journal-portfolio-pnl" class="text-lg font-black text-emerald-600">+₹0.00</strong>
+                </div>
+                <button type="button" onclick="squareOffAllJournalPos()" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black font-mono shadow-sm transition-all flex items-center space-x-1 active:scale-95 cursor-pointer">
+                    <i class="fa-solid fa-power-off text-[10px]"></i>
+                    <span>Square Off All</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Dynamic Multi-Position Cards Grid -->
+        <div id="journal-multi-positions-grid" class="space-y-4">
+            <!-- Position cards populated reactively by pollJournalTelemetry() -->
+        </div>
+    </div>
+
+    <!-- TAB 1: EXECUTED TRADES & TAX AUDIT LEDGER -->
+    <div id="section-ledger" class="space-y-6">
+        <!-- Account High-Contrast Summary Metric Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+            <div class="apple-box p-4 bg-white border border-slate-200/90 shadow-sm">
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Executions</span>
+                <div id="journal-total-trades" class="text-2xl font-black font-mono text-slate-900 mt-1">{{ stats.total_trades }}</div>
+                <div class="text-[11px] font-bold text-blue-600 mt-1 flex items-center space-x-1">
+                    <span id="journal-win-count" class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px]">{{ stats.win_count }}W</span>
+                    <span id="journal-loss-count" class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px]">{{ stats.loss_count }}L</span>
+                </div>
+            </div>
+
+            <div class="apple-box p-4 bg-white border border-slate-200/90 shadow-sm">
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Win Rate</span>
+                <div id="journal-win-rate" class="text-2xl font-black font-mono {% if stats.win_rate >= 50 %}text-emerald-600{% else %}text-slate-900{% endif %} mt-1">
+                    {{ "%.1f"|format(stats.win_rate) }}%
+                </div>
+                <div class="text-[11px] text-slate-500 mt-1 font-mono">Profit Factor: <strong id="journal-profit-factor" class="text-slate-800">{{ "%.2f"|format(stats.profit_factor) }}</strong></div>
+            </div>
+
+            <div class="apple-box p-4 bg-white border border-slate-200/90 shadow-sm">
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Gross Trading P&L</span>
+                <div id="journal-gross-pnl" class="text-2xl font-black font-mono {% if stats.gross_pnl >= 0 %}text-emerald-600{% else %}text-rose-600{% endif %} mt-1">
+                    {% if stats.gross_pnl >= 0 %}+{% endif %}₹{{ stats.gross_pnl|inr }}
+                </div>
+                <div class="text-[11px] text-slate-400 mt-1">Before Dhan fees & taxes</div>
+            </div>
+
+            <div class="apple-box p-4 bg-white border border-slate-200/90 shadow-sm">
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Taxes & Brokerage</span>
+                <div id="journal-taxes" class="text-2xl font-black font-mono text-amber-600 mt-1">
+                    -₹{{ stats.total_charges|inr_abs }}
+                </div>
+                <div class="text-[11px] text-slate-500 mt-1 truncate" title="Brokerage + STT + GST">
+                    Dhan: ₹{{ stats.total_brokerage|inr }} | STT: ₹{{ stats.total_stt|inr }}
+                </div>
+            </div>
+
+            <div class="apple-box p-4 {% if stats.net_takehome >= 0 %}bg-emerald-50/70 border-emerald-300{% else %}bg-rose-50/70 border-rose-300{% endif %} border shadow-sm">
+                <span class="text-[10px] font-bold {% if stats.net_takehome >= 0 %}text-emerald-800{% else %}text-rose-800{% endif %} uppercase tracking-wider block">Net Take-Home Capital</span>
+                <div id="journal-net-takehome" class="text-2xl font-black font-mono {% if stats.net_takehome >= 0 %}text-emerald-600{% else %}text-rose-600{% endif %} mt-1">
+                    {% if stats.net_takehome >= 0 %}+{% endif %}₹{{ stats.net_takehome|inr }}
+                </div>
+                <div class="text-[11px] {% if stats.net_takehome >= 0 %}text-emerald-700{% else %}text-rose-700{% endif %} font-bold mt-1">Realized Net Account Balance</div>
+            </div>
+        </div>
+
+        <!-- Historical Trades Table Card -->
+        <div class="apple-box overflow-hidden bg-white border border-slate-200 shadow-sm">
+            <div class="p-4 border-b border-slate-200/80 bg-slate-50/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                    <h3 class="font-extrabold text-sm text-slate-900 tracking-tight flex items-center space-x-2">
+                        <span>Historical Trade Execution Ledger</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-mono font-bold">DhanHQ Compliant</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Chronological trade-by-trade audit with precise entry/exit pricing, duration, and net realization.</p>
+                </div>
+                <div class="flex items-center space-x-1.5 text-xs font-mono">
+                    <button type="button" onclick="filterLedgerMode('ALL')" id="filter-btn-all" class="px-3 py-1 rounded-lg bg-blue-600 text-white font-bold transition shadow-sm">All Modes</button>
+                    <button type="button" onclick="filterLedgerMode('LIVE')" id="filter-btn-live" class="px-3 py-1 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">🇮🇳 Live Dhan</button>
+                    <button type="button" onclick="filterLedgerMode('PAPER')" id="filter-btn-paper" class="px-3 py-1 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">🧪 Paper Trades</button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs" id="journal-trades-table">
+                    <thead class="bg-slate-100/70 text-slate-600 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200">
+                        <tr>
+                            <th class="p-3.5">Contract & Mode</th>
+                            <th class="p-3.5">Timestamps</th>
+                            <th class="p-3.5">Duration</th>
+                            <th class="p-3.5">Capital & Execution</th>
+                            <th class="p-3.5">Gross P&L</th>
+                            <th class="p-3.5">Dhan Charges</th>
+                            <th class="p-3.5">Net Take-Home</th>
+                            <th class="p-3.5">Strategy Thesis & Exit Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 text-[11px] text-slate-700">
+                        {% for trade in trades %}
+                        <tr class="hover:bg-slate-50/80 transition trade-row" data-mode="{{ trade.mode|upper }}">
+                            <td class="p-3.5">
+                                <div class="flex items-center space-x-1.5">
+                                    <strong class="font-bold text-slate-900 text-xs">{{ trade.symbol }}</strong>
+                                    <span class="text-[9px] px-1.5 py-0.5 rounded font-black font-mono {% if trade.mode == 'LIVE' %}bg-rose-100 text-rose-700 border border-rose-200{% else %}bg-blue-100 text-blue-700 border border-blue-200{% endif %}">
+                                        {{ trade.mode }}
+                                    </span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 font-mono block mt-0.5">{{ trade.trade_date }} &bull; {{ trade.action }}</span>
+                            </td>
+                            <td class="p-3.5 font-mono text-[11px]">
+                                <div class="text-slate-800"><span class="text-slate-400">In:</span> {{ trade.order_executed_time }}</div>
+                                <div class="text-slate-500"><span class="text-slate-400">Out:</span> {{ trade.exit_time }}</div>
+                            </td>
+                            <td class="p-3.5 font-bold text-blue-600 font-mono">{{ trade.duration_str }}</td>
+                            <td class="p-3.5 font-mono">
+                                <div class="font-bold text-slate-900 text-xs">
+                                    ₹{{ trade.entry_price }} ➔ ₹{{ trade.exit_price }}
+                                </div>
+                                <div class="text-amber-700 text-[10px] font-bold">
+                                    Invested: ₹{{ (trade.entry_price * trade.quantity)|round(2) }} ({{ trade.quantity }} Qty)
+                                </div>
+                            </td>
+                            <td class="p-3.5 font-mono font-black text-xs {% if trade.gross_pnl >= 0 %}text-emerald-600{% else %}text-rose-600{% endif %}">
+                                {% if trade.gross_pnl >= 0 %}+{% endif %}₹{{ trade.gross_pnl|inr }}
+                            </td>
+                            <td class="p-3.5 font-mono text-slate-600">
+                                <div class="font-bold text-slate-800">₹{{ trade.total_charges }}</div>
+                                <div class="text-slate-400 text-[10px]">B: ₹{{ trade.brokerage }} | STT: ₹{{ trade.stt }}</div>
+                            </td>
+                            <td class="p-3.5 font-mono font-black text-sm {% if trade.net_pnl >= 0 %}text-emerald-600{% else %}text-rose-600{% endif %}">
+                                {% if trade.net_pnl >= 0 %}+{% endif %}₹{{ trade.net_pnl|inr }}
+                            </td>
+                            <td class="p-3.5 text-slate-600 text-[11px] max-w-xs">
+                                <div class="font-semibold text-slate-800">{{ trade.exit_reason }}</div>
+                                {% if trade.trade_rationale %}
+                                <div class="text-[10px] text-blue-700 font-medium bg-blue-50/70 p-1 rounded mt-1 border border-blue-100">
+                                    <strong class="text-blue-900">Why Taken:</strong> {{ trade.trade_rationale }}
+                                </div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center p-10 text-slate-400">
+                                <div class="max-w-sm mx-auto space-y-2">
+                                    <i class="fa-solid fa-folder-open text-3xl text-slate-300"></i>
+                                    <p class="font-bold text-slate-600 text-sm">No Executed Trades Logged Yet</p>
+                                    <p class="text-xs text-slate-400">Arm the bot on the Trading Desk or trigger an instant high-velocity scalp to populate this audit ledger.</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Live Dhan Orders Book (Direct from DhanHQ Broker Server) -->
+        {% if dhan_orders and dhan_orders|length > 0 %}
+        <div class="apple-box overflow-hidden bg-white border border-slate-200 shadow-sm">
+            <div class="p-3.5 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                <h3 class="font-bold text-xs uppercase tracking-wider text-rose-600 flex items-center space-x-1.5">
+                    <i class="fa-solid fa-satellite-dish text-emerald-500 animate-pulse"></i>
+                    <span>Direct DhanHQ Broker Order Book</span>
+                </h3>
+                <span class="text-xs text-slate-500 font-mono">Live DhanHQ Exchange Sync</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs font-mono">
+                    <thead class="bg-slate-100 text-slate-600 uppercase text-[9px] tracking-wider border-b border-slate-200">
+                        <tr>
+                            <th class="p-3">Order ID</th>
+                            <th class="p-3">Symbol</th>
+                            <th class="p-3">Type</th>
+                            <th class="p-3">Qty</th>
+                            <th class="p-3">Price</th>
+                            <th class="p-3">Status</th>
+                            <th class="p-3">Time</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 text-[11px] text-slate-700">
+                        {% for o in dhan_orders %}
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="p-3 text-slate-500">{{ o.orderId or o.order_id }}</td>
+                            <td class="p-3 font-bold text-slate-900">{{ o.tradingSymbol or o.trading_symbol }}</td>
+                            <td class="p-3"><span class="px-1.5 py-0.5 rounded font-black text-[9px] {% if (o.transactionType or o.transaction_type) == 'BUY' %}bg-emerald-100 text-emerald-800{% else %}bg-rose-100 text-rose-800{% endif %}">{{ o.transactionType or o.transaction_type }}</span></td>
+                            <td class="p-3 text-slate-900">{{ o.quantity }}</td>
+                            <td class="p-3 text-emerald-600 font-bold">₹{{ o.price or o.averageTradedPrice or 0.0 }}</td>
+                            <td class="p-3"><span class="px-1.5 py-0.5 rounded font-bold text-[9px] bg-slate-100 text-slate-700">{{ o.orderStatus or o.status }}</span></td>
+                            <td class="p-3 text-slate-500">{{ o.createTime or o.timestamp }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- TAB 2: REAL-TIME ACCOUNT INSIGHTS & BALANCE ANALYTICS -->
+    <div id="section-insights" class="hidden space-y-6">
+        <!-- Live Account Balances & Margin Telemetry -->
+        <div class="apple-box p-6 bg-white border border-slate-200 shadow-sm">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-4 mb-4 border-b border-slate-100">
+                <div>
+                    <h3 class="font-extrabold text-base text-slate-900 flex items-center space-x-2">
+                        <i class="fa-solid fa-wallet text-blue-600"></i>
+                        <span>Live Capital Allocation & Bank Limit Telemetry</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Real-time status of your Dhan wallet cash, paper budget buffer, and daily risk headroom.</p>
+                </div>
+                <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono text-xs font-bold flex items-center space-x-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>1000ms Live Refresh</span>
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="p-4 rounded-2xl bg-gradient-to-br from-blue-50/80 to-slate-50 border border-blue-100">
+                    <span class="text-xs font-bold text-blue-700 uppercase tracking-wider block">Dhan Wallet Available Cash</span>
+                    <div class="text-2xl font-black font-mono text-slate-900 mt-1" id="insight-real-cash">₹{{ stats.available_cash|inr }}</div>
+                    <span class="text-[11px] text-slate-500 mt-1 block">Live balance in your DhanHQ account</span>
+                </div>
+
+                <div class="p-4 rounded-2xl bg-gradient-to-br from-slate-50 to-indigo-50/50 border border-slate-200">
+                    <span class="text-xs font-bold text-slate-700 uppercase tracking-wider block">Simulated Paper Capital</span>
+                    <div class="text-2xl font-black font-mono text-slate-900 mt-1" id="insight-paper-cap">₹{{ stats.paper_capital|inr }}</div>
+                    <span class="text-[11px] text-slate-500 mt-1 block">Configured test risk budget</span>
+                </div>
+
+                <div class="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/80 to-teal-50/50 border border-emerald-200">
+                    <span class="text-xs font-bold text-emerald-700 uppercase tracking-wider block">Daily Risk Loss Headroom</span>
+                    <div class="text-2xl font-black font-mono text-emerald-700 mt-1" id="insight-loss-headroom">₹{{ stats.loss_headroom|inr }}</div>
+                    <span class="text-[11px] text-emerald-800/80 mt-1 block">Allowed before RMS Auto Kill-Switch (₹{{ stats.daily_loss_limit|inr }} limit)</span>
+                </div>
+
+                <div class="p-4 rounded-2xl bg-gradient-to-br from-amber-50/80 to-orange-50/40 border border-amber-200">
+                    <span class="text-xs font-bold text-amber-800 uppercase tracking-wider block">Active Capital in Play</span>
+                    <div class="text-2xl font-black font-mono text-amber-700 mt-1" id="insight-active-cap">
+                        {% if active_position %}₹{{ active_position.invested_capital|inr }}{% else %}₹0.00{% endif %}
+                    </div>
+                    <span class="text-[11px] text-amber-800/70 mt-1 block">
+                        {% if active_position %}100% Margin Allocated{% else %}Capital 100% Preserved in Cash{% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Risk Budget Progress Bar -->
+            <div class="mt-5 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="flex justify-between items-center text-xs font-bold mb-1.5">
+                    <span class="text-slate-700">Daily Risk Loss Consumption Meter</span>
+                    <span class="font-mono text-slate-900">
+                        ₹{{ (stats.daily_loss_limit - stats.loss_headroom)|round(2) }} used / ₹{{ stats.daily_loss_limit|inr }} limit
+                    </span>
+                </div>
+                {% set loss_pct = (((stats.daily_loss_limit - stats.loss_headroom) / stats.daily_loss_limit) * 100)|round(1) if stats.daily_loss_limit > 0 else 0 %}
+                <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                    <div class="h-2.5 rounded-full {% if loss_pct >= 80 %}bg-rose-500{% elif loss_pct >= 50 %}bg-amber-500{% else %}bg-emerald-500{% endif %} transition-all duration-500" 
+                        style="width: {{ [loss_pct, 100]|min }}%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DhanHQ Institutional Friction & Tax Impact Model -->
+        <div class="apple-box p-6 bg-white border border-slate-200 shadow-sm">
+            <div class="pb-3 mb-4 border-b border-slate-100">
+                <h3 class="font-extrabold text-base text-slate-900 flex items-center space-x-2">
+                    <i class="fa-solid fa-scale-balanced text-amber-600"></i>
+                    <span>DhanHQ Regulatory Friction & Taxation Cost Model</span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">Exact fee structure breakdown applied to every options trade in accordance with SEBI / NSE rules.</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50">
+                    <div class="flex items-center justify-between">
+                        <strong class="text-slate-900">Dhan Brokerage</strong>
+                        <span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-mono font-bold text-[10px]">₹20 / order</span>
+                    </div>
+                    <p class="text-slate-500 mt-1 text-[11px]">Flat ₹20 buy + ₹20 sell = ₹40.00 round trip for intraday options execution.</p>
+                </div>
+
+                <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50">
+                    <div class="flex items-center justify-between">
+                        <strong class="text-slate-900">STT (Govt Tax)</strong>
+                        <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-mono font-bold text-[10px]">0.0625% on Sell</span>
+                    </div>
+                    <p class="text-slate-500 mt-1 text-[11px]">Securities Transaction Tax calculated strictly on option premium sell value.</p>
+                </div>
+
+                <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50">
+                    <div class="flex items-center justify-between">
+                        <strong class="text-slate-900">GST (18%)</strong>
+                        <span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-mono font-bold text-[10px]">18% on Fees</span>
+                    </div>
+                    <p class="text-slate-500 mt-1 text-[11px]">Applies on brokerage + exchange turnover charges combined.</p>
+                </div>
+
+                <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50">
+                    <div class="flex items-center justify-between">
+                        <strong class="text-slate-900">Minimum Profitable Move</strong>
+                        <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono font-bold text-[10px]">+6.5 pts</span>
+                    </div>
+                    <p class="text-slate-500 mt-1 text-[11px]">Requires at least +6.5 pts on Bank Nifty or +3.5 pts on Nifty to guarantee net take-home.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- World-Class Day Trader Performance & Expectancy Radar -->
+        <div class="apple-box p-6 bg-white border border-slate-200 shadow-sm">
+            <div class="pb-3 mb-4 border-b border-slate-100">
+                <h3 class="font-extrabold text-base text-slate-900 flex items-center space-x-2">
+                    <i class="fa-solid fa-trophy text-amber-500"></i>
+                    <span>Institutional Trader Mathematical Expectancy Radar</span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">Metrics modelled on top global day traders (Linda Raschke, Al Brooks, Paul Tudor Jones).</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="p-4 rounded-xl border border-slate-200 bg-white">
+                    <span class="text-xs font-bold text-slate-500 block uppercase">Average Win vs Average Loss</span>
+                    <div class="flex items-center space-x-3 mt-2">
+                        <div>
+                            <span class="text-[10px] text-emerald-600 font-bold block">Avg Win</span>
+                            <span class="text-lg font-black font-mono text-emerald-600">₹{{ stats.avg_win|inr }}</span>
+                        </div>
+                        <span class="text-slate-300 font-light text-xl">/</span>
+                        <div>
+                            <span class="text-[10px] text-rose-600 font-bold block">Avg Loss</span>
+                            <span class="text-lg font-black font-mono text-rose-600">₹{{ stats.avg_loss|inr }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-4 rounded-xl border border-slate-200 bg-white">
+                    <span class="text-xs font-bold text-slate-500 block uppercase">Net Expectancy per Execution</span>
+                    <div class="text-2xl font-black font-mono {% if stats.expectancy >= 0 %}text-emerald-600{% else %}text-rose-600{% endif %} mt-2">
+                        {% if stats.expectancy >= 0 %}+{% endif %}₹{{ stats.expectancy|inr }}
+                    </div>
+                    <span class="text-[10px] text-slate-500 mt-0.5 block">Formula: (Win% &times; AvgWin) - (Loss% &times; AvgLoss)</span>
+                </div>
+
+                <div class="p-4 rounded-xl border border-slate-200 bg-white">
+                    <span class="text-xs font-bold text-slate-500 block uppercase">Active Execution Safeguards</span>
+                    <ul class="text-xs space-y-1.5 mt-2 text-slate-700 font-medium">
+                        <li class="flex items-center space-x-1.5 text-emerald-700">
+                            <i class="fa-solid fa-circle-check text-emerald-500 text-[11px]"></i>
+                            <span>Breakeven Lock at +8 pts (Risk-Free)</span>
+                        </li>
+                        <li class="flex items-center space-x-1.5 text-blue-700">
+                            <i class="fa-solid fa-circle-check text-blue-500 text-[11px]"></i>
+                            <span>1.5R to 2.5R Profit Target Objective</span>
+                        </li>
+                        <li class="flex items-center space-x-1.5 text-purple-700">
+                            <i class="fa-solid fa-circle-check text-purple-500 text-[11px]"></i>
+                            <span>Dynamic Trailing Defense for Runners</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function switchJournalTab(tabName) {
+    const secLedger = document.getElementById('section-ledger');
+    const secInsights = document.getElementById('section-insights');
+    const btnLedger = document.getElementById('tab-btn-ledger');
+    const btnInsights = document.getElementById('tab-btn-insights');
+
+    if (tabName === 'ledger') {
+        secLedger.classList.remove('hidden');
+        secInsights.classList.add('hidden');
+        btnLedger.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-900 bg-white shadow-sm transition flex items-center space-x-1.5";
+        btnInsights.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition flex items-center space-x-1.5";
+    } else {
+        secLedger.classList.add('hidden');
+        secInsights.classList.remove('hidden');
+        btnInsights.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-900 bg-white shadow-sm transition flex items-center space-x-1.5";
+        btnLedger.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition flex items-center space-x-1.5";
+    }
+}
+
+function filterLedgerMode(mode) {
+    const rows = document.querySelectorAll('.trade-row');
+    rows.forEach(r => {
+        if (mode === 'ALL' || r.getAttribute('data-mode') === mode) {
+            r.style.display = '';
+        } else {
+            r.style.display = 'none';
+        }
+    });
+    ['all', 'live', 'paper'].forEach(m => {
+        const btn = document.getElementById(`filter-btn-${m}`);
+        if (btn) {
+            if (m.toUpperCase() === mode) {
+                btn.className = "px-3 py-1 rounded-lg bg-blue-600 text-white font-bold transition shadow-sm";
+            } else {
+                btn.className = "px-3 py-1 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition";
+            }
+        }
+    });
+}
+
+// Live Second-by-Second Telemetry & Active Trade Poller
+let hadActivePosition = {% if active_position %}true{% else %}false{% endif %};
+
+async function pollJournalTelemetry() {
+    try {
+        const res = await fetch('/api/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        // 1. Update Insight Balances
+        if (data.funds) {
+            const rc = document.getElementById('insight-real-cash');
+            const pc = document.getElementById('insight-paper-cap');
+            if (rc) rc.innerText = '₹' + Number(data.funds.real_cash_balance || 0).toLocaleString('en-IN', {minimumFractionDigits: 2});
+            if (pc) pc.innerText = '₹' + Number(data.funds.paper_capital || 0).toLocaleString('en-IN', {minimumFractionDigits: 2});
+        }
+
+        // 2. Update Summary Metric Cards in Real-Time
+        if (data.rms) {
+            const elNetPnl = document.getElementById('journal-net-takehome');
+            if (elNetPnl) {
+                const np = data.rms.net_pnl || 0.0;
+                elNetPnl.innerText = `${np >= 0 ? '+' : ''}₹${Number(np).toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+                elNetPnl.className = `text-2xl font-black font-mono mt-1 ${np >= 0 ? 'text-emerald-600' : 'text-rose-600'}`;
+            }
+            const elGross = document.getElementById('journal-gross-pnl');
+            if (elGross) {
+                const gp = data.rms.gross_pnl || 0.0;
+                elGross.innerText = `${gp >= 0 ? '+' : ''}₹${Number(gp).toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+                elGross.className = `text-2xl font-black font-mono mt-1 ${gp >= 0 ? 'text-emerald-600' : 'text-rose-600'}`;
+            }
+            const elTrades = document.getElementById('journal-total-trades');
+            if (elTrades) elTrades.innerText = data.rms.total_trades || 0;
+            const elWinRate = document.getElementById('journal-win-rate');
+            if (elWinRate) elWinRate.innerText = `${Number(data.rms.win_rate || 0).toFixed(1)}%`;
+            const elWins = document.getElementById('journal-win-count');
+            if (elWins && data.rms.win_count !== undefined) elWins.innerText = `${data.rms.win_count}W`;
+            const elLosses = document.getElementById('journal-loss-count');
+            if (elLosses && data.rms.loss_count !== undefined) elLosses.innerText = `${data.rms.loss_count}L`;
+        }
+
+        // 3. Update Real-Time Multi-Position Portfolio HUD
+        const section = document.getElementById('journal-multi-positions-section');
+        const grid = document.getElementById('journal-multi-positions-grid');
+        const positions = (data.active_positions && data.active_positions.length > 0)
+            ? data.active_positions
+            : (data.active_position ? [data.active_position] : []);
+
+        if (positions.length > 0) {
+            hadActivePosition = true;
+            if (section) section.classList.remove('hidden');
+
+            const numEl = document.getElementById('journal-multi-count-num');
+            if (numEl) numEl.innerText = positions.length;
+
+            const paperPill = document.getElementById('journal-multi-paper-pill');
+            if (paperPill) {
+                const pc = data.paper_active_count !== undefined ? data.paper_active_count : positions.filter(p => (p.execution_mode || p.mode) === 'PAPER').length;
+                paperPill.innerText = `${pc} Paper`;
+            }
+
+            const livePill = document.getElementById('journal-multi-live-pill');
+            if (livePill) {
+                const lc = data.live_active_count !== undefined ? data.live_active_count : positions.filter(p => (p.execution_mode || p.mode) === 'LIVE').length;
+                livePill.innerText = `${lc} Live`;
+            }
+
+            const pnlEl = document.getElementById('journal-portfolio-pnl');
+            if (pnlEl) {
+                const totalPnl = (data.total_open_pnl !== undefined) ? data.total_open_pnl : positions.reduce((acc, p) => acc + (Number(p.pnl) || 0), 0);
+                const sign = totalPnl >= 0 ? '+' : '';
+                pnlEl.innerText = `${sign}₹${Number(totalPnl).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                pnlEl.className = `text-lg font-black font-mono ${totalPnl >= 0 ? 'text-emerald-600' : 'text-rose-600'}`;
+            }
+
+            if (grid) {
+                grid.innerHTML = positions.map(pos => {
+                    const isLive = (pos.execution_mode === 'LIVE' || pos.mode === 'LIVE');
+                    const modeBadge = isLive 
+                        ? '<span class="text-[10px] font-black uppercase font-mono px-2 py-0.5 rounded-full bg-rose-100 text-rose-900 border border-rose-300">🇮🇳 LIVE DHAN</span>'
+                        : '<span class="text-[10px] font-black uppercase font-mono px-2 py-0.5 rounded-full bg-blue-100 text-blue-900 border border-blue-300">🧪 PAPER SIM</span>';
+                    
+                    const pnlVal = Number(pos.pnl || 0);
+                    const pnlColor = pnlVal >= 0 ? 'text-emerald-600' : 'text-rose-600';
+                    const posId = pos.position_id || '';
+                    const invVal = pos.invested_capital || pos.invested_amount || (Number(pos.entry_premium) * Number(pos.quantity));
+
+                    let elapsedStr = 'Live Active';
+                    if (pos.entry_time) {
+                        try {
+                            const timePart = pos.entry_time.includes(' ') ? pos.entry_time.split(' ')[1] : pos.entry_time;
+                            const [h, m, s] = timePart.split(':');
+                            const now = new Date();
+                            const ed = new Date();
+                            ed.setHours(parseInt(h), parseInt(m), parseInt(s || 0));
+                            const elapsed = Math.max(0, Math.floor((now - ed) / 1000));
+                            elapsedStr = `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`;
+                        } catch(e) {}
+                    }
+
+                    return `
+                        <div class="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-sm hover:shadow-md transition-all">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2.5 mb-2.5 border-b border-slate-100">
+                                <div class="flex items-center space-x-2 flex-wrap">
+                                    <span class="w-2 h-2 rounded-full ${isLive ? 'bg-rose-500' : 'bg-blue-500'} animate-ping"></span>
+                                    <strong class="font-mono text-sm font-black text-slate-900">${pos.symbol}</strong>
+                                    ${modeBadge}
+                                    <span class="text-[11px] font-mono text-slate-500">In: ${pos.entry_time ? pos.entry_time.slice(-8) : '--'}</span>
+                                    <span class="text-[11px] font-mono text-slate-600 font-bold bg-slate-100 px-2 py-0.5 rounded">⏱️ ${elapsedStr}</span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-xs text-slate-500 font-medium">Position Net P&L:</span>
+                                    <strong class="text-base font-black font-mono ${pnlColor}">
+                                        ${pnlVal >= 0 ? '+' : ''}₹${pnlVal.toFixed(2)}
+                                    </strong>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
+                                <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Lots & Qty</span>
+                                    <strong class="text-slate-800 font-mono text-xs block mt-0.5">${pos.quantity} Qty</strong>
+                                    <span class="text-[10px] text-slate-500">${pos.lots || 1} Lot(s)</span>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Invested Margin</span>
+                                    <strong class="text-amber-600 font-mono text-xs block mt-0.5">₹${Number(invVal).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong>
+                                    <span class="text-[10px] text-slate-500">Deployed</span>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                                    <span class="text-[10px] text-slate-400 font-bold uppercase block">Entry ➔ LTP</span>
+                                    <strong class="text-slate-900 font-mono text-xs block mt-0.5">₹${Number(pos.entry_premium).toFixed(2)} ➔ ₹${Number(pos.current_premium).toFixed(2)}</strong>
+                                    <span class="text-[10px] text-slate-500">1s Live Sync</span>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-emerald-50/40 border border-emerald-100">
+                                    <span class="text-[10px] text-emerald-800 font-bold uppercase block">Target Price</span>
+                                    <strong class="text-emerald-700 font-mono text-xs block mt-0.5">₹${Number(pos.target_premium || 0).toFixed(2)}</strong>
+                                    <span class="text-[10px] text-emerald-600">1.5R - 2.5R</span>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-rose-50/40 border border-rose-100">
+                                    <span class="text-[10px] text-rose-800 font-bold uppercase block">Hard Stop Loss</span>
+                                    <strong class="text-rose-700 font-mono text-xs block mt-0.5">₹${Number(pos.hard_stop_premium || 0).toFixed(2)}</strong>
+                                    <span class="text-[10px] text-rose-600">Protected Floor</span>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-teal-50/40 border border-teal-100">
+                                    <span class="text-[10px] text-teal-800 font-bold uppercase block">Trailing / Locked</span>
+                                    <strong class="text-teal-700 font-mono text-xs block mt-0.5">₹${Number(pos.trailing_sl_premium || pos.hard_stop_premium || 0).toFixed(2)}</strong>
+                                    <span class="text-[10px] text-teal-700 font-bold">${Number(pos.locked_profit_inr || 0) > 0 ? '+₹' + Number(pos.locked_profit_inr).toFixed(0) + ' locked' : 'Tracking'}</span>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mt-3 pt-2.5 border-t border-slate-100 text-xs">
+                                <div class="text-[11px] text-slate-600 flex items-center space-x-1.5 truncate">
+                                    <span class="font-bold text-slate-800 shrink-0"><i class="fa-solid fa-bullseye text-blue-600 mr-1"></i>Rationale:</span>
+                                    <span class="truncate">${pos.trade_rationale || 'High-probability momentum continuation setup validated across VWAP, EMA and Volume confluence.'}</span>
+                                </div>
+                                <div class="flex items-center space-x-2 shrink-0">
+                                    <button type="button" onclick="lockBreakevenJournalPos('${posId}', '${pos.symbol}')" class="px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold font-mono transition-colors active:scale-95 cursor-pointer">
+                                        <i class="fa-solid fa-lock text-[10px] mr-1"></i>Lock BE
+                                    </button>
+                                    <button type="button" onclick="squareOffJournalPos('${posId}', '${pos.symbol}')" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold font-mono transition-colors active:scale-95 cursor-pointer">
+                                        <i class="fa-solid fa-xmark text-[10px] mr-1"></i>Square Off
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        } else {
+            if (hadActivePosition) {
+                hadActivePosition = false;
+                if (section) section.classList.add('hidden');
+                setTimeout(() => window.location.reload(), 1000);
+            }
+        }
+    } catch (e) {
+        console.warn('Journal polling error:', e);
+    }
+}
+
+async function squareOffJournalPos(posId, symbol) {
+    if (!confirm(`Square off position ${symbol}?`)) return;
+    try {
+        const res = await fetch('/api/square-off', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ position_id: posId, symbol: symbol })
+        });
+        const data = await res.json();
+        if (data.success) {
+            pollJournalTelemetry();
+        } else {
+            alert('Square off failed: ' + (data.error || 'Unknown error'));
+        }
+    } catch(e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function lockBreakevenJournalPos(posId, symbol) {
+    try {
+        const res = await fetch('/api/lock-breakeven', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ position_id: posId, symbol: symbol })
+        });
+        const data = await res.json();
+        if (data.success) {
+            pollJournalTelemetry();
+        } else {
+            alert(data.message || 'Could not lock breakeven');
+        }
+    } catch(e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function squareOffAllJournalPos() {
+    if (!confirm('Are you sure you want to SQUARE OFF ALL running positions across Paper and Live?')) return;
+    try {
+        const res = await fetch('/api/square-off-all', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            pollJournalTelemetry();
+            setTimeout(() => window.location.reload(), 800);
+        } else {
+            alert('Square off all failed: ' + (data.error || 'Unknown error'));
+        }
+    } catch(e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+setInterval(pollJournalTelemetry, 3000);
+
+async function confirmClearTrades() {
+    if (!confirm("Are you sure you want to reset all Paper Trades and clear the ledger?\n\nThis will reset your daily P&L, RMS loss counters, and trade history so you can start fresh with 0 trades.")) {
+        return;
+    }
+    try {
+        let res = await fetch('/api/clear-trades', { method: 'POST' });
+        if (!res.ok) {
+            res = await fetch('/api/clear-journal', { method: 'POST' });
+        }
+        const data = await res.json();
+        if (data.success) {
+            alert("✅ Paper Trade Journal & RMS Counters cleared successfully! Starting fresh with 0 trades.");
+            window.location.reload();
+        } else {
+            alert("Notice: " + (data.message || data.error || "Reset completed."));
+            window.location.reload();
+        }
+    } catch (e) {
+        try {
+            const res2 = await fetch('/api/clear-trades');
+            const data2 = await res2.json();
+            if (data2.success) {
+                alert("✅ Paper Trade Journal cleared successfully!");
+                window.location.reload();
+                return;
+            }
+        } catch(e2) {}
+        alert("Network error: " + (e.message || String(e)));
+    }
+}
+
+async function emailJournalPdf() {
+    const btn = document.getElementById('btn-email-journal-pdf');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Dispatching...</span>';
+    }
+    try {
+        const res = await fetch('/api/journal/email-pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recipient: 'vijayaram9@gmail.com' })
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert('✓ Trading journal PDF successfully emailed to ' + (data.recipient || 'vijayaram9@gmail.com') + '!');
+        } else {
+            alert('Notice: ' + (data.error || data.message || 'Failed to dispatch email.'));
+        }
+    } catch (err) {
+        alert('Network error emailing journal: ' + err);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+    }
+}
+</script>
+{% endblock %}

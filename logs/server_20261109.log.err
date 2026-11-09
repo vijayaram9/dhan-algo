@@ -1,0 +1,33 @@
+D:\Automation Projects\dhan-nifty-algo\.venv\Lib\site-packages\yfinance\utils.py:568: Pandas4Warning: The inplace keyword in DataFrame.sort_index is deprecated and will be removed in a future version (PDEP-8).
+See https://pandas.pydata.org/docs/dev/whatsnew/v3.1.0.html#deprecation-inplace for more details.
+  quotes.sort_index(inplace=True)
+D:\Automation Projects\dhan-nifty-algo\.venv\Lib\site-packages\yfinance\utils.py:514: Pandas4Warning: The inplace keyword in DataFrame.drop is deprecated and will be removed in a future version (PDEP-8).
+See https://pandas.pydata.org/docs/dev/whatsnew/v3.1.0.html#deprecation-inplace for more details.
+  df.drop(
+D:\Automation Projects\dhan-nifty-algo\.venv\Lib\site-packages\yfinance\utils.py:518: Pandas4Warning: The inplace keyword in DataFrame.rename is deprecated and will be removed in a future version (PDEP-8).
+See https://pandas.pydata.org/docs/dev/whatsnew/v3.1.0.html#deprecation-inplace for more details.
+  df.rename(columns={
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.29.177:5000
+Press CTRL+C to quit
+127.0.0.1 - - [09/Nov/2026 10:56:21] "GET /api/market-intelligence?asset=NIFTY&capital=150000 HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:21] "GET /api/status HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:22] "GET /api/status HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:22] "GET /api/status HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:22] "GET /api/chart-data?asset=NIFTY&timeframe=10s&chart_target=underlying HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:22] "GET /api/status HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:23] "GET /api/order-flow?asset=NIFTY HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:23] "GET /api/market-intelligence?asset=NIFTY&capital=150000 HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:23] "GET /api/status HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:23] "GET /api/status HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:25] "GET /api/status HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:25] "GET /api/global-markets?force=false HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:25] "GET /api/market-intelligence?asset=NIFTY&capital=150000 HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:25] "GET /api/premarket-intelligence?asset=NIFTY&force=false HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:25] "GET /api/funds HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:25] "GET /api/market-news?category=ALL&limit=25 HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:25] "GET /api/status HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:26] "GET /api/chart-data?asset=NIFTY&timeframe=10s&chart_target=underlying HTTP/1.1" 200 -
+127.0.0.1 - - [09/Nov/2026 10:56:26] "POST /api/set-paper-capital HTTP/1.1" 200 -

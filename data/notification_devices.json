@@ -1,0 +1,9 @@
+[
+  {
+    "id": "primary",
+    "name": "Primary Trading Mobile (Master)",
+    "topic": "sai-nifty-trades-9422",
+    "is_primary": true,
+    "subscribe_url": "https://ntfy.sh/sai-nifty-trades-9422"
+  }
+]
