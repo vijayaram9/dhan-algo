@@ -28,6 +28,18 @@ class AssetInfo:
     is_custom: bool = False
 
 ASSET_CATALOG: Dict[str, AssetInfo] = {
+    "GIFTNIFTY": AssetInfo(
+        key="GIFTNIFTY",
+        display_name="GIFT NIFTY",
+        category="INDEX",
+        exchange="NSE",
+        tv_symbol="NSE:GIFTNIFTY",
+        yfinance_symbol="^NSEI",
+        lot_size=65,
+        strike_step=50,
+        expiry_day_name="Thursday",
+        baseline_price=25164.5
+    ),
     "NIFTY": AssetInfo(
         key="NIFTY",
         display_name="NIFTY 50",
@@ -478,6 +490,7 @@ class MarketIntelligenceEngine:
 
         # 1. Primary: Direct DhanHQ MarketFeed Quote or Intraday Chart Data
         dhan_asset_meta = {
+            "GIFTNIFTY": ("5024", "IDX_I", "INDEX"),
             "NIFTY": ("13", "IDX_I", "INDEX"),
             "BANKNIFTY": ("25", "IDX_I", "INDEX"),
             "FINNIFTY": ("27", "IDX_I", "INDEX"),
@@ -517,7 +530,8 @@ class MarketIntelligenceEngine:
                     
                     # If quote_data is 0 (e.g. market closed for equities), pull authentic close from Dhan intraday candles
                     today_str = datetime.datetime.now().strftime("%Y-%m-%d")
-                    res_c = dhan.intraday_minute_data(sec_id, seg, itype, today_str, today_str, interval=5)
+                    from_str = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+                    res_c = dhan.intraday_minute_data(sec_id, seg, itype, from_str, today_str, interval=5)
                     if isinstance(res_c, dict) and res_c.get("status") == "success":
                         d_c = res_c.get("data", {})
                         if isinstance(d_c, dict):
@@ -742,7 +756,7 @@ class MarketIntelligenceEngine:
             from dhan_client import get_dhan_client
             client = get_dhan_client()
             sec_id_map = {
-                "NIFTY": "13", "BANKNIFTY": "25", "FINNIFTY": "27", "SENSEX": "51",
+                "GIFTNIFTY": "5024", "NIFTY": "13", "BANKNIFTY": "25", "FINNIFTY": "27", "SENSEX": "51",
                 "CRUDEOILM": "573423", "NATGASMINI": "574320", "GOLDM": "575011", "SILVERM": "483080",
                 "RELIANCE": "2885", "TCS": "11536", "HDFCBANK": "1333", "ICICIBANK": "4963", "INFY": "1594", "SBIN": "3045"
             }

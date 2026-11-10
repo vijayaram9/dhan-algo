@@ -751,7 +751,7 @@
                 <div class="flex items-center justify-between">
                     <span class="text-[10px] font-black uppercase tracking-wider font-mono text-slate-500 flex items-center space-x-1">
                         <i class="fa-solid fa-layer-group text-blue-600"></i>
-                        <span>2. Key Intraday Levels (NIFTY)</span>
+                        <span>2. Key Intraday Levels (<span id="pm-levels-asset-label">NIFTY 50</span>)</span>
                     </span>
                     <span class="text-[9px] font-mono text-slate-400">Classic Floor Pivots</span>
                 </div>
@@ -5246,6 +5246,8 @@
         if (trapText) trapText.innerText = d.verdict.trap_warning;
 
         // 5. Pivot Levels
+        const assetLabel = document.getElementById('pm-levels-asset-label');
+        if (assetLabel) assetLabel.innerText = d.asset_display_name || d.asset || 'NIFTY 50';
         const r2 = document.getElementById('pm-level-r2'); if (r2) r2.innerText = `₹${d.levels.r2.toFixed(1)}`;
         const r1 = document.getElementById('pm-level-r1'); if (r1) r1.innerText = `₹${d.levels.r1.toFixed(1)}`;
         const pp = document.getElementById('pm-level-pivot'); if (pp) pp.innerText = `₹${d.levels.pivot.toFixed(1)}`;

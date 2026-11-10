@@ -2,7 +2,7 @@ import threading
 import json
 import random
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any, Tuple
 from config import config
 
@@ -319,7 +319,7 @@ class DhanTraderClient:
                 today_str = datetime.now().strftime("%Y-%m-%d")
                 res = self.dhan.intraday_minute_data(
                     security_id="13", exchange_segment="IDX_I", instrument_type="INDEX",
-                    from_date=today_str, to_date=today_str, interval=5
+                    from_date=(datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"), to_date=today_str, interval=5
                 )
                 if isinstance(res, dict) and res.get("status") == "success":
                     closes = res.get("data", {}).get("close", [])

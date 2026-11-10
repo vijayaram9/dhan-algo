@@ -25,6 +25,10 @@ from notifier import notifier
 
 init(autoreset=True)
 
+def get_ist_now() -> datetime.datetime:
+    """Returns current datetime strictly in Indian Standard Time (IST = UTC + 5:30)."""
+    return datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)
+
 @dataclass
 class SmartEdgePosition:
     symbol: str = ""
@@ -363,7 +367,7 @@ class NiftySmartEdgeEngine:
         # 2. Secondary fallback: market feed
 
         # Fallback synthetic completed candles
-        now = datetime.datetime.now()
+        now = get_ist_now()
         for i in range(35, 0, -1):
             t = (now - datetime.timedelta(minutes=i * 5)).strftime("%H:%M:%S")
             p = spot + ((35 - i) * 0.3)
@@ -381,7 +385,7 @@ class NiftySmartEdgeEngine:
     # -------------------------------------------------------------------------
     def is_market_open(self, asset_key: Optional[str] = None) -> Tuple[bool, str]:
         """Checks whether Indian exchanges (NSE/BSE/MCX) are currently in session."""
-        now = datetime.datetime.now()
+        now = get_ist_now()
         weekday = now.weekday()
         if weekday in [5, 6]:
             return False, "Weekend: Indian Exchanges Closed (Opens Monday morning)."
@@ -414,11 +418,11 @@ class NiftySmartEdgeEngine:
         if not market_open:
             return False, reason
 
-        now_time = datetime.datetime.now().strftime("%H:%M")
+        now_time = get_ist_now().strftime("%H:%M")
         is_commodity = (asset_key in ["CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"]) or (self.active_position and getattr(self.active_position, "asset_key", "") in ["CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"])
 
         if is_commodity:
-            if "09:00" <= now_time < "09:15":
+            if now_time < "09:15":
                 return False, "09:00-09:15 AM: MCX Commodity opening price discovery."
             if now_time >= "23:00":
                 return False, "23:00 PM: MCX intraday cut-off. Managing existing positions only."
@@ -664,7 +668,7 @@ class NiftySmartEdgeEngine:
             pass
 
         # Force Cutoff: 3:15 PM for Equity, 11:15 PM for MCX Commodities
-        now_hm = datetime.datetime.now().strftime("%H:%M")
+        now_hm = get_ist_now().strftime("%H:%M")
         is_comm = getattr(pos, "asset_key", "") in ["CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"]
         if not is_comm and "15:15" <= now_hm < "15:30":
             return True, "3:15 PM IST: Mandatory Equity Intraday Force Square-Off."
@@ -1242,7 +1246,7 @@ class NiftySmartEdgeEngine:
             print(Fore.RED + f"[ORDER FAILED] Order placement rejected: {rej_err}. Global lock released.")
 
     def print_dashboard(self, spot: float, signal: SmartEdgeSignal):
-        now = datetime.datetime.now().strftime("%H:%M:%S")
+        now = get_ist_now().strftime("%H:%M:%S")
         status_lines = [
             ["Time / Engine", f"{now} | {self.mode} (NIFTY SMART EDGE v1.0)"],
             ["Nifty Spot", f"Rs.{spot:.2f}"],
@@ -1267,13 +1271,13 @@ class NiftySmartEdgeEngine:
     def run_tick(self):
         current_spot = self.client.get_spot_ltp()
         self.latest_spot = current_spot
-        now_dt = datetime.datetime.now()
+        now_dt = get_ist_now()
         now_time = now_dt.strftime("%H:%M:%S")
 
         is_equity_open, _ = self.is_market_open("NIFTY")
         is_mcx_open, _ = self.is_market_open("CRUDEOILM")
         is_open = is_equity_open or is_mcx_open
-        if not is_open and self.mode == "LIVE":
+        if not is_open:
             # Both Indian Equity and MCX Commodity sessions are closed.
             return
 
@@ -1376,22 +1380,26 @@ class NiftySmartEdgeEngine:
                 is_evening_session = (now_hm_curr >= "15:30" or now_hm_curr < "09:15")
                 active_assets = {getattr(p, "asset_key", "") for p in self.active_positions}
                 
-                if is_evening_session and is_mcx_open:
-                    allowed_targets = ["CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"]
-                    valid_opps = [
-                        o for o in all_opps 
-                        if o["key"] in allowed_targets 
-                        and o["key"] not in active_assets 
-                        and self.check_trading_schedule(o["key"])[0]
-                    ]
-                else:
-                    # Daytime (09:15 - 15:30 IST): STRICTLY Indian Index & Bluechip Equities (No Commodities!)
+                if is_evening_session:
+                    if is_mcx_open:
+                        allowed_targets = ["CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"]
+                        valid_opps = [
+                            o for o in all_opps 
+                            if o["key"] in allowed_targets 
+                            and o["key"] not in active_assets 
+                            and self.check_trading_schedule(o["key"])[0]
+                        ]
+                    else:
+                        valid_opps = []
+                elif is_equity_open:
                     valid_opps = [
                         o for o in all_opps 
                         if o["key"] not in active_assets
                         and o["key"] not in ["CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"]
                         and self.check_trading_schedule(o["key"])[0]
                     ]
+                else:
+                    valid_opps = []
                 # High-Confluence Institutional Selection:
                 for top_opp in valid_opps:
                     # Check per-instrument cooldown

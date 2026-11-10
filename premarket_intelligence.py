@@ -16,10 +16,10 @@ import time
 import datetime
 from typing import Dict, Any, Optional
 from global_market_intelligence import global_tracker
-from market_intelligence import market_intelligence
+from market_intelligence import market_intelligence, ASSET_CATALOG
 
 class PreMarketIntelligenceEngine:
-    def __init__(self, cache_ttl_seconds: int = 45):
+    def __init__(self, cache_ttl_seconds: int = 15):
         self.cache_ttl = cache_ttl_seconds
         self.last_computed_time: float = 0.0
         self.cached_report: Dict[str, Any] = {}
@@ -27,14 +27,19 @@ class PreMarketIntelligenceEngine:
     def get_premarket_report(self, asset_key: str = "NIFTY", force: bool = False) -> Dict[str, Any]:
         """Generates comprehensive pre-market analysis and setup playbook."""
         now = time.time()
+        asset_key = (asset_key or "NIFTY").upper()
         if not force and self.cached_report and (now - self.last_computed_time < self.cache_ttl):
             if self.cached_report.get("asset") == asset_key:
                 return self.cached_report
 
-        asset_key = (asset_key or "NIFTY").upper()
-        spot = market_intelligence.get_asset_spot(asset_key)
+        # 1. Fetch Benchmark NIFTY 50 and Authentic GIFT NIFTY Spot Quotes
+        nifty_spot = market_intelligence.get_asset_spot("NIFTY")
+        if nifty_spot <= 0:
+            nifty_spot = 25044.65
+
+        gift_spot = market_intelligence.get_asset_spot("GIFTNIFTY")
         
-        # 1. Fetch Global Developed Market Cues
+        # 2. Fetch Global Developed Market Cues
         global_data = global_tracker.fetch_live_quotes(force=force)
         comp_bias = global_data.get("composite_bias", {})
         score = float(comp_bias.get("score", 0.0))
@@ -43,14 +48,18 @@ class PreMarketIntelligenceEngine:
         sp500_pct = float(comp_bias.get("sp500_pct", 0.0))
         brent_pct = float(comp_bias.get("brent_pct", 0.0))
 
-        # 2. Derive GIFT NIFTY Opening Gap Projection
-        # Gap points model: based on global weighted score and spot volatility
-        # Score of +2% roughly equates to +45 to +85 pts on NIFTY 50
-        gap_points = round((score * 28.5) + (nasdaq_pct * 18.0) - (brent_pct * 8.5), 1)
-        # Clamp gap points to realistic intraday boundary (+/- 250 pts)
-        gap_points = max(-250.0, min(250.0, gap_points))
-        implied_open = round(spot + gap_points, 2)
-        gap_pct = round((gap_points / spot) * 100.0, 2) if spot > 0 else 0.0
+        # 3. Derive GIFT NIFTY Opening Gap Projection (STRICTLY tied to NIFTY 50)
+        if gift_spot and gift_spot > 0:
+            gap_points = round(gift_spot - nifty_spot, 1)
+            implied_open = round(gift_spot, 2)
+            gap_pct = round((gap_points / nifty_spot) * 100.0, 2)
+            feed_source = "NSE IFSC GIFT NIFTY (Live Exchange Feed)"
+        else:
+            gap_points = round((score * 28.5) + (nasdaq_pct * 18.0) - (brent_pct * 8.5), 1)
+            gap_points = max(-250.0, min(250.0, gap_points))
+            implied_open = round(nifty_spot + gap_points, 2)
+            gap_pct = round((gap_points / nifty_spot) * 100.0, 2) if nifty_spot > 0 else 0.0
+            feed_source = "Global Correlation Model Implied Open"
 
         if gap_points >= 60:
             gap_type = "STRONG GAP-UP"
@@ -73,7 +82,7 @@ class PreMarketIntelligenceEngine:
             gap_badge_color = "amber"
             gap_summary = f"Flat opening indicated ({gap_points:+.1f} pts). Pure price-action and opening range breakout will dominate."
 
-        # 3. Overall Directional Verdict
+        # 4. Overall Directional Verdict
         if score >= 3.0 or (nasdaq_pct > 0.5 and sp500_pct > 0.3 and brent_pct < 0):
             direction_verdict = "BULLISH BIAS"
             direction_color = "emerald"
@@ -90,8 +99,17 @@ class PreMarketIntelligenceEngine:
             direction_confidence = "MODERATE (60% - 70% Confluence)"
             opening_trap_warning = "Market in balanced equilibrium. Strictly wait for the 15-minute Opening Range (09:15 - 09:30) breakout before entering."
 
-        # 4. Compute Daily Intraday Key Pivot Levels (Classic Floor Trader Levels)
-        # Using realistic baseline ranges around current spot
+        # 5. Selected Asset Spot and Intraday Floor Pivot Levels
+        if asset_key == "NIFTY":
+            spot = nifty_spot
+            display_name = "NIFTY 50"
+        else:
+            spot = market_intelligence.get_asset_spot(asset_key)
+            if spot <= 0:
+                asset_inf = ASSET_CATALOG.get(asset_key)
+                spot = getattr(asset_inf, "baseline_price", 0.0) or nifty_spot
+            display_name = ASSET_CATALOG.get(asset_key).display_name if asset_key in ASSET_CATALOG else asset_key
+
         range_est = round(spot * 0.0085, 1)  # ~0.85% average daily true range
         pivot = round(spot, 1)
         r1 = round(pivot + (range_est * 0.58), 1)
@@ -99,12 +117,11 @@ class PreMarketIntelligenceEngine:
         s1 = round(pivot - (range_est * 0.58), 1)
         s2 = round(pivot - range_est, 1)
 
-        # 5. Derivatives & Institutional Positioning
-        # Realistic Indian F&O metrics for NIFTY 50
+        # 6. Derivatives & Institutional Positioning (Always NIFTY 50 reference)
         pcr = 1.14 if score >= 0 else 0.88
-        max_pain = round(round(spot / 50.0) * 50.0)
-        call_wall = max_pain + 200
-        put_wall = max_pain - 200
+        nifty_max_pain = round(round(nifty_spot / 50.0) * 50.0)
+        call_wall = nifty_max_pain + 200
+        put_wall = nifty_max_pain - 200
 
         # Institutional Flows
         fii_long_ratio = round(54.2 + (score * 2.1), 1)
@@ -112,7 +129,7 @@ class PreMarketIntelligenceEngine:
         fii_cash = "+₹1,140 Cr" if score >= 0 else "-₹860 Cr"
         dii_cash = "+₹950 Cr"
 
-        # 6. Session Setup Playbook
+        # 7. Session Setup Playbook
         playbook = [
             {
                 "phase": "Phase 1: Opening 15 Mins (09:15 – 09:30 IST)",
@@ -138,7 +155,9 @@ class PreMarketIntelligenceEngine:
         report = {
             "success": True,
             "asset": asset_key,
+            "asset_display_name": display_name,
             "spot": spot,
+            "nifty_spot": nifty_spot,
             "timestamp_str": formatted_time,
             "gift_nifty": {
                 "implied_open": implied_open,
@@ -146,7 +165,9 @@ class PreMarketIntelligenceEngine:
                 "gap_pct": gap_pct,
                 "gap_type": gap_type,
                 "badge_color": gap_badge_color,
-                "summary": gap_summary
+                "summary": gap_summary,
+                "feed_source": feed_source,
+                "nifty_close": nifty_spot
             },
             "verdict": {
                 "direction": direction_verdict,
@@ -168,7 +189,7 @@ class PreMarketIntelligenceEngine:
                 "r2": r2,
                 "s1": s1,
                 "s2": s2,
-                "max_pain": max_pain,
+                "max_pain": nifty_max_pain,
                 "pcr": pcr,
                 "call_wall": call_wall,
                 "put_wall": put_wall
@@ -183,6 +204,8 @@ class PreMarketIntelligenceEngine:
         }
 
         self.last_computed_time = now
+        self.cached_report = report
+        return report
         self.cached_report = report
         return report
 
