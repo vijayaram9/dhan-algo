@@ -2321,7 +2321,10 @@ def journal_page():
 def download_journal():
     journal.export_csv()
     if os.path.exists(CSV_PATH):
-        return send_file(CSV_PATH, as_attachment=True, download_name="dhan_trading_journal.csv")
+        resp = make_response(send_file(CSV_PATH, as_attachment=True, download_name="dhan_trading_journal.csv", mimetype="text/csv"))
+        resp.headers["Content-Disposition"] = 'attachment; filename="dhan_trading_journal.csv"'
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return resp
     return "No journal CSV found", 404
 
 @app.route("/download-journal-pdf")
@@ -2331,10 +2334,18 @@ def download_journal_pdf():
     try:
         from journal_pdf_mailer import generate_journal_pdf
         today_str = datetime.date.today().strftime("%Y-%m-%d")
-        ok, pdf_path, kpis = generate_journal_pdf(today_str)
-        if ok and os.path.exists(pdf_path):
-            return send_file(pdf_path, as_attachment=True, download_name=f"Trading_Journal_{today_str}.pdf", mimetype="application/pdf")
-        return jsonify({"success": False, "error": f"PDF compilation failed: {pdf_path}"}), 500
+        ok, doc_path, kpis = generate_journal_pdf(today_str)
+        if ok and os.path.exists(doc_path) and doc_path.endswith(".pdf"):
+            resp = make_response(send_file(doc_path, as_attachment=True, download_name=f"Trading_Journal_{today_str}.pdf", mimetype="application/pdf"))
+            resp.headers["Content-Disposition"] = f'attachment; filename="Trading_Journal_{today_str}.pdf"'
+            resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            return resp
+        elif os.path.exists(doc_path) and doc_path.endswith(".html"):
+            with open(doc_path, "r", encoding="utf-8") as f:
+                html = f.read()
+            printable_html = html.replace("</body>", "<script>window.onload = function() { window.print(); };</script></body>")
+            return printable_html, 200, {"Content-Type": "text/html"}
+        return jsonify({"success": False, "error": f"PDF compilation failed: {doc_path}"}), 500
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
