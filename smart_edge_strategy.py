@@ -90,6 +90,25 @@ class NiftySmartEdgeStrategy:
         self.orb_high = high
         self.orb_low = low
 
+    def load_real_candles(self, candles: list):
+        """Loads authentic completed 5-minute candles into the strategy engine."""
+        self.candles_5m = []
+        self.candles_15m = []
+        for c in candles:
+            if isinstance(c, tuple) and len(c) >= 5:
+                t_epoch, o, h, l, cl = c[:5]
+                t_str = datetime.datetime.fromtimestamp(float(t_epoch)).strftime("%H:%M:%S")
+                self.add_completed_candle(t_str, float(o), float(h), float(l), float(cl), volume=1500)
+            elif isinstance(c, dict):
+                self.add_completed_candle(
+                    str(c.get("timestamp", "")),
+                    float(c.get("open", 0.0)),
+                    float(c.get("high", 0.0)),
+                    float(c.get("low", 0.0)),
+                    float(c.get("close", 0.0)),
+                    int(c.get("volume", 1500))
+                )
+
     def add_completed_candle(self, timestamp: str, open_: float, high: float, low: float, close: float, volume: int):
         c = {
             "timestamp": timestamp,
@@ -183,10 +202,11 @@ class NiftySmartEdgeStrategy:
         can_trigger_ce = (ce_rules_met == 8) or (ce_rules_met >= 7 and all([c1, c2, c3, c5]))
 
         if regime.permitted_strategy in ["TREND_CE", "TREND_OR_ORB"] and can_trigger_ce:
-            structural_sl = min(prev_c["low"], last_c["low"]) - (0.2 * atr5)
-            risk_pts = last_c["close"] - structural_sl
-            t1 = last_c["close"] + (1.5 * risk_pts)
-            t2 = last_c["close"] + (2.0 * risk_pts)
+            raw_sl = min(prev_c["low"], last_c["low"]) - max(0.8 * atr5, 12.0)
+            risk_pts = max(25.0, last_c["close"] - raw_sl)
+            structural_sl = round(last_c["close"] - risk_pts, 2)
+            t1 = round(last_c["close"] + (1.5 * risk_pts), 2)
+            t2 = round(last_c["close"] + (2.0 * risk_pts), 2)
             return SmartEdgeSignal(
                 action="BUY_CE",
                 strategy_name="TREND_PULLBACK",
@@ -229,24 +249,11 @@ class NiftySmartEdgeStrategy:
         can_trigger_pe = (pe_rules_met == 8) or (pe_rules_met >= 7 and all([c1_pe, c2_pe, c3_pe, c5_pe]))
 
         if regime.permitted_strategy in ["TREND_PE", "TREND_OR_ORB"] and can_trigger_pe:
-            structural_sl = max(prev_c["high"], last_c["high"]) + (0.2 * atr5)
-            risk_pts = structural_sl - last_c["close"]
-            t1 = last_c["close"] - (1.5 * risk_pts)
-            t2 = last_c["close"] - (2.0 * risk_pts)
-            return SmartEdgeSignal(
-                action="BUY_PE",
-                strategy_name="TREND_PULLBACK",
-                regime=regime.classification,
-                spot_price=last_c["close"],
-                structural_sl_spot=structural_sl,
-                target_1_spot=t1,
-                target_2_spot=t2,
-                audit_checklist=checklist
-            ), checklist
-            structural_sl = max(prev_c["high"], last_c["high"]) + (0.2 * atr5)
-            risk_pts = structural_sl - last_c["close"]
-            t1 = last_c["close"] - (1.5 * risk_pts)
-            t2 = last_c["close"] - (2.0 * risk_pts)
+            raw_sl = max(prev_c["high"], last_c["high"]) + max(0.8 * atr5, 12.0)
+            risk_pts = max(25.0, raw_sl - last_c["close"])
+            structural_sl = round(last_c["close"] + risk_pts, 2)
+            t1 = round(last_c["close"] - (1.5 * risk_pts), 2)
+            t2 = round(last_c["close"] - (2.0 * risk_pts), 2)
             return SmartEdgeSignal(
                 action="BUY_PE",
                 strategy_name="TREND_PULLBACK",

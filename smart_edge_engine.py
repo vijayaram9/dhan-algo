@@ -338,12 +338,42 @@ class NiftySmartEdgeEngine:
         self.seed_candles(spot)
         print(Fore.GREEN + "[*] Engine Initialization Complete. Multi-strategy monitoring active.\n")
 
+    def refresh_real_candles(self) -> bool:
+        """Rebuilds the strategy's candle history from authentic Dhan 5m candles (last 5 sessions),
+        keeping ONLY completed candles (the still-forming candle is dropped)."""
+        try:
+            res = self.client.dhan.intraday_minute_data(
+                "13", "IDX_I", "INDEX",
+                (get_ist_now() - datetime.timedelta(days=7)).strftime("%Y-%m-%d"),
+                get_ist_now().strftime("%Y-%m-%d"), 5
+            ) if self.client.dhan else None
+            d = res.get("data", {}) if isinstance(res, dict) and res.get("status") == "success" else {}
+            closes = d.get("close", []) if isinstance(d, dict) else []
+            if len(closes) < 30:
+                return False
+            now_epoch = (get_ist_now() - datetime.timedelta(hours=5, minutes=30) - datetime.datetime(1970, 1, 1)).total_seconds()
+            candles = []
+            for o, h, l, c, t in zip(d["open"], d["high"], d["low"], d["close"], d["timestamp"]):
+                if float(t) + 300 > now_epoch:   # candle not yet closed
+                    continue
+                candles.append((float(t), float(o), float(h), float(l), float(c)))
+            self.strategy.load_real_candles(candles)
+            return True
+        except Exception as e:
+            print(f"[Candles] Real candle refresh failed: {e}")
+            return False
+
     def seed_candles(self, spot: float):
         """Seeds real historical 5-minute candles to prime all indicators immediately."""
         high = spot + 30.0
         low = spot - 30.0
         self.strategy.update_opening_range(high, low)
         self.strategy.set_daily_pivots(spot + 80.0, spot - 80.0, spot)
+
+        # 0. Preferred: multi-session authentic completed candles (needed for 15m EMAs / ATR)
+        if self.refresh_real_candles():
+            print(Fore.GREEN + f"[*] Primed engine with {len(self.strategy.candles_5m)} authentic Dhan 5m candles.")
+            return
 
         # 1. Primary: Direct authentic 5m candles from DhanHQ Intraday Charts API
         try:
@@ -695,7 +725,7 @@ class NiftySmartEdgeEngine:
         if spot_is_sane:
             if pos.option_type == "CE":
                 # Structural Invalidation (CE: underlying breaks swing low)
-                if pos.underlying_structural_sl > 0 and current_spot <= pos.underlying_structural_sl:
+                if pos.underlying_structural_sl > 0 and current_spot <= pos.underlying_structural_sl and pos.current_premium <= pos.entry_premium:
                     return True, f"Layer 1 Structural Invalidation: {getattr(pos, 'asset_key', 'Spot')} {current_spot:.1f} broke swing low {pos.underlying_structural_sl:.1f}"
 
                 # Target 1 (1.5R) reached (CE: underlying rises to or above target; requires minimum 15s)
@@ -712,7 +742,7 @@ class NiftySmartEdgeEngine:
 
             elif pos.option_type == "PE":
                 # Structural Invalidation (PE: underlying breaks swing high)
-                if pos.underlying_structural_sl > 0 and current_spot >= pos.underlying_structural_sl:
+                if pos.underlying_structural_sl > 0 and current_spot >= pos.underlying_structural_sl and pos.current_premium <= pos.entry_premium:
                     return True, f"Layer 1 Structural Invalidation: {getattr(pos, 'asset_key', 'Spot')} {current_spot:.1f} broke swing high {pos.underlying_structural_sl:.1f}"
 
                 # Target 1 (1.5R) reached (PE: underlying falls to or below target; requires minimum 15s)
@@ -855,9 +885,9 @@ class NiftySmartEdgeEngine:
         try:
             from global_trade_lock import global_trade_lock
             base_cd = int(getattr(config, "cooldown_seconds", 60))
-            # Anti-revenge-trading: a 15s cooldown let the engine re-buy the SAME losing contract
-            # 16 seconds after a loss (06-Nov CRUDEOIL trades #1 -> #2). After a loss, stand down 5 min.
-            cd_secs = max(base_cd, 60)
+            # Anti-revenge-trading: Stand down 5 minutes after any loss so the engine never re-enters into adverse chop
+            cd_secs = max(base_cd, 300) if pos.pnl < 0 else max(base_cd, 60)
+            self.cooldown_until = datetime.datetime.now() + datetime.timedelta(seconds=cd_secs)
             global_trade_lock.release_lock(position_id=getattr(pos, "position_id", ""), cooldown_seconds=cd_secs)
             print(Fore.CYAN + f"[GlobalTradeLock] Lock released. Cooldown active for {cd_secs}s.")
         except Exception as e:
@@ -1072,38 +1102,38 @@ class NiftySmartEdgeEngine:
             pass
 
         if trade_style == "SNIPER":
-            # 🎯 REALISTIC VOLATILITY-ADJUSTED SCALP SETUP (1:2 R:R, Capital-Safe Sizing)
+            # 🎯 REALISTIC VOLATILITY-ADJUSTED SCALP SETUP (15% SL, 1.8R Target = ~27% Gain)
             if is_bn:
-                sl_distance = 25.0  # Realistic 25 pts stop on BankNifty (~₹375 on 15 qty)
+                sl_distance = round(max(35.0, contract.estimated_premium * 0.15), 2)
                 hard_sl = round(max(5.0, contract.estimated_premium - sl_distance), 2)
                 if target_premium <= 0:
-                    target_premium = round(contract.estimated_premium + 50.0, 2)
+                    target_premium = round(contract.estimated_premium + (sl_distance * 1.8), 2)
             elif asset_k == "SENSEX":
-                sl_distance = 30.0  # Realistic 30 pts stop on Sensex
+                sl_distance = round(max(40.0, contract.estimated_premium * 0.15), 2)
                 hard_sl = round(max(5.0, contract.estimated_premium - sl_distance), 2)
                 if target_premium <= 0:
-                    target_premium = round(contract.estimated_premium + 60.0, 2)
+                    target_premium = round(contract.estimated_premium + (sl_distance * 1.8), 2)
             elif is_comm:
                 if asset_k == "NATGASMINI":
-                    sl_distance = 1.2   # ~₹300 on 250 qty
+                    sl_distance = round(max(1.5, contract.estimated_premium * 0.12), 2)
                     hard_sl = round(max(0.2, contract.estimated_premium - sl_distance), 2)
                     if target_premium <= 0:
-                        target_premium = round(contract.estimated_premium + 2.5, 2)
+                        target_premium = round(contract.estimated_premium + (sl_distance * 1.8), 2)
                 elif asset_k in ["GOLDM", "SILVERM"]:
                     sl_distance = round(contract.estimated_premium * 0.12, 1) # 12% of premium
                     hard_sl = round(max(5.0, contract.estimated_premium - sl_distance), 2)
                     if target_premium <= 0:
-                        target_premium = round(contract.estimated_premium * 1.25, 2)
+                        target_premium = round(contract.estimated_premium + (sl_distance * 1.8), 2)
                 else: # CRUDEOILM
-                    sl_distance = 18.0  # 18 pts stop on Crude Oil (~₹180 on 10 qty, ~6% of premium)
+                    sl_distance = round(max(20.0, contract.estimated_premium * 0.10), 2)
                     hard_sl = round(max(5.0, contract.estimated_premium - sl_distance), 2)
                     if target_premium <= 0:
-                        target_premium = round(contract.estimated_premium + 36.0, 2)
+                        target_premium = round(contract.estimated_premium + (sl_distance * 1.8), 2)
             else: # NIFTY / Blue-chip Equity Options
-                sl_distance = 14.0  # Realistic 14 pts stop on Nifty (~₹910 on 65 qty)
+                sl_distance = round(max(18.0, contract.estimated_premium * 0.15), 2)
                 hard_sl = round(max(5.0, contract.estimated_premium - sl_distance), 2)
                 if target_premium <= 0:
-                    target_premium = round(contract.estimated_premium + 28.0, 2)
+                    target_premium = round(contract.estimated_premium + (sl_distance * 1.8), 2)
             max_holding_seconds = 1800  # 30 minutes institutional trade window
         elif trade_style == "SWING":
             if target_premium <= 0:
@@ -1308,18 +1338,14 @@ class NiftySmartEdgeEngine:
             # When market is closed, position management runs but no automatic new entries
             return
 
-        # Update Completed Candle every 5 minutes (or simulate continuous tick aggregation)
-        current_minute = now_dt.minute
-        if self.last_candle_minute is None or (current_minute % 5 == 0 and current_minute != self.last_candle_minute):
-            self.strategy.add_completed_candle(
-                timestamp=now_time,
-                open_=current_spot - 2.0,
-                high=current_spot + 3.0,
-                low=current_spot - 3.0,
-                close=current_spot,
-                volume=1250
-            )
-            self.last_candle_minute = current_minute
+        # Refresh REAL completed 5m candles from Dhan once per 5-minute boundary.
+        # (Previously a synthetic candle open=spot-2/close=spot was injected: every candle looked
+        #  green with a fixed 6-pt range, so the engine only ever bought CALLs and placed stops
+        #  ~3 pts away. That was the root cause of the instant stop-outs.)
+        bucket = (now_dt.hour * 60 + now_dt.minute) // 5
+        if self.last_candle_minute != bucket:
+            if self.refresh_real_candles():
+                self.last_candle_minute = bucket
 
         # Evaluate Multi-Strategy & Regime Detector
         signal = self.strategy.evaluate(now_dt.strftime("%H:%M"))
