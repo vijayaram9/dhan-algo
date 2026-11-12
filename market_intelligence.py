@@ -863,11 +863,14 @@ class MarketIntelligenceEngine:
 
             bb_upper, bb_mid, bb_lower = IndicatorEngine.calculate_bollinger_bands(df5["close"])
             cpr = IndicatorEngine.calculate_cpr(float(df5["high"].max()), float(df5["low"].min()), last_c)
+            candlestick_pat = IndicatorEngine.detect_candlestick_patterns(df5)
+            fvg_data = IndicatorEngine.detect_fair_value_gap(df5)
 
-            # Symmetrical 10-rule evaluation
-            is_ema_bullish = (e9 >= e21)
+            # Symmetrical 10-rule evaluation with Slope & Velocity Validation
+            e9_slope = float(df5["close"].ewm(span=9, adjust=False).mean().diff().iloc[-1]) if len(df5) >= 2 else 0.0
+            is_ema_bullish = (e9 >= e21 and e5 >= e9 and e9_slope >= 0.0)
             is_above_vwap = (spot >= vwap)
-            rsi_bullish = (rsi >= 50.0)
+            rsi_bullish = (52.0 <= rsi <= 72.0)
             adx_trending = (adx >= 18.0)
             vol_bullish = (vol_ratio >= 0.85)
             bb_bullish = (spot >= bb_mid)
@@ -876,30 +879,32 @@ class MarketIntelligenceEngine:
             cvd_bullish = (spot >= vwap and is_candle_green)
             pcr = 1.15 if is_above_vwap else 0.85
             pcr_bullish = is_above_vwap
-            trap_risk_low = (40.0 <= rsi <= 75.0) and (adx >= 16.0)
+            trap_risk_low = (40.0 <= rsi <= 75.0) and (adx >= 16.0) and (candlestick_pat.get("pattern") not in ["BEARISH_SHOOTING_STAR", "BEARISH_ENGULFING"])
         else:
-            # Fallback when candle history is initialising
+            # Stand-down safe state when candle history is initializing or rate-limited
             vwap = spot
             e5, e9, e21 = spot, spot, spot
             rsi = 50.0
-            adx = 20.0
-            pdi, mdi = 22.0, 20.0
+            adx = 15.0
+            pdi, mdi = 20.0, 20.0
             vol_ratio = 1.0
-            is_candle_green = True
+            is_candle_green = False
+            candlestick_pat = {"pattern": "STAND_DOWN", "bias": "NEUTRAL"}
+            fvg_data = {"type": "NONE", "active": False}
             bb_upper, bb_mid, bb_lower = spot + step, spot, spot - step
             cpr = IndicatorEngine.calculate_cpr(spot + step, spot - step, spot)
-            is_ema_bullish = True
-            is_above_vwap = True
-            rsi_bullish = True
-            adx_trending = True
-            vol_bullish = True
-            bb_bullish = True
-            cpr_bullish = True
-            cvd_val = 1000.0
-            cvd_bullish = True
-            pcr = 1.10
-            pcr_bullish = True
-            trap_risk_low = True
+            is_ema_bullish = False
+            is_above_vwap = False
+            rsi_bullish = False
+            adx_trending = False
+            vol_bullish = False
+            bb_bullish = False
+            cpr_bullish = False
+            cvd_val = 0.0
+            cvd_bullish = False
+            pcr = 1.0
+            pcr_bullish = False
+            trap_risk_low = False
 
         details: List[IndicatorDetail] = [
             IndicatorDetail(

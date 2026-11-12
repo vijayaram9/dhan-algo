@@ -994,6 +994,86 @@ class NiftySmartEdgeEngine:
                 except Exception:
                     pass
 
+                # Guardrail B3: Directional Consecutive Loss Circuit Breaker (The "2-Strike Rule")
+                # Institutional risk control: 2 consecutive losses in one direction on an asset locks that direction
+                try:
+                    from journal import journal
+                    import datetime
+                    j_df = journal.get_all_trades_df()
+                    if not j_df.empty:
+                        today_s = datetime.date.today().strftime("%Y-%m-%d")
+                        asset_trades = j_df[j_df["trade_date"] == today_s] if "trade_date" in j_df.columns else j_df
+                        recent_matches = []
+                        for _, tr in asset_trades.iloc[::-1].iterrows():
+                            sym = str(tr.get("symbol", ""))
+                            act = str(tr.get("action", ""))
+                            if (asset_k in sym) or (signal.action in act):
+                                recent_matches.append(tr)
+                                if len(recent_matches) >= 2:
+                                    break
+                        if len(recent_matches) >= 2:
+                            pnl1 = float(recent_matches[0].get("net_pnl", 0.0))
+                            pnl2 = float(recent_matches[1].get("net_pnl", 0.0))
+                            act1 = str(recent_matches[0].get("action", ""))
+                            act2 = str(recent_matches[1].get("action", ""))
+                            if signal.action in act1 and signal.action in act2 and pnl1 < -10.0 and pnl2 < -10.0:
+                                print(Fore.RED + f"[CIRCUIT BREAKER BLOCKED] {signal.action} entries on {asset_k} are LOCKED for the session after 2 consecutive stop-outs (-₹{abs(pnl1):.1f}, -₹{abs(pnl2):.1f}). Preserving capital against trend decay.")
+                                return
+                except Exception:
+                    pass
+
+                # Guardrail B4: Candlestick Confirmation, EMA Slope & Market Structure Gate
+                try:
+                    if df_b is not None and len(df_b) >= 3:
+                        from indicators import IndicatorEngine
+                        last_c = float(df_b["close"].iloc[-1])
+                        last_o = float(df_b["open"].iloc[-1])
+                        is_candle_green = last_c >= last_o
+                        pat = IndicatorEngine.detect_candlestick_patterns(df_b)
+
+                        # 1. Candlestick Color & Rejection Patterns
+                        if signal.action == "BUY_CE":
+                            if not is_candle_green:
+                                print(Fore.YELLOW + f"[CANDLESTICK VETO] Skipping CALL entry: Current 5m candle is RED (Close {last_c:.1f} < Open {last_o:.1f}). Never catch falling knives.")
+                                return
+                            if pat.get("pattern") in ["BEARISH_SHOOTING_STAR", "BEARISH_ENGULFING"]:
+                                print(Fore.YELLOW + f"[CANDLESTICK VETO] Skipping CALL entry: Bearish pattern '{pat.get('pattern')}' detected.")
+                                return
+                        elif signal.action == "BUY_PE":
+                            if is_candle_green:
+                                print(Fore.YELLOW + f"[CANDLESTICK VETO] Skipping PUT entry: Current 5m candle is GREEN (Close {last_c:.1f} > Open {last_o:.1f}). Never short green momentum.")
+                                return
+                            if pat.get("pattern") in ["BULLISH_HAMMER_PINBAR", "BULLISH_ENGULFING"]:
+                                print(Fore.YELLOW + f"[CANDLESTICK VETO] Skipping PUT entry: Bullish pattern '{pat.get('pattern')}' detected.")
+                                return
+
+                        # 2. EMA 9 Slope / Velocity Gate
+                        if len(df_b) >= 5:
+                            e9_series = df_b["close"].ewm(span=9, adjust=False).mean()
+                            e9_slope = float(e9_series.iloc[-1] - e9_series.iloc[-2])
+                            if signal.action == "BUY_CE" and e9_slope < -0.5:
+                                print(Fore.YELLOW + f"[EMA SLOPE VETO] Skipping CALL entry: EMA 9 slope is negative ({e9_slope:.2f}). Downward momentum active.")
+                                return
+                            if signal.action == "BUY_PE" and e9_slope > 0.5:
+                                print(Fore.YELLOW + f"[EMA SLOPE VETO] Skipping PUT entry: EMA 9 slope is positive ({e9_slope:.2f}). Upward momentum active.")
+                                return
+
+                        # 3. Market Structure Shift (MSS) 3-Candle Lower Lows / Higher Highs
+                        l1 = float(df_b["low"].iloc[-1])
+                        l2 = float(df_b["low"].iloc[-2])
+                        l3 = float(df_b["low"].iloc[-3])
+                        if signal.action == "BUY_CE" and (l1 < l2 < l3):
+                            print(Fore.YELLOW + f"[STRUCTURE VETO] Skipping CALL entry: 3 consecutive Lower Lows detected ({l3:.1f} > {l2:.1f} > {l1:.1f}). Downward distribution structure.")
+                            return
+                        h1 = float(df_b["high"].iloc[-1])
+                        h2 = float(df_b["high"].iloc[-2])
+                        h3 = float(df_b["high"].iloc[-3])
+                        if signal.action == "BUY_PE" and (h1 > h2 > h3):
+                            print(Fore.YELLOW + f"[STRUCTURE VETO] Skipping PUT entry: 3 consecutive Higher Highs detected ({h3:.1f} < {h2:.1f} < {h1:.1f}). Upward breakout structure.")
+                            return
+                except Exception:
+                    pass
+
                 # Guardrail C: Real-time Premium Verification (STRICT LIVE DHAN ONLY - NO MATHEMATICAL DRIFT)
                 # Universal for ALL instruments (NIFTY, BANKNIFTY, FINNIFTY, SENSEX, Stocks, MCX) in both LIVE and PAPER
                 active_mode = mode or getattr(self, "mode", "PAPER")

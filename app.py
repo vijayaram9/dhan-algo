@@ -395,11 +395,16 @@ def api_chart_data():
     now_ts_sec = time.time()
     candles = []
 
-    # Fast 2.5s memory cache to prevent external API throttling & freezing
+    # Memory cache with live tick mutation to prevent Dhan DH-904 rate limits
     if cache_key in _chart_candles_cache:
         cached_c, c_time = _chart_candles_cache[cache_key]
-        if (now_ts_sec - c_time < 2.5) and cached_c:
+        if (now_ts_sec - c_time < 45.0) and cached_c:
             candles = [dict(c) for c in cached_c]
+            # Mutate active running candle in memory with live exchange spot tick
+            if candles and spot > 0:
+                candles[-1]["close"] = round(spot, 2)
+                candles[-1]["high"] = max(candles[-1]["high"], round(spot, 2))
+                candles[-1]["low"] = min(candles[-1]["low"], round(spot, 2))
 
     # Pre-calculate active option metadata for possible option charting
     step = asset_info.strike_step
@@ -446,9 +451,10 @@ def api_chart_data():
         try:
             from dhan_client import DhanTraderClient, get_dhan_client
             from datetime import date, timedelta
-            today_str = date.today().strftime("%Y-%m-%d")
-            # For intraday minute candles, Dhan requires from_date within today's session
-            from_date_str = today_str
+            today_d = date.today()
+            today_str = today_d.strftime("%Y-%m-%d")
+            # Fetch last 3 trading days of candles (span 4 calendar days)
+            from_date_str = (today_d - timedelta(days=4)).strftime("%Y-%m-%d")
             dhan_c = get_dhan_client()
 
             if dhan_c.dhan:
@@ -473,6 +479,16 @@ def api_chart_data():
                         to_date=today_str,
                         interval=intv
                     )
+                    # Safe fallback to today if multi-day returned empty
+                    if not (isinstance(dhan_res, dict) and dhan_res.get("status") == "success" and dhan_res.get("data", {}).get("open")):
+                        dhan_res = dhan_c.dhan.intraday_minute_data(
+                            security_id=str(target_sec_id),
+                            exchange_segment=target_seg,
+                            instrument_type=target_itype,
+                            from_date=today_str,
+                            to_date=today_str,
+                            interval=intv
+                        )
                     if isinstance(dhan_res, dict) and dhan_res.get("status") == "success":
                         ddata = dhan_res.get("data", {})
                         opens = ddata.get("open", [])
