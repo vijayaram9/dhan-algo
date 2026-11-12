@@ -444,7 +444,15 @@ def api_chart_data():
             "HDFCBANK": ("1333", "NSE_EQ", "EQUITY"),
             "ICICIBANK": ("4963", "NSE_EQ", "EQUITY"),
             "INFY": ("1594", "NSE_EQ", "EQUITY"),
-            "SBIN": ("3045", "NSE_EQ", "EQUITY")
+            "SBIN": ("3045", "NSE_EQ", "EQUITY"),
+            "BHARTIARTL": ("10604", "NSE_EQ", "EQUITY"),
+            "LT": ("11483", "NSE_EQ", "EQUITY"),
+            "AXISBANK": ("5900", "NSE_EQ", "EQUITY"),
+            "KOTAKBANK": ("1922", "NSE_EQ", "EQUITY"),
+            "TATASTEEL": ("3499", "NSE_EQ", "EQUITY"),
+            "BAJFINANCE": ("317", "NSE_EQ", "EQUITY"),
+            "MARUTI": ("10999", "NSE_EQ", "EQUITY"),
+            "M&M": ("2031", "NSE_EQ", "EQUITY")
         }
         dhan_interval_map = {"10s": 1, "1m": 1, "3m": 3, "5m": 5, "10m": 10, "15m": 15, "1h": 60, "1d": 60}
 

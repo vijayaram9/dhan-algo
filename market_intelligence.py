@@ -172,6 +172,102 @@ ASSET_CATALOG: Dict[str, AssetInfo] = {
         expiry_day_name="Last Thursday",
         baseline_price=0.0
     ),
+    "BHARTIARTL": AssetInfo(
+        key="BHARTIARTL",
+        display_name="Bharti Airtel",
+        category="STOCK",
+        exchange="NSE",
+        tv_symbol="NSE:BHARTIARTL",
+        yfinance_symbol="BHARTIARTL.NS",
+        lot_size=475,
+        strike_step=10,
+        expiry_day_name="Last Thursday",
+        baseline_price=0.0
+    ),
+    "LT": AssetInfo(
+        key="LT",
+        display_name="Larsen & Toubro",
+        category="STOCK",
+        exchange="NSE",
+        tv_symbol="NSE:LT",
+        yfinance_symbol="LT.NS",
+        lot_size=175,
+        strike_step=25,
+        expiry_day_name="Last Thursday",
+        baseline_price=0.0
+    ),
+    "AXISBANK": AssetInfo(
+        key="AXISBANK",
+        display_name="Axis Bank",
+        category="STOCK",
+        exchange="NSE",
+        tv_symbol="NSE:AXISBANK",
+        yfinance_symbol="AXISBANK.NS",
+        lot_size=625,
+        strike_step=10,
+        expiry_day_name="Last Thursday",
+        baseline_price=0.0
+    ),
+    "KOTAKBANK": AssetInfo(
+        key="KOTAKBANK",
+        display_name="Kotak Mahindra Bank",
+        category="STOCK",
+        exchange="NSE",
+        tv_symbol="NSE:KOTAKBANK",
+        yfinance_symbol="KOTAKBANK.NS",
+        lot_size=400,
+        strike_step=20,
+        expiry_day_name="Last Thursday",
+        baseline_price=0.0
+    ),
+    "TATASTEEL": AssetInfo(
+        key="TATASTEEL",
+        display_name="Tata Steel",
+        category="STOCK",
+        exchange="NSE",
+        tv_symbol="NSE:TATASTEEL",
+        yfinance_symbol="TATASTEEL.NS",
+        lot_size=2750,
+        strike_step=2.5,
+        expiry_day_name="Last Thursday",
+        baseline_price=0.0
+    ),
+    "BAJFINANCE": AssetInfo(
+        key="BAJFINANCE",
+        display_name="Bajaj Finance",
+        category="STOCK",
+        exchange="NSE",
+        tv_symbol="NSE:BAJFINANCE",
+        yfinance_symbol="BAJFINANCE.NS",
+        lot_size=125,
+        strike_step=50,
+        expiry_day_name="Last Thursday",
+        baseline_price=0.0
+    ),
+    "MARUTI": AssetInfo(
+        key="MARUTI",
+        display_name="Maruti Suzuki",
+        category="STOCK",
+        exchange="NSE",
+        tv_symbol="NSE:MARUTI",
+        yfinance_symbol="MARUTI.NS",
+        lot_size=50,
+        strike_step=100,
+        expiry_day_name="Last Thursday",
+        baseline_price=0.0
+    ),
+    "M&M": AssetInfo(
+        key="M&M",
+        display_name="Mahindra & Mahindra",
+        category="STOCK",
+        exchange="NSE",
+        tv_symbol="NSE:M&M",
+        yfinance_symbol="M&M.NS",
+        lot_size=200,
+        strike_step=20,
+        expiry_day_name="Last Thursday",
+        baseline_price=0.0
+    ),
     # -------------------------------------------------------------------------
     # MCX COMMODITIES (MINI LOTS) - Session 09:00 AM to 11:30 PM IST
     # -------------------------------------------------------------------------
@@ -1381,27 +1477,20 @@ class MarketIntelligenceEngine:
                 "NIFTY", "BANKNIFTY", "SENSEX", "FINNIFTY", "RELIANCE"
             ]
         else:
+            # Common liquid stock basket
+            liquid_stocks = [
+                "RELIANCE", "HDFCBANK", "ICICIBANK", "SBIN", "INFY", "TCS",
+                "BHARTIARTL", "LT", "AXISBANK", "KOTAKBANK", "TATASTEEL", "BAJFINANCE", "MARUTI", "M&M"
+            ]
             # Daytime: Indian equity indices & bluechips strictly take precedence!
             if weekday_idx == 1: # Tuesday: FIN NIFTY Expiry
-                priority_order = [
-                    "FINNIFTY", "NIFTY", "BANKNIFTY", "SENSEX",
-                    "RELIANCE", "HDFCBANK", "ICICIBANK", "SBIN", "INFY", "TCS"
-                ]
+                priority_order = ["FINNIFTY", "NIFTY", "BANKNIFTY", "SENSEX"] + liquid_stocks
             elif weekday_idx == 2: # Wednesday: BANK NIFTY
-                priority_order = [
-                    "BANKNIFTY", "NIFTY", "FINNIFTY", "SENSEX",
-                    "RELIANCE", "HDFCBANK", "ICICIBANK", "SBIN", "INFY", "TCS"
-                ]
+                priority_order = ["BANKNIFTY", "NIFTY", "FINNIFTY", "SENSEX"] + liquid_stocks
             elif weekday_idx == 4: # Friday: BSE SENSEX Expiry
-                priority_order = [
-                    "SENSEX", "NIFTY", "BANKNIFTY", "FINNIFTY",
-                    "RELIANCE", "HDFCBANK", "ICICIBANK", "SBIN", "INFY", "TCS"
-                ]
+                priority_order = ["SENSEX", "NIFTY", "BANKNIFTY", "FINNIFTY"] + liquid_stocks
             else: # Monday, Thursday, and other days: Benchmark NIFTY & BANKNIFTY first
-                priority_order = [
-                    "NIFTY", "BANKNIFTY", "SENSEX", "FINNIFTY",
-                    "RELIANCE", "HDFCBANK", "ICICIBANK", "SBIN", "INFY", "TCS"
-                ]
+                priority_order = ["NIFTY", "BANKNIFTY", "SENSEX", "FINNIFTY"] + liquid_stocks
         
         # Seamlessly include user-added custom stocks/calls/futures into the opportunity scanner
         for k, v in ASSET_CATALOG.items():
