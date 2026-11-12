@@ -175,11 +175,11 @@ class ContractSelector:
         # Trades MUST be backed by genuine real-time live quotes directly from Dhan API.
         # ---------------------------------------------------------------------
         if estimated_premium <= 0.10:
-            # Check last authentic flashed price from Dhan
+            # Check last authentic flashed price from Dhan (strictly <= 15 seconds old)
             try:
                 from dhan_client import get_dhan_client
                 client = get_dhan_client()
-                last_f = client.get_last_flashed_price(sec_id, [custom_sym, contract_meta.get("trading_symbol", "")])
+                last_f = client.get_last_flashed_price(sec_id, [custom_sym, contract_meta.get("trading_symbol", "")], max_age=15.0)
                 if last_f > 0.10:
                     estimated_premium = last_f
             except Exception:
@@ -189,6 +189,48 @@ class ContractSelector:
             # Strictly NO synthetic or mathematical estimates. Genuine Dhan quotes only.
             rejection = f"🚨 AUTHENTIC DHAN QUOTE REQUIRED: Live Dhan tick unavailable for {contract_meta.get('custom_symbol')}. Refusing entry to prevent phantom execution or distorted pricing."
             return SelectedContract(
+                    security_id=sec_id,
+                    trading_symbol=contract_meta.get("trading_symbol", ""),
+                    custom_symbol=contract_meta.get("custom_symbol", ""),
+                    strike_price=contract_strike,
+                    option_type=option_type,
+                    expiry_date=exp_date,
+                    lot_size=65,
+                    estimated_premium=estimated_premium,
+                    estimated_delta=0.0,
+                    hard_stop_premium=0.0,
+                    trade_risk_inr=0.0,
+                    risk_budget_approved=False,
+                    rejection_reason=rejection,
+                    asset_key=asset_key,
+                    number_of_lots=0,
+                    margin_required=0.0,
+                    advisory_alert=rejection,
+                    signal_id=sig_id,
+                    candle_timestamp=candle_ts,
+                    segment=contract_seg
+                )
+
+        # ---------------------------------------------------------------------
+        # COMPLIANCE GUARDRAIL 2B: 0DTE INTRINSIC SANITY CEILING
+        # On expiry days, out-of-the-money or near-the-money options cannot trade
+        # above intrinsic value + max plausible extrinsic time value.
+        # Catches stale ticks recorded when the underlying was hundreds of points higher!
+        # ---------------------------------------------------------------------
+        today_iso = datetime.datetime.now().strftime("%Y-%m-%d")
+        is_0dte = (exp_date == today_iso) or (exp_date.startswith(today_iso))
+        if is_0dte and estimated_premium > 0:
+            intrinsic = max(0.0, spot_price - contract_strike) if option_type == "CE" else max(0.0, contract_strike - spot_price)
+            max_plausible_prem = intrinsic + (step * 0.75) + 40.0
+            if estimated_premium > max_plausible_prem:
+                rejection = (
+                    f"🚨 0DTE EXPIRY VALUE CEILING VIOLATION: Contract {custom_sym} premium ₹{estimated_premium:.2f} "
+                    f"exceeds 0DTE max allowable value ₹{max_plausible_prem:.2f} "
+                    f"(Intrinsic: ₹{intrinsic:.2f} + Max Plausible Extrinsic: ₹{step*0.75 + 40.0:.2f}) at spot {spot_price:.1f}. "
+                    f"Blocked entry to prevent buying at stale/inflated quote."
+                )
+                print(f"[GUARDRAIL BLOCKED] {rejection}")
+                return SelectedContract(
                     security_id=sec_id,
                     trading_symbol=contract_meta.get("trading_symbol", ""),
                     custom_symbol=contract_meta.get("custom_symbol", ""),

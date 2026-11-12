@@ -1510,16 +1510,25 @@ class MarketIntelligenceEngine:
             is_bear = "PE" in verdict["action"] or "PUT" in verdict["action"]
             levels = self.calculate_levels_and_stops(spot, key, is_bear=is_bear)
             
-            # Check expiry day
+            # Check expiry day dynamically from authentic Dhan scrip master
             is_expiry_today = False
-            if weekday_idx == 1 and key == "FINNIFTY":
-                is_expiry_today = True
-            elif weekday_idx == 2 and key == "BANKNIFTY":
-                is_expiry_today = True
-            elif weekday_idx == 3 and key in ["NIFTY", "NIFTYIT"]:
-                is_expiry_today = True
-            elif weekday_idx == 4 and key == "SENSEX":
-                is_expiry_today = True
+            try:
+                from scrip_master import scrip_master
+                today_s = datetime.date.today().strftime("%Y-%m-%d")
+                nearest_exp = scrip_master.get_nearest_expiry(key)
+                if nearest_exp and nearest_exp.startswith(today_s):
+                    is_expiry_today = True
+            except Exception:
+                pass
+            if not is_expiry_today:
+                if weekday_idx == 1 and key == "FINNIFTY":
+                    is_expiry_today = True
+                elif weekday_idx == 2 and key == "BANKNIFTY":
+                    is_expiry_today = True
+                elif weekday_idx == 3 and key in ["NIFTY", "NIFTYIT", "SENSEX"]:
+                    is_expiry_today = True
+                elif weekday_idx == 4 and key in ["SENSEX", "BANKEX"]:
+                    is_expiry_today = True
 
             step = info.strike_step
             atm_strike = round(spot / step) * step

@@ -53,14 +53,22 @@ class MultiTimeframeEngine:
 
     def get_expiry_schedule(self, asset_key: str) -> Tuple[bool, str]:
         """Checks if today is the high-volatility zero-theta expiry day for the asset."""
+        try:
+            from scrip_master import scrip_master
+            today_str = datetime.date.today().strftime("%Y-%m-%d")
+            nearest_exp = scrip_master.get_nearest_expiry(asset_key)
+            if nearest_exp and nearest_exp.startswith(today_str):
+                return True, f"⭐️ {asset_key} 0DTE EXPIRY DAY (ZERO-THETA GAMMA REGIME)"
+        except Exception:
+            pass
         weekday_idx = datetime.datetime.now().weekday()
         # 0=Monday, 1=Tuesday (FINNIFTY), 2=Wednesday, 3=Thursday (NIFTY/BANKNIFTY), 4=Friday (SENSEX)
         if asset_key == "FINNIFTY" and weekday_idx == 1:
             return True, "⭐️ FINNIFTY TUESDAY EXPIRY (ZERO-THETA GAMMA SURGE)"
         elif asset_key in ["NIFTY", "BANKNIFTY"] and weekday_idx == 3:
             return True, f"⭐️ {asset_key} THURSDAY WEEKLY EXPIRY"
-        elif asset_key == "SENSEX" and weekday_idx == 4:
-            return True, "⭐️ BSE SENSEX FRIDAY EXPIRY"
+        elif asset_key == "SENSEX" and (weekday_idx == 3 or weekday_idx == 4):
+            return True, "⭐️ BSE SENSEX WEEKLY EXPIRY"
         elif asset_key == "CRUDEOILM" and weekday_idx in [1, 2]:
             return False, "MCX Commodity Active Session"
         return False, f"Regular Trading Session"
@@ -185,7 +193,8 @@ class MultiTimeframeEngine:
         df5 = self.get_real_candles(asset_key)
         
         # Calculate real indicator parameters
-        if df5 is not None and len(df5) >= 5:
+        has_real_candles = (df5 is not None and len(df5) >= 5)
+        if has_real_candles:
             e5, e9, e21, ema_align = IndicatorEngine.calculate_triple_ema(df5["close"])
             rsi_val = IndicatorEngine.calculate_rsi(df5["close"])
             is_real_bear = (spot < vwap) and (e9 <= e21)
@@ -193,8 +202,8 @@ class MultiTimeframeEngine:
         else:
             e9, e21 = spot, spot
             rsi_val = 50.0
-            is_real_bear = (spot < vwap - 10.0)
-            is_real_bull = (spot > vwap + 10.0)
+            is_real_bear = False
+            is_real_bull = False
 
         # ---------------------------------------------------------------------
         # 1. 15-MINUTE MACRO TIMEFRAME (Real Trend from Dhan Price Action)
@@ -329,7 +338,30 @@ class MultiTimeframeEngine:
 
         key_reasons = []
 
-        if is_hero_zero_time:
+        if not has_real_candles:
+            # 🛡️ FAIL-CLOSED PROTECTION: Never trade without genuine candles from Dhan
+            setup_type = "AWAITING_CANDLES"
+            market_regime = "UNCONFIRMED_DATA"
+            recommended_action = "STAND_DOWN"
+            option_type = "CE"
+            recommended_strike = f"{display_name} {atm_strike:,.0f} (No Candles)"
+            direction_label = "STAND DOWN (AWAITING DATA)"
+            confluence_score = 40
+            stop_loss_pts = default_stop_pts
+            target_pts = default_target_pts
+            risk_reward_ratio = "N/A"
+            is_actionable = False
+            rationale = (
+                f"🛡️ FAIL-CLOSED DEFENSE: Awaiting authentic 5m candles for {display_name} directly from DhanHQ. "
+                f"Indicators (VWAP, EMA 9/21, RSI) require genuine multi-timeframe candles. Standing down in safe cash."
+            )
+            key_reasons = [
+                f"Dhan 5m candle feed not yet available (minimum 5 candles required)",
+                f"Fail-Closed Discipline: Strictly refusing to execute trades on unconfirmed or synthetic data",
+                f"Safe Cash Defense active until verified candles are fetched"
+            ]
+
+        elif is_hero_zero_time:
             # ⭐️ HERO-TO-ZERO EXPIRY SETUP (Explosive Gamma Expansion)
             setup_type = "HERO_TO_ZERO"
             market_regime = "EXPIRY_GAMMA_ACCELERATION"

@@ -61,23 +61,35 @@ class DhanTraderClient:
                 if k:
                     self._last_flashed_prices[str(k)] = entry
 
-    def get_last_flashed_price(self, security_id: str, fallback_keys: list = None) -> float:
+    def get_last_flashed_price(self, security_id: str, fallback_keys: list = None, max_age: float = 15.0) -> float:
         """
         Retrieves the most recent authentic exchange price flashed by Dhan for this security.
-        Guarantees that momentary network drops or rate-limits never result in zero valuation or zero execution.
+        CRITICAL GUARDRAIL: Only returns prices flashed within max_age seconds (default 15.0s).
+        Any price older than max_age is considered STALE and returns 0.0 to prevent phantom fills
+        or using hours-old prices during violent market moves.
         """
+        now_ts = time.time()
         s_id = str(security_id)
         if s_id in self._last_flashed_prices:
-            p = self._last_flashed_prices[s_id].get("price", 0.0)
-            if p > 0.05:
-                return p
+            entry = self._last_flashed_prices[s_id]
+            age = now_ts - entry.get("timestamp", 0.0)
+            if age <= max_age:
+                p = entry.get("price", 0.0)
+                if p > 0.05:
+                    return p
+            else:
+                pass  # Stale tick expired
+
         if fallback_keys:
             for k in fallback_keys:
                 k_str = str(k)
                 if k_str in self._last_flashed_prices:
-                    p = self._last_flashed_prices[k_str].get("price", 0.0)
-                    if p > 0.05:
-                        return p
+                    entry = self._last_flashed_prices[k_str]
+                    age = now_ts - entry.get("timestamp", 0.0)
+                    if age <= max_age:
+                        p = entry.get("price", 0.0)
+                        if p > 0.05:
+                            return p
         return 0.0
 
     def init_dhan(self) -> bool:
@@ -607,14 +619,14 @@ class DhanTraderClient:
         # ZERO-PRICE & PHANTOM TRADE PREVENTION:
         # Never allow an order to be executed at ₹0.0. Resolve to Dhan's authentic last flashed price.
         if price <= 0.05:
-            last_flashed = self.get_last_flashed_price(security_id, [trading_symbol])
+            last_flashed = self.get_last_flashed_price(security_id, [trading_symbol], max_age=15.0)
             if last_flashed > 0.05:
                 price = last_flashed
             else:
-                print(f"[ORDER BLOCKED] Cannot execute {transaction_type} {trading_symbol} at ₹{price:.2f} (no authentic Dhan price has flashed).")
+                print(f"[ORDER BLOCKED] Cannot execute {transaction_type} {trading_symbol} at ₹{price:.2f} (no authentic Dhan price has flashed within 15s).")
                 return {
                     "status": "failure",
-                    "remarks": f"Zero Price Guardrail: Blocked execution for {trading_symbol} at ₹0.0 (no authentic Dhan exchange quote available)."
+                    "remarks": f"Zero Price Guardrail: Blocked execution for {trading_symbol} at ₹0.0 (no authentic Dhan exchange quote available within 15s)."
                 }
 
         if target_mode == "LIVE" and self.dhan:
