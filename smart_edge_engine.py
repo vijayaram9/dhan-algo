@@ -640,25 +640,25 @@ class NiftySmartEdgeEngine:
                     self.log_sniper_event(msg, "PROFIT")
 
             # 3. Multi-Tiered Dynamic Trailing Stop & Profit Lock for Swing:
-            # Tier 1 (+12% premium gain): Move stop to Breakeven (+1.5 pts). Trade is 100% Risk-Free!
-            if prem_gain_pct >= 12.0 and pos.trailing_step_level < 1:
+            # Tier 1 (+8% premium gain or +18 pts): Move stop to Breakeven (+1.5 pts). Trade is 100% Risk-Free!
+            if (prem_gain_pct >= 8.0 or prem_gain >= 18.0) and pos.trailing_step_level < 1:
                 pos.hard_stop_premium = max(pos.hard_stop_premium, round(pos.entry_premium + 1.5, 2))
                 pos.is_trailing_active = True
                 pos.trailing_step_level = 1
                 pos.locked_profit_inr = round(1.5 * pos.quantity, 2)
                 print(f"[SWING TIER 1] 🌊 Breakeven Locked @ ₹{pos.hard_stop_premium:.2f} (Risk-Free)")
 
-            # Tier 2 (+22% premium gain): Lock in at least +12% profit!
-            if prem_gain_pct >= 22.0 and pos.trailing_step_level < 2:
-                locked_prem = round(pos.entry_premium * 1.12, 2)
+            # Tier 2 (+16% premium gain): Lock in at least +10% profit!
+            if (prem_gain_pct >= 16.0 or prem_gain >= 35.0) and pos.trailing_step_level < 2:
+                locked_prem = round(pos.entry_premium * 1.10, 2)
                 pos.hard_stop_premium = max(pos.hard_stop_premium, locked_prem)
                 pos.trailing_step_level = 2
                 pos.locked_profit_inr = round((pos.hard_stop_premium - pos.entry_premium) * pos.quantity, 2)
-                print(f"[SWING TIER 2] 🌊 +12% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
+                print(f"[SWING TIER 2] 🌊 +10% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
 
-            # Tier 3 (+30% or higher runner): Trail tightly at 88% of highest watermark!
-            if prem_gain_pct >= 30.0:
-                trail_sl = round(pos.highest_premium * 0.88, 2)
+            # Tier 3 (+25% or higher runner): Trail tightly at 90% of highest watermark!
+            if prem_gain_pct >= 25.0:
+                trail_sl = round(pos.highest_premium * 0.90, 2)
                 if trail_sl > pos.hard_stop_premium:
                     pos.hard_stop_premium = trail_sl
                     pos.trailing_step_level = 3

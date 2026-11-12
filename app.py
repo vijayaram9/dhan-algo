@@ -447,7 +447,8 @@ def api_chart_data():
             from dhan_client import DhanTraderClient, get_dhan_client
             from datetime import date, timedelta
             today_str = date.today().strftime("%Y-%m-%d")
-            from_date_str = (date.today() - timedelta(days=3)).strftime("%Y-%m-%d")
+            # For intraday minute candles, Dhan requires from_date within today's session
+            from_date_str = today_str
             dhan_c = get_dhan_client()
 
             if dhan_c.dhan:
