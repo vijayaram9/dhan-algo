@@ -1373,15 +1373,15 @@
                     <button onclick="selectAsset('LT')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 transition text-slate-700" id="qpill-LT">L&T</button>
                 </div>
 
-                <!-- Dual View Mode Toggle: Dhan TV View vs Algo Signals Desk -->
+                <!-- Dual View Mode Toggle: Algo Desk vs Dhan TV Terminal -->
                 <div class="flex items-center bg-slate-100 p-0.5 rounded-xl text-xs font-mono font-bold shadow-inner">
-                    <button onclick="toggleChartMode('tv')" id="btn-chart-mode-tv" class="px-3 py-1.5 rounded-lg transition bg-blue-600 text-white shadow-xs flex items-center space-x-1.5" title="Interactive Dhan TradingView Terminal">
-                        <i class="fa-solid fa-chart-line text-[11px]"></i>
-                        <span>Dhan TV Terminal</span>
-                    </button>
-                    <button onclick="toggleChartMode('algo')" id="btn-chart-mode-algo" class="px-3 py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900 flex items-center space-x-1.5" title="Lightweight Charts with Algo Overlays & Option Chain">
-                        <i class="fa-solid fa-bolt text-[11px] text-amber-500"></i>
+                    <button onclick="toggleChartMode('algo')" id="btn-chart-mode-algo" class="px-3 py-1.5 rounded-lg transition bg-blue-600 text-white shadow-xs flex items-center space-x-1.5" title="Lightweight Charts with Authentic Dhan Feed & Algo Overlays">
+                        <i class="fa-solid fa-bolt text-[11px] text-amber-300"></i>
                         <span>Algo Desk</span>
+                    </button>
+                    <button onclick="toggleChartMode('tv')" id="btn-chart-mode-tv" class="px-3 py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900 flex items-center space-x-1.5" title="Interactive TradingView Embed">
+                        <i class="fa-solid fa-chart-line text-[11px]"></i>
+                        <span>TradingView</span>
                     </button>
                 </div>
             </div>
@@ -1393,18 +1393,18 @@
                         <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                         <span id="candlestick-asset-name">NIFTY 50</span>
                         <span id="chart-timeframe-tag" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono font-bold">5M</span>
-                        <span id="chart-mode-badge" class="text-[9px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-mono font-bold">TradingView Live</span>
+                        <span id="chart-mode-badge" class="text-[9px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono font-bold">Dhan Live Feed</span>
                     </h3>
                     <div class="flex items-center space-x-3 text-xs text-slate-400 mt-0.5 font-mono">
                         <span id="chart-ist-clock"><i class="fa-regular fa-clock mr-1 text-blue-600"></i>IST: Live Exchange Feed</span>
                         <span class="text-slate-300">•</span>
-                        <span>Interactive Candles + Drawing Tools + S/R + VWAP</span>
+                        <span>Authentic Dhan Candles + EMA 9/21 + VWAP + S/R</span>
                     </div>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
                     <!-- Indicator Overlays Switcher (EMA 9/21, VWAP, S/R) - for Algo Desk -->
-                    <div id="algo-chart-controls" class="items-center gap-1 bg-slate-100 p-0.5 rounded-xl text-xs font-mono font-bold" style="display: none;">
+                    <div id="algo-chart-controls" class="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl text-xs font-mono font-bold">
                         <button onclick="toggleIndicator('ema')" id="btn-toggle-ema" class="px-2 py-1 rounded-lg bg-cyan-50 text-cyan-700 border border-cyan-200 transition shadow-2xs" title="Toggle EMA 9 & EMA 21 Ribbon">EMA 9/21</button>
                         <button onclick="toggleIndicator('vwap')" id="btn-toggle-vwap" class="px-2 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 transition shadow-2xs" title="Toggle Intraday VWAP">VWAP</button>
                         <button onclick="toggleIndicator('sr')" id="btn-toggle-sr" class="px-2 py-1 rounded-lg bg-white text-slate-800 transition shadow-2xs" title="Toggle Support & Resistance Levels">S/R Levels</button>
@@ -1427,19 +1427,19 @@
                         
                         <!-- External Dhan Direct Link -->
                         <a id="btn-dhan-tv-link" href="https://tv.dhan.co/" target="_blank"
-                            class="ml-1 px-2.5 py-1 rounded-lg bg-white hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center space-x-1 transition shadow-2xs" title="Open Native Dhan TradingView Web App">
-                            <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-blue-600"></i>
-                            <span>Dhan App</span>
+                            class="ml-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold flex items-center space-x-1.5 transition border border-blue-200" title="Launch Full Dhan TradingView Terminal at tv.dhan.co">
+                            <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                            <span>Dhan TV (tv.dhan.co)</span>
                         </a>
                     </div>
                 </div>
             </div>
 
-            <!-- CONTAINER 1: Dhan TV Terminal (Advanced TradingView Real-Time Widget) -->
-            <div id="tradingview_chart_container" style="height: 580px; width: 100%; border-radius: 12px; overflow: hidden; background: #ffffff;"></div>
+            <!-- CONTAINER 1: Candlestick Container (Rendered via LightweightCharts for Algo Desk - Default) -->
+            <div id="candlestick_chart_container" style="height: 480px; width: 100%; position: relative; display: block;"></div>
 
-            <!-- CONTAINER 2: Candlestick Container (Rendered via LightweightCharts for Algo Desk) -->
-            <div id="candlestick_chart_container" style="height: 440px; width: 100%; position: relative; display: none;"></div>
+            <!-- CONTAINER 2: Dhan TV Terminal (Advanced TradingView Real-Time Widget) -->
+            <div id="tradingview_chart_container" style="height: 580px; width: 100%; border-radius: 12px; overflow: hidden; background: #ffffff; display: none;"></div>
 
             <!-- Real-time Quick Quote Bar with Dynamic Levels -->
             <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2.5 mt-3 pt-3 border-t border-black/[0.04] text-xs font-mono">
@@ -3363,7 +3363,7 @@
     }
 
     // Switch Selected Trading Asset (Adaptive for any stock, commodity, or radar recommendation)
-    let activeChartMode = 'tv'; // 'tv' = TradingView Dhan Terminal, 'algo' = Lightweight Charts Algo Desk
+    let activeChartMode = 'algo'; // 'algo' = Lightweight Charts Algo Desk, 'tv' = TradingView Embed
     let tvWidget = null;
 
     const TV_SYMBOL_MAP = {
@@ -6498,7 +6498,14 @@
             switchMasterMarketSegment('COMMODITY');
         }
 
-        setTimeout(() => initTradingViewWidget(activeAssetKey, activeTimeframe), 250);
+        if (activeChartMode === 'tv') {
+            setTimeout(() => initTradingViewWidget(activeAssetKey, activeTimeframe), 250);
+        } else {
+            setTimeout(() => {
+                if (!lwChart) initCandlestickChart();
+                fetchCandlestickData();
+            }, 100);
+        }
         fetchCandlestickData();
         fetchOpportunities();
         fetchSniperScan();
