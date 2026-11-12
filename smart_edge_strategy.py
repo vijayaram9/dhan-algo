@@ -313,8 +313,9 @@ class NiftySmartEdgeStrategy:
 
             if all([c1, c2, c3, c4, c5, c6, c7, c8]):
                 self.orb_attempts += 1
-                structural_sl = self.orb_high - (0.3 * atr5)
-                risk_pts = last_c["close"] - structural_sl
+                sl_dist = max(last_c["close"] - (self.orb_high - (0.5 * atr5)), 20.0)
+                structural_sl = round(last_c["close"] - sl_dist, 2)
+                risk_pts = sl_dist
                 t1 = last_c["close"] + (1.5 * risk_pts)
                 t2 = last_c["close"] + (2.0 * risk_pts)
                 return SmartEdgeSignal(
@@ -349,8 +350,9 @@ class NiftySmartEdgeStrategy:
 
             if all([c1, c2, c3, c4, c5, c6, c7, c8]):
                 self.orb_attempts += 1
-                structural_sl = self.orb_low + (0.3 * atr5)
-                risk_pts = structural_sl - last_c["close"]
+                sl_dist = max((self.orb_low + (0.5 * atr5)) - last_c["close"], 20.0)
+                structural_sl = round(last_c["close"] + sl_dist, 2)
+                risk_pts = sl_dist
                 t1 = last_c["close"] - (1.5 * risk_pts)
                 t2 = last_c["close"] - (2.0 * risk_pts)
                 return SmartEdgeSignal(
@@ -401,7 +403,8 @@ class NiftySmartEdgeStrategy:
         checklist.append(AuditCheckItem("Breaks Confirmation High", f"> {prev_c['high']:.1f}", f"{last_c['close']:.1f}", c5, side="CE"))
 
         if all([c1, c2, c3, c4, c5]):
-            structural_sl = min(prev_c["low"], last_c["low"]) - (0.2 * atr5)
+            sl_dist = max(last_c["close"] - (min(prev_c["low"], last_c["low"]) - (0.5 * atr5)), 18.0)
+            structural_sl = round(last_c["close"] - sl_dist, 2)
             t1 = min(vwap5, bb_mid)  # Target is VWAP or Bollinger Middle Band
             t2 = max(vwap5, bb_mid)
             return SmartEdgeSignal(
@@ -428,7 +431,8 @@ class NiftySmartEdgeStrategy:
         checklist.append(AuditCheckItem("Breaks Confirmation Low", f"< {prev_c['low']:.1f}", f"{last_c['close']:.1f}", c5, side="PE"))
 
         if all([c1, c2, c3, c4, c5]):
-            structural_sl = max(prev_c["high"], last_c["high"]) + (0.2 * atr5)
+            sl_dist = max((max(prev_c["high"], last_c["high"]) + (0.5 * atr5)) - last_c["close"], 18.0)
+            structural_sl = round(last_c["close"] + sl_dist, 2)
             t1 = max(vwap5, bb_mid)  # Target is VWAP or Bollinger Middle Band
             t2 = min(vwap5, bb_mid)
             return SmartEdgeSignal(
@@ -478,8 +482,9 @@ class NiftySmartEdgeStrategy:
         c_ce_rsi = 38.0 <= rsi5 <= 68.0
 
         if (c_ce_mom or c_ce_bounce) and c_ce_candle and c_ce_rsi:
-            sl_spot = min(last_c["low"], prev_c["low"]) - (0.15 * atr5)
-            risk_pts = max(last_c["close"] - sl_spot, 6.0)
+            sl_dist = max(last_c["close"] - (min(last_c["low"], prev_c["low"]) - (0.35 * atr5)), 18.0)
+            sl_spot = last_c["close"] - sl_dist
+            risk_pts = sl_dist
             t1 = last_c["close"] + (1.5 * risk_pts)
             t2 = last_c["close"] + (2.5 * risk_pts)
             checklist.append(AuditCheckItem("Consolidation Scalp CE", "Bullish Micro Bounce", f"Close {last_c['close']:.1f}", True, side="CE"))
@@ -503,8 +508,9 @@ class NiftySmartEdgeStrategy:
         c_pe_rsi = 32.0 <= rsi5 <= 62.0
 
         if (c_pe_mom or c_pe_reject) and c_pe_candle and c_pe_rsi:
-            sl_spot = max(last_c["high"], prev_c["high"]) + (0.15 * atr5)
-            risk_pts = max(sl_spot - last_c["close"], 6.0)
+            sl_dist = max((max(last_c["high"], prev_c["high"]) + (0.35 * atr5)) - last_c["close"], 18.0)
+            sl_spot = last_c["close"] + sl_dist
+            risk_pts = sl_dist
             t1 = last_c["close"] - (1.5 * risk_pts)
             t2 = last_c["close"] - (2.5 * risk_pts)
             checklist.append(AuditCheckItem("Consolidation Scalp PE", "Bearish Micro Rejection", f"Close {last_c['close']:.1f}", True, side="PE"))

@@ -423,18 +423,19 @@ class DhanTraderClient:
 
             today_str = datetime.now().strftime("%Y-%m-%d")
 
-            # Route MCX Commodity Options directly to intraday_minute_data
-            # (Dhan does not service ticker_data/quote_data for MCX options)
-            if target_seg == "MCX_COMM":
+            # Route MCX Commodity Options and BSE SENSEX / BANKEX Options directly to intraday_minute_data
+            # (Dhan does not service ticker_data/quote_data packets for MCX or BSE F&O)
+            if target_seg in ["MCX_COMM", "BSE_FNO"]:
                 try:
                     DhanTraderClient.throttle_request(0.20)
+                    itype = "OPTFUT" if target_seg == "MCX_COMM" else ("OPTIDX" if strike > 50000 or real_spot > 50000 else "OPTSTK")
                     res_m = self.dhan.intraday_minute_data(
-                        str(security_id), "MCX_COMM", "OPTFUT", today_str, today_str, interval=1
+                        str(security_id), target_seg, itype, today_str, today_str, interval=1
                     )
                     if isinstance(res_m, dict) and "Rate_Limit" in str(res_m):
-                        time.sleep(0.6)
+                        time.sleep(0.5)
                         res_m = self.dhan.intraday_minute_data(
-                            str(security_id), "MCX_COMM", "OPTFUT", today_str, today_str, interval=1
+                            str(security_id), target_seg, itype, today_str, today_str, interval=1
                         )
                     if isinstance(res_m, dict) and res_m.get("status") == "success":
                         d_m = res_m.get("data", {})
@@ -448,7 +449,8 @@ class DhanTraderClient:
                 except Exception:
                     pass
             else:
-                # NSE / BSE Options: Use fast ticker_data then quote_data
+                # NSE Index & Stock Options (NIFTY, BANKNIFTY, FINNIFTY, TCS, RELIANCE, etc.):
+                # Use fast real-time ticker_data, then quote_data
                 try:
                     res = self.dhan.ticker_data({target_seg: [sec_int]})
                     if not (isinstance(res, dict) and res.get("status") == "success"):
@@ -469,9 +471,9 @@ class DhanTraderClient:
                 except Exception:
                     pass
 
-                # Fallback to intraday minute data for NSE/BSE if quote was unavailable
+                # Fallback to intraday minute data for NSE if quote packet had a momentary hitch
                 try:
-                    itype = "OPTIDX" if target_seg in ["NSE_FNO", "BSE_FNO"] else "OPTSTK"
+                    itype = "OPTIDX" if target_seg == "NSE_FNO" and (strike > 10000 or real_spot > 10000) else "OPTSTK"
                     res_c = self.dhan.intraday_minute_data(
                         str(security_id), target_seg, itype, today_str, today_str, interval=1
                     )

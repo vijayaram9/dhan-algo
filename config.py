@@ -25,7 +25,7 @@ class TradingConfig:
     risk_per_trade_pct: float = float(os.getenv("RISK_PER_TRADE_PCT", "1.0"))  # 1.0% of Capital per trade (₹1,500 on ₹1.5L)
     max_daily_loss: float = float(os.getenv("MAX_DAILY_LOSS", "3000.0"))       # 2% of ₹1.5L = ₹3,000 risk ceiling
     max_daily_profit: float = float(os.getenv("MAX_DAILY_PROFIT", "8000.0"))
-    max_trades_per_day: int = int(os.getenv("MAX_TRADES_PER_DAY", "20"))
+    max_trades_per_day: int = int(os.getenv("MAX_TRADES_PER_DAY", "8"))
     max_consecutive_losses: int = 3
     
     # Multi-Instrument Execution & Concurrency Control

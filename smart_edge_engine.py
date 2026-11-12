@@ -139,8 +139,8 @@ class NiftySmartEdgeEngine:
         self.max_concurrent_positions: int = 5
         self.account_capital: float = float(getattr(config, 'account_capital', 150000.0))
         self.daily_loss_limit: float = max(float(getattr(config, 'max_daily_loss', 3000.0)), self.account_capital * 0.02)
-        self.max_daily_trades: int = max(25, int(getattr(config, 'max_trades_per_day', 25)))
-        self.auto_expand_trades: bool = True  # Automatically expands trade cap on profitable winning runs
+        self.max_daily_trades: int = max(1, int(getattr(config, 'max_trades_per_day', 8)))
+        self.auto_expand_trades: bool = False  # Strict discipline: do not auto-expand daily trades without user confirmation
         self.trade_expand_step: int = 5       # Increments cap by +5 trades when momentum is strong
         self.profit_scaling_milestone: float = 25000.0  # Dynamic scaling milestone: Every Rs.25,000 net profit grants +10 trades
         self.profit_milestones_claimed: int = 0
@@ -265,15 +265,7 @@ class NiftySmartEdgeEngine:
                     config.max_trades_per_day = self.max_daily_trades
                     print(f"[SmartEdgeEngine] 🏆 Profit Milestone Restored (+Rs.{self.realized_pnl:,.2f}). Cap auto-scaled to {self.max_daily_trades} trades.")
 
-        # In Paper Simulation mode, auto-scale capacity and keep auto-pilot active without locking
-        if self.mode == "PAPER":
-            self.is_kill_switch_active = False
-            self.kill_switch_reason = ""
-            if self.trade_count >= self.max_daily_trades:
-                self.max_daily_trades = self.trade_count + getattr(self, "trade_expand_step", 10)
-                config.max_trades_per_day = self.max_daily_trades
-            return
-
+        # Check journal for consecutive losses and daily state across all modes
         df = journal.get_all_trades_df()
         if not df.empty:
             today_str = datetime.date.today().strftime("%Y-%m-%d")
@@ -309,12 +301,7 @@ class NiftySmartEdgeEngine:
             self.kill_switch_reason = ""
             print(f"[RECOVERY PROTOCOL] 2 consecutive scratch losses detected. 15m patience cooldown active until {self.cooldown_until.strftime('%H:%M:%S')}. Auto-pilot will resume in Defensive Recovery Mode (80%+ confluence only).")
         elif self.trade_count >= self.max_daily_trades:
-            if getattr(self, "auto_expand_trades", True) and self.realized_pnl > 0:
-                self.max_daily_trades = self.trade_count + getattr(self, "trade_expand_step", 5)
-                config.max_trades_per_day = self.max_daily_trades
-                print(f"[SmartEdgeEngine] Profitable session restored (+Rs.{self.realized_pnl:.2f}). Cap auto-expanded to {self.max_daily_trades} trades.")
-            else:
-                self.activate_kill_switch(f"Maximum daily trades ({self.max_daily_trades}) completed.")
+            self.activate_kill_switch(f"Maximum daily trades ({self.max_daily_trades}) completed. Preserving capital and locking trading session.")
 
     def activate_kill_switch(self, reason: str):
         self.is_kill_switch_active = True
@@ -724,8 +711,8 @@ class NiftySmartEdgeEngine:
         spot_is_sane = (current_spot > 0 and abs(current_spot - pos.underlying_entry_spot) / max(1.0, pos.underlying_entry_spot) < 0.50)
         if spot_is_sane:
             if pos.option_type == "CE":
-                # Structural Invalidation (CE: underlying breaks swing low)
-                if pos.underlying_structural_sl > 0 and current_spot <= pos.underlying_structural_sl and pos.current_premium <= pos.entry_premium:
+                # Structural Invalidation (CE: underlying breaks swing low with confirmed penetration & minimum 20s breathing room)
+                if pos.underlying_structural_sl > 0 and current_spot <= (pos.underlying_structural_sl - 1.0) and pos.current_premium <= pos.entry_premium and elapsed_seconds >= 20.0:
                     return True, f"Layer 1 Structural Invalidation: {getattr(pos, 'asset_key', 'Spot')} {current_spot:.1f} broke swing low {pos.underlying_structural_sl:.1f}"
 
                 # Target 1 (1.5R) reached (CE: underlying rises to or above target; requires minimum 15s)
@@ -741,8 +728,8 @@ class NiftySmartEdgeEngine:
                         pos.underlying_structural_sl = new_sl
 
             elif pos.option_type == "PE":
-                # Structural Invalidation (PE: underlying breaks swing high)
-                if pos.underlying_structural_sl > 0 and current_spot >= pos.underlying_structural_sl and pos.current_premium <= pos.entry_premium:
+                # Structural Invalidation (PE: underlying breaks swing high with confirmed penetration & minimum 20s breathing room)
+                if pos.underlying_structural_sl > 0 and current_spot >= (pos.underlying_structural_sl + 1.0) and pos.current_premium <= pos.entry_premium and elapsed_seconds >= 20.0:
                     return True, f"Layer 1 Structural Invalidation: {getattr(pos, 'asset_key', 'Spot')} {current_spot:.1f} broke swing high {pos.underlying_structural_sl:.1f}"
 
                 # Target 1 (1.5R) reached (PE: underlying falls to or below target; requires minimum 15s)
@@ -851,30 +838,20 @@ class NiftySmartEdgeEngine:
         # Check Account Protection Limits (Section 7)
         if self.realized_pnl <= -self.daily_loss_limit:
             self.activate_kill_switch(f"Daily loss limit of Rs.{self.daily_loss_limit} breached (Net: Rs.{self.realized_pnl:.2f})")
-        elif self.consecutive_losses >= 2 and self.realized_pnl <= 0:
-            # Self-Adaptation: Instead of halting the session permanently,
-            # engage an intelligent tactical adaptation: tighten entry filters and continue searching for high-probability setups!
+        elif self.consecutive_losses >= 3 and self.realized_pnl <= 0:
+            self.cooldown_until = datetime.datetime.now() + datetime.timedelta(minutes=15)
+            self.in_recovery_mode = True
+            msg = f"🛡️ Risk Defense: 3 consecutive pullbacks in drawdown (Net: Rs.{self.realized_pnl:+.2f}). 15-minute patience cooldown active until {self.cooldown_until.strftime('%H:%M:%S')} to preserve capital."
+            self.log_sniper_event(msg, "WARNING")
+            notifier.notify("🛡️ 15m Cooldown Active", msg, tags="warning,shield")
+        elif self.consecutive_losses >= 3 and self.realized_pnl > 0:
             self.log_sniper_event(
-                f"🧠 Self-Adaptation Activated: 2 consecutive pullbacks in drawdown (Net: Rs.{self.realized_pnl:+.2f}). Adapting strategy to higher-confluence setups to restore profitability.",
+                f"⚠️ Discipline Alert: 3 consecutive pullbacks in profit zone (Net: Rs.{self.realized_pnl:+,.2f}). Session protected with positive cushion; 5m cooldown engaged.",
                 "WARNING"
             )
-            self.consecutive_losses = 0  # Reset counter to allow adaptive recovery trades
-        elif self.consecutive_losses >= 2 and self.realized_pnl > 0:
-            # Winning session: Log caution event, do NOT kill switch the profitable day!
-            self.log_sniper_event(
-                f"⚠️ Discipline Alert: 2 consecutive pullbacks in profit zone (Net: Rs.{self.realized_pnl:+,.2f}). Session protected with positive cushion; continuing scanning with strict confluence.",
-                "WARNING"
-            )
+            self.cooldown_until = datetime.datetime.now() + datetime.timedelta(minutes=5)
         elif self.trade_count >= self.max_daily_trades:
-            if getattr(self, "auto_expand_trades", True) and self.realized_pnl > 0:
-                old_cap = self.max_daily_trades
-                self.max_daily_trades += getattr(self, "trade_expand_step", 5)
-                config.max_trades_per_day = self.max_daily_trades
-                msg = f"🚀 Winning Day Momentum! Net P&L: Rs.{self.realized_pnl:+.2f}. Daily cap auto-expanded from {old_cap} to {self.max_daily_trades} trades!"
-                self.log_sniper_event(msg, "PROFIT")
-                notifier.notify("🚀 Winning Momentum Auto-Expansion", msg, tags="rocket,chart_with_upwards_trend")
-            else:
-                self.activate_kill_switch(f"Maximum daily limit ({self.max_daily_trades} trades) completed.")
+            self.activate_kill_switch(f"Maximum daily limit ({self.max_daily_trades} trades) completed. Preserving capital and locking trading session.")
 
         if pos in self.active_positions:
             self.active_positions.remove(pos)
@@ -993,22 +970,26 @@ class NiftySmartEdgeEngine:
                     return
 
                 # Guardrail C: Real-time Premium Verification (STRICT LIVE DHAN ONLY - NO MATHEMATICAL DRIFT)
-                # In PAPER mode, prefer pre-selected contract estimated premium to execute in <100ms
+                # Universal for ALL instruments (NIFTY, BANKNIFTY, FINNIFTY, SENSEX, Stocks, MCX) in both LIVE and PAPER
                 active_mode = mode or getattr(self, "mode", "PAPER")
-                if active_mode == "PAPER" and getattr(contract, "estimated_premium", 0.0) > 0.05:
-                    verified_prem = contract.estimated_premium
-                else:
-                    verified_prem = self.client.get_option_ltp(
-                        contract.security_id, verified_spot, contract.strike_price, contract.option_type, contract.expiry_date, require_live=(active_mode == "LIVE")
+                contract_seg = getattr(contract, "segment", None)
+                verified_prem = self.client.get_option_ltp(
+                    contract.security_id,
+                    verified_spot,
+                    contract.strike_price,
+                    contract.option_type,
+                    contract.expiry_date,
+                    require_live=True,
+                    segment=contract_seg
+                )
+                if verified_prem <= 0.05:
+                    verified_prem = self.client.get_last_flashed_price(
+                        contract.security_id, [contract.custom_symbol, contract.trading_symbol]
                     )
-                    if verified_prem <= 0.05:
-                        verified_prem = self.client.get_last_flashed_price(contract.security_id, [contract.custom_symbol, contract.trading_symbol])
-                    if verified_prem <= 0.05 and active_mode == "PAPER":
-                        verified_prem = getattr(contract, "estimated_premium", 0.0)
-                    if verified_prem <= 0.05:
-                        print(Fore.RED + f"[GUARDRAIL BLOCKED] Trade entry aborted! Real Dhan quote could not be confirmed for {contract.custom_symbol} (Zero/Rate-Limited).")
-                        return
-                # Update contract estimated premium to ground truth verified LTP
+                if verified_prem <= 0.05:
+                    print(Fore.RED + f"[GUARDRAIL BLOCKED] Trade entry aborted! Real Dhan quote could not be confirmed for {contract.custom_symbol} (Zero/Rate-Limited). Refusing synthetic/stale entry.")
+                    return
+                # Update contract estimated premium to ground truth verified live LTP
                 contract.estimated_premium = verified_prem
 
                 # Guardrail D: ANTI-CHASE (uses Dhan 1m candles of the option itself).
