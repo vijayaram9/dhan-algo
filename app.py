@@ -510,41 +510,42 @@ def api_chart_data():
                             )
                     if isinstance(dhan_res, dict) and dhan_res.get("status") == "success":
                         ddata = dhan_res.get("data", {})
-                        opens = ddata.get("open", [])
-                        highs = ddata.get("high", [])
-                        lows = ddata.get("low", [])
-                        closes = ddata.get("close", [])
-                        volumes = ddata.get("volume", [1000] * len(opens))
-                        timestamps = ddata.get("timestamp", [])
+                        if isinstance(ddata, dict):
+                            opens = ddata.get("open", [])
+                            highs = ddata.get("high", [])
+                            lows = ddata.get("low", [])
+                            closes = ddata.get("close", [])
+                            volumes = ddata.get("volume", [1000] * len(opens))
+                            timestamps = ddata.get("timestamp", [])
 
-                        cum_vol = 0
-                        cum_pv = 0.0
-                        seen_times = set()
-                        for o, h, l, c, v, t in zip(opens, highs, lows, closes, volumes, timestamps):
-                            ts_epoch = int(t)
-                            if ts_epoch in seen_times:
-                                continue
-                            seen_times.add(ts_epoch)
+                            cum_vol = 0
+                            cum_pv = 0.0
+                            seen_times = set()
+                            for o, h, l, c, v, t in zip(opens, highs, lows, closes, volumes, timestamps):
+                                ts_epoch = int(t)
+                                if ts_epoch in seen_times:
+                                    continue
+                                seen_times.add(ts_epoch)
 
-                            o_f, h_f, l_f, c_f = round(float(o), 2), round(float(h), 2), round(float(l), 2), round(float(c), 2)
-                            v_i = int(v) if v else 1000
-                            cum_vol += v_i
-                            cum_pv += ((h_f + l_f + c_f) / 3.0) * v_i
-                            vwap = round(cum_pv / cum_vol, 2) if cum_vol > 0 else c_f
-                            candles.append({
-                                "time": ts_epoch,
-                                "open": o_f,
-                                "high": h_f,
-                                "low": l_f,
-                                "close": c_f,
-                                "volume": v_i,
-                                "vwap": vwap
-                            })
+                                o_f, h_f, l_f, c_f = round(float(o), 2), round(float(h), 2), round(float(l), 2), round(float(c), 2)
+                                v_i = int(v) if v else 1000
+                                cum_vol += v_i
+                                cum_pv += ((h_f + l_f + c_f) / 3.0) * v_i
+                                vwap = round(cum_pv / cum_vol, 2) if cum_vol > 0 else c_f
+                                candles.append({
+                                    "time": ts_epoch,
+                                    "open": o_f,
+                                    "high": h_f,
+                                    "low": l_f,
+                                    "close": c_f,
+                                    "volume": v_i,
+                                    "vwap": vwap
+                                })
         except Exception as e:
             print(f"[Dhan Chart Feed Note] {e}")
 
-        # 2. Secondary Fallback: yfinance for Global Cues (NASDAQ, S&P 500, DAX)
-        if not candles and asset_info.category == "GLOBAL":
+        # 2. Resilient Fallback: yfinance for Instant Continuity on Rate Limits / Global Cues
+        if not candles and getattr(asset_info, "yfinance_symbol", None):
             tf_specs = {
                 "10s": ("1d", "1m"),
                 "1m": ("1d", "1m"),
