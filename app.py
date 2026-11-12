@@ -479,24 +479,35 @@ def api_chart_data():
                     target_sec_id, target_seg, target_itype = None, None, None
 
                 if target_sec_id and str(target_sec_id).isdigit() and int(target_sec_id) > 0:
-                    dhan_res = dhan_c.dhan.intraday_minute_data(
-                        security_id=str(target_sec_id),
-                        exchange_segment=target_seg,
-                        instrument_type=target_itype,
-                        from_date=from_date_str,
-                        to_date=today_str,
-                        interval=intv
-                    )
-                    # Safe fallback to today if multi-day returned empty
-                    if not (isinstance(dhan_res, dict) and dhan_res.get("status") == "success" and dhan_res.get("data", {}).get("open")):
+                    if timeframe == "1d":
+                        from_date_daily = (today_d - timedelta(days=180)).strftime("%Y-%m-%d")
+                        dhan_res = dhan_c.dhan.historical_daily_data(
+                            security_id=str(target_sec_id),
+                            exchange_segment=target_seg,
+                            instrument_type=target_itype,
+                            from_date=from_date_daily,
+                            to_date=today_str,
+                            expiry_code=0
+                        )
+                    else:
                         dhan_res = dhan_c.dhan.intraday_minute_data(
                             security_id=str(target_sec_id),
                             exchange_segment=target_seg,
                             instrument_type=target_itype,
-                            from_date=today_str,
+                            from_date=from_date_str,
                             to_date=today_str,
                             interval=intv
                         )
+                        # Safe fallback to today if multi-day returned empty
+                        if not (isinstance(dhan_res, dict) and dhan_res.get("status") == "success" and dhan_res.get("data", {}).get("open")):
+                            dhan_res = dhan_c.dhan.intraday_minute_data(
+                                security_id=str(target_sec_id),
+                                exchange_segment=target_seg,
+                                instrument_type=target_itype,
+                                from_date=today_str,
+                                to_date=today_str,
+                                interval=intv
+                            )
                     if isinstance(dhan_res, dict) and dhan_res.get("status") == "success":
                         ddata = dhan_res.get("data", {})
                         opens = ddata.get("open", [])
