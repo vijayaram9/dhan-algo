@@ -1415,7 +1415,7 @@ class NiftySmartEdgeEngine:
                         continue
 
                     # Require strong institutional confluence (score >= 70%)
-                    if not top_opp.get("is_actionable") or top_opp.get("confluence_score", 0) < 80:
+                    if not top_opp.get("is_actionable") or top_opp.get("confluence_score", 0) < 70:
                         continue
                     asset_key = top_opp["key"]
                     opp_action = "BUY_CE" if any(x in top_opp["action"].upper() for x in ["CE", "CALL", "BULLISH"]) else ("BUY_PE" if any(x in top_opp["action"].upper() for x in ["PE", "PUT", "BEARISH"]) else None)
@@ -1434,14 +1434,17 @@ class NiftySmartEdgeEngine:
                     if opp_action == "BUY_PE" and opp_spot > real_vwap:
                         continue
 
-                    # Candlestick bar color check (Never buy Calls on Red bars, never buy Puts on Green bars)
+                    # Candlestick breakdown check: Only reject if candle is aggressively breaking against trend
                     df_bars = mtf_engine.get_real_candles(asset_key)
                     if df_bars is not None and len(df_bars) >= 2:
                         b_close = df_bars["close"].iloc[-1]
-                        b_open = df_bars["open"].iloc[-1]
-                        if opp_action == "BUY_CE" and b_close < b_open:
+                        prev_low = df_bars["low"].iloc[-2]
+                        prev_high = df_bars["high"].iloc[-2]
+                        # Don't buy CE if price is breaking below previous bar's low with heavy selling
+                        if opp_action == "BUY_CE" and b_close < (prev_low - (opp_spot * 0.0008)):
                             continue
-                        if opp_action == "BUY_PE" and b_close > b_open:
+                        # Don't buy PE if price is breaking above previous bar's high with heavy buying
+                        if opp_action == "BUY_PE" and b_close > (prev_high + (opp_spot * 0.0008)):
                             continue
                     opp_spot = top_opp["spot"]
                     opp_contract = contract_selector.select_contract(
