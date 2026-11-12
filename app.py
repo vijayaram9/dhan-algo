@@ -2462,14 +2462,31 @@ def settings_page():
 
 @app.route("/api/admin/sync-code", methods=["POST"])
 def api_admin_sync_code():
-    """Admin endpoint to perform zero-downtime git pull on AWS directly."""
+    """Admin endpoint to perform zero-downtime git pull on AWS directly and restart daemon."""
     import subprocess
     try:
         repo_dir = os.path.dirname(os.path.abspath(__file__))
         out = subprocess.check_output(["git", "pull"], cwd=repo_dir, stderr=subprocess.STDOUT, text=True)
-        return jsonify({"status": "success", "output": out})
+        # Clear Jinja template cache
+        if hasattr(app, "jinja_env") and hasattr(app.jinja_env, "cache") and app.jinja_env.cache is not None:
+            app.jinja_env.cache.clear()
+        # Automatically restart background daemon so changes take effect
+        def _delayed_restart():
+            time.sleep(1.0)
+            os._exit(0)
+        threading.Thread(target=_delayed_restart, daemon=True).start()
+        return jsonify({"status": "success", "output": out, "restart": "scheduled"})
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
+
+@app.route("/api/admin/restart", methods=["POST", "GET"])
+def api_admin_restart():
+    """Restarts the background daemon on AWS by exiting the process (systemd auto-respawns)."""
+    def _delayed_restart():
+        time.sleep(0.5)
+        os._exit(0)
+    threading.Thread(target=_delayed_restart, daemon=True).start()
+    return jsonify({"status": "restarting", "message": "Service restarting under systemd..."})
 
 @app.route("/webhook-guide")
 def webhook_guide():

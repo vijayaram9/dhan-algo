@@ -28,6 +28,19 @@ except Exception:
 
 # Ensure project root is available
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Check for automated service restart trigger
+_trigger_path = os.path.join(PROJECT_DIR, ".restart_trigger")
+if os.path.exists(_trigger_path):
+    try:
+        os.remove(_trigger_path)
+    except Exception:
+        pass
+    import threading
+    def _do_exit():
+        time.sleep(0.5)
+        os._exit(0)
+    threading.Thread(target=_do_exit, daemon=True).start()
 if PROJECT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_DIR)
 
