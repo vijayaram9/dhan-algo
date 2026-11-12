@@ -1027,7 +1027,15 @@ class MarketIntelligenceEngine:
     def calculate_levels_and_stops(self, spot: float, asset_key: str = "NIFTY", is_bear: bool = False) -> dict:
         info = ASSET_CATALOG.get(asset_key, ASSET_CATALOG["NIFTY"])
         step = info.strike_step
-        atr = round(step * 0.45, 1)
+        # Volatility-scaled ATR based on underlying index point value
+        if asset_key == 'SENSEX':
+            atr = 95.0   # SENSEX (82k+ index): 80-100 pt breathing room
+        elif asset_key == 'BANKNIFTY':
+            atr = 65.0   # BANKNIFTY (61k+ index): 50-65 pt breathing room
+        elif asset_key == 'FINNIFTY':
+            atr = 30.0   # FINNIFTY (24k index): 25-30 pt breathing room
+        else:
+            atr = round(max(22.0, step * 0.45), 1)
 
         pp = round(spot - (step * 0.1), 1)
         r1 = round(pp + (step * 0.6), 1)
