@@ -465,9 +465,15 @@ class NiftySmartEdgeEngine:
             return False, ""
 
         pos = target_pos
+        pos_asset = getattr(pos, "asset_key", "NIFTY")
+        p_seg = getattr(pos, "segment", None)
+        if not p_seg:
+            p_seg = "BSE_FNO" if (pos_asset == "SENSEX" or "SENSEX" in pos.symbol) else (
+                "MCX_COMM" if pos_asset in ["CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"] else "NSE_FNO"
+            )
         strike_val = pos.strike_price if pos.strike_price > 0 else (round(current_spot / 50.0) * 50)
         refreshed_ltp = self.client.get_option_ltp(
-            pos.security_id, current_spot, strike_val, pos.option_type, pos.expiry_date, segment=getattr(pos, "segment", None)
+            pos.security_id, current_spot, strike_val, pos.option_type, pos.expiry_date, segment=p_seg
         )
         if refreshed_ltp > 0.05:
             pos.current_premium = refreshed_ltp

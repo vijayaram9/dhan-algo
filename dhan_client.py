@@ -423,12 +423,12 @@ class DhanTraderClient:
 
             today_str = datetime.now().strftime("%Y-%m-%d")
 
-            # Route MCX Commodity Options and BSE SENSEX / BANKEX Options directly to intraday_minute_data
-            # (Dhan does not service ticker_data/quote_data packets for MCX or BSE F&O)
-            if target_seg in ["MCX_COMM", "BSE_FNO"]:
+            # Route MCX Commodity Options directly to intraday_minute_data
+            # (Dhan does not service ticker_data packets for MCX commodities)
+            if target_seg == "MCX_COMM":
                 try:
                     DhanTraderClient.throttle_request(0.20)
-                    itype = "OPTFUT" if target_seg == "MCX_COMM" else ("OPTIDX" if strike > 50000 or real_spot > 50000 else "OPTSTK")
+                    itype = "OPTFUT"
                     res_m = self.dhan.intraday_minute_data(
                         str(security_id), target_seg, itype, today_str, today_str, interval=1
                     )
@@ -449,25 +449,29 @@ class DhanTraderClient:
                 except Exception:
                     pass
             else:
-                # NSE Index & Stock Options (NIFTY, BANKNIFTY, FINNIFTY, TCS, RELIANCE, etc.):
-                # Use fast real-time ticker_data, then quote_data
+                # NSE and BSE Options (NIFTY, BANKNIFTY, FINNIFTY, SENSEX, TCS, RELIANCE, etc.):
+                # Use lightweight, real-time sub-second ticker_data feed directly from Dhan with fast retry
                 try:
-                    res = self.dhan.ticker_data({target_seg: [sec_int]})
-                    if not (isinstance(res, dict) and res.get("status") == "success"):
-                        res = self.dhan.quote_data({target_seg: [sec_int]})
+                    DhanTraderClient.throttle_request(0.05)
+                    for attempt in range(2):
+                        res = self.dhan.ticker_data({target_seg: [sec_int]})
+                        if not (isinstance(res, dict) and res.get("status") == "success"):
+                            res = self.dhan.quote_data({target_seg: [sec_int]})
 
-                    if isinstance(res, dict) and res.get("status") == "success":
-                        data = res.get("data", {})
-                        if isinstance(data, dict):
-                            if "data" in data and isinstance(data["data"], dict):
-                                data = data["data"]
-                            sec_dict = data.get(target_seg, {}).get(str(security_id), {}) or data.get(str(security_id), {})
-                            ltp = float(sec_dict.get("last_price", 0.0))
-                            if ltp > 0:
-                                val = round(ltp, 2)
-                                self._quote_cache[sec_key] = (val, time.time())
-                                self.record_last_flashed_price(str(security_id), val, [sec_key])
-                                return val
+                        if isinstance(res, dict) and res.get("status") == "success":
+                            data = res.get("data", {})
+                            if isinstance(data, dict):
+                                if "data" in data and isinstance(data["data"], dict):
+                                    data = data["data"]
+                                seg_data = data.get(target_seg, {})
+                                sec_dict = seg_data.get(str(security_id), {}) or seg_data.get(int(security_id), {}) or data.get(str(security_id), {})
+                                ltp = float(sec_dict.get("last_price", 0.0))
+                                if ltp > 0:
+                                    val = round(ltp, 2)
+                                    self._quote_cache[sec_key] = (val, time.time())
+                                    self.record_last_flashed_price(str(security_id), val, [sec_key])
+                                    return val
+                        time.sleep(0.25)
                 except Exception:
                     pass
 

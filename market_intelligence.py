@@ -1359,7 +1359,7 @@ class MarketIntelligenceEngine:
         3. High-beta movers: NIFTY IT, SENSEX, RELIANCE, HDFC BANK.
         """
         now_ts = time.time()
-        if hasattr(self, "_opps_cache") and (now_ts - getattr(self, "_opps_time", 0)) < 1.0 and self._opps_cache:
+        if hasattr(self, "_opps_cache") and (now_ts - getattr(self, "_opps_time", 0)) < 5.0 and self._opps_cache:
             return self._opps_cache
 
         results = []
