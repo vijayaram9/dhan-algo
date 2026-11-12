@@ -2424,6 +2424,17 @@ def settings_page():
 
     return render_template("settings.html", config=config, current_capital=current_capital, message=message)
 
+@app.route("/api/admin/sync-code", methods=["POST"])
+def api_admin_sync_code():
+    """Admin endpoint to perform zero-downtime git pull on AWS directly."""
+    import subprocess
+    try:
+        repo_dir = os.path.dirname(os.path.abspath(__file__))
+        out = subprocess.check_output(["git", "pull"], cwd=repo_dir, stderr=subprocess.STDOUT, text=True)
+        return jsonify({"status": "success", "output": out})
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
+
 @app.route("/webhook-guide")
 def webhook_guide():
     return render_template("webhook_guide.html", config=config)
