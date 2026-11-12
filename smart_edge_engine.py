@@ -975,6 +975,25 @@ class NiftySmartEdgeEngine:
                     print(Fore.RED + f"[GUARDRAIL BLOCKED] Trade entry aborted! Strike {contract.strike_price:.1f} is {strike_drift:.1f} pts away from live spot {verified_spot:.1f} (Max: {step_sz * 2.5:.1f}).")
                     return
 
+                # Guardrail B2: Day High / Day Low Exhaustion Buffer
+                # Prevents buying CALLs directly under Day High / R1 resistance, and buying PUTs into Day Low / S1 support
+                try:
+                    from mtf_engine import mtf_engine
+                    df_b = mtf_engine.get_real_candles(asset_k)
+                    if df_b is not None and not df_b.empty:
+                        d_high = float(df_b["high"].max())
+                        d_low = float(df_b["low"].min())
+                        # If CALL: Block if within 0.15% of Day High unless already broken out
+                        if signal.action == "BUY_CE" and verified_spot < d_high and ((d_high - verified_spot) / verified_spot) < 0.0015:
+                            print(Fore.YELLOW + f"[RESISTANCE BUFFER BLOCKED] Skipping CALL entry: Spot {verified_spot:.1f} is directly under Day High {d_high:.1f}. Awaiting confirmed breakout to avoid reversal.")
+                            return
+                        # If PUT: Block if within 0.15% of Day Low unless already broken down
+                        if signal.action == "BUY_PE" and verified_spot > d_low and ((verified_spot - d_low) / verified_spot) < 0.0015:
+                            print(Fore.YELLOW + f"[SUPPORT BUFFER BLOCKED] Skipping PUT entry: Spot {verified_spot:.1f} is directly above Day Low {d_low:.1f}. Awaiting confirmed breakdown to avoid bounce.")
+                            return
+                except Exception:
+                    pass
+
                 # Guardrail C: Real-time Premium Verification (STRICT LIVE DHAN ONLY - NO MATHEMATICAL DRIFT)
                 # Universal for ALL instruments (NIFTY, BANKNIFTY, FINNIFTY, SENSEX, Stocks, MCX) in both LIVE and PAPER
                 active_mode = mode or getattr(self, "mode", "PAPER")
