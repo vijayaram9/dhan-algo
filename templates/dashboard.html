@@ -1403,18 +1403,20 @@
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
-                    <!-- Indicator Overlays Switcher (EMA 9/21, VWAP, S/R) - for Algo Desk -->
+                    <!-- Indicator Overlays Switcher (EMA 9/21, VWAP, S/R, Volume Profile, Patterns) - for Algo Desk -->
                     <div id="algo-chart-controls" class="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl text-xs font-mono font-bold">
                         <button onclick="toggleIndicator('ema')" id="btn-toggle-ema" class="px-2 py-1 rounded-lg bg-cyan-50 text-cyan-700 border border-cyan-200 transition shadow-2xs" title="Toggle EMA 9 & EMA 21 Ribbon">EMA 9/21</button>
                         <button onclick="toggleIndicator('vwap')" id="btn-toggle-vwap" class="px-2 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 transition shadow-2xs" title="Toggle Intraday VWAP">VWAP</button>
                         <button onclick="toggleIndicator('sr')" id="btn-toggle-sr" class="px-2 py-1 rounded-lg bg-white text-slate-800 transition shadow-2xs" title="Toggle Support & Resistance Levels">S/R Levels</button>
+                        <button onclick="toggleIndicator('vp')" id="btn-toggle-vp" class="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 transition shadow-2xs" title="Toggle Volume Profile (POC, VAH, VAL)">Vol Profile</button>
+                        <button onclick="toggleIndicator('patterns')" id="btn-toggle-patterns" class="px-2 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 transition shadow-2xs" title="Toggle Technical Chart Patterns & Predictive Forecast">Patterns</button>
                         <div class="flex items-center bg-slate-200/80 p-0.5 rounded-lg ml-1">
                             <button onclick="setChartTarget('underlying')" id="chart-target-underlying" class="px-2 py-0.5 rounded transition bg-white text-slate-900 text-[11px]">Spot</button>
                             <button onclick="setChartTarget('option')" id="chart-target-option" class="px-2 py-0.5 rounded transition text-slate-600 hover:text-slate-900 text-[11px]">Option</button>
                         </div>
                     </div>
 
-                    <!-- Multi-Timeframe Switcher (10s, 1m, 3m, 5m, 10m, 15m, 1h, 1D) -->
+                    <!-- Multi-Timeframe Switcher (10s, 1m, 3m, 5m, 10m, 15m, 30m, 1h, 4h, 1D) -->
                     <div class="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-mono font-bold">
                         <button onclick="setTimeframe('10s')" id="tf-10s" class="px-2 py-1 rounded-lg transition text-slate-600 hover:text-slate-900">10s</button>
                         <button onclick="setTimeframe('1m')" id="tf-1m" class="px-2 py-1 rounded-lg transition text-slate-600 hover:text-slate-900">1m</button>
@@ -1422,7 +1424,9 @@
                         <button onclick="setTimeframe('5m')" id="tf-5m" class="px-2 py-1 rounded-lg transition bg-white text-slate-900 shadow-2xs">5m</button>
                         <button onclick="setTimeframe('10m')" id="tf-10m" class="px-2 py-1 rounded-lg transition text-slate-600 hover:text-slate-900">10m</button>
                         <button onclick="setTimeframe('15m')" id="tf-15m" class="px-2 py-1 rounded-lg transition text-slate-600 hover:text-slate-900">15m</button>
+                        <button onclick="setTimeframe('30m')" id="tf-30m" class="px-2 py-1 rounded-lg transition text-slate-600 hover:text-slate-900">30m</button>
                         <button onclick="setTimeframe('1h')" id="tf-1h" class="px-2 py-1 rounded-lg transition text-slate-600 hover:text-slate-900">1h</button>
+                        <button onclick="setTimeframe('4h')" id="tf-4h" class="px-2 py-1 rounded-lg transition text-slate-600 hover:text-slate-900">4h</button>
                         <button onclick="setTimeframe('1d')" id="tf-1d" class="px-2 py-1 rounded-lg transition text-slate-600 hover:text-slate-900">1D</button>
                         
                         <!-- External Dhan Direct Link -->
@@ -1432,6 +1436,46 @@
                             <span>Dhan TV (tv.dhan.co)</span>
                         </a>
                     </div>
+                </div>
+            </div>
+
+            <!-- Technical Chart Pattern & Predictive Horizon Intelligence Banner -->
+            <div id="pattern-horizon-banner" class="mb-3 p-3 rounded-xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border border-indigo-800/40 shadow-sm transition-all">
+                <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5">
+                    <div class="flex items-center space-x-2.5">
+                        <span class="p-1.5 rounded-lg bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        </span>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-[10px] uppercase tracking-wider text-indigo-300 font-mono font-bold">Predictive Pattern Horizon</span>
+                                <span id="pat-badge-bias" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">BULLISH</span>
+                                <span id="pat-badge-conf" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-200 border border-indigo-500/30 font-mono">85% CONF</span>
+                            </div>
+                            <div class="text-sm font-bold text-white font-mono mt-0.5" id="pat-name-text">
+                                DOUBLE BOTTOM (W-FORMATION) • REVERSAL CONFIRMATION
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-3 text-xs font-mono">
+                        <div class="text-left bg-black/30 px-2.5 py-1 rounded-lg border border-white/10">
+                            <div class="text-[9px] text-amber-300 uppercase">POC (Vol Node)</div>
+                            <div class="text-xs font-bold text-amber-300" id="pat-poc-val">₹--</div>
+                        </div>
+                        <div class="text-left bg-black/30 px-2.5 py-1 rounded-lg border border-white/10">
+                            <div class="text-[9px] text-emerald-400 uppercase">Projected Target</div>
+                            <div class="text-xs font-bold text-emerald-400" id="pat-target-val">₹--</div>
+                        </div>
+                        <div class="text-left bg-black/30 px-2.5 py-1 rounded-lg border border-white/10">
+                            <div class="text-[9px] text-rose-400 uppercase">Invalidation Stop</div>
+                            <div class="text-xs font-bold text-rose-400" id="pat-inval-val">₹--</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-2 pt-2 border-t border-white/10 text-[11px] text-indigo-100/90 font-sans flex items-center justify-between">
+                    <span id="pat-forecast-text">Analyzing live candlestick structures across multi-timeframe horizon...</span>
+                    <span class="text-[10px] text-slate-400 font-mono">Real-time Dhan Feed</span>
                 </div>
             </div>
 
@@ -2621,6 +2665,8 @@
     let showEMA = true;
     let showVWAP = true;
     let showSR = true;
+    let showVP = true;
+    let showPatterns = true;
 
     // Direct Dhan Terminal URLs mapping
     const dhanTerminalMap = {
@@ -3550,17 +3596,17 @@
         }
     }
 
-    // Set Timeframe (10s, 1m, 3m, 5m, 10m, 15m, 1h, 1D)
+    // Set Timeframe (10s, 1m, 3m, 5m, 10m, 15m, 30m, 1h, 4h, 1D)
     function setTimeframe(tf) {
         activeTimeframe = tf;
-        const allTfs = ['10s', '1m', '3m', '5m', '10m', '15m', '1h', '1d'];
+        const allTfs = ['10s', '1m', '3m', '5m', '10m', '15m', '30m', '1h', '4h', '1d'];
         allTfs.forEach(t => {
             const btn = document.getElementById(`tf-${t}`);
             if (btn) {
                 if (t === tf) {
-                    btn.className = "px-2.5 py-1 rounded-lg transition bg-white text-slate-900 shadow-2xs font-bold";
+                    btn.className = "px-2 py-1 rounded-lg transition bg-white text-slate-900 shadow-2xs font-bold";
                 } else {
-                    btn.className = "px-2.5 py-1 rounded-lg transition text-slate-600 hover:text-slate-900 font-bold";
+                    btn.className = "px-2 py-1 rounded-lg transition text-slate-600 hover:text-slate-900 font-bold";
                 }
             }
         });
@@ -3739,6 +3785,20 @@
             if (btn) btn.className = showSR 
                 ? "px-2 py-1 rounded-lg bg-white text-slate-800 transition shadow-2xs font-bold" 
                 : "px-2 py-1 rounded-lg bg-slate-100 text-slate-400 transition font-bold";
+        } else if (ind === 'vp') {
+            showVP = !showVP;
+            const btn = document.getElementById('btn-toggle-vp');
+            if (btn) btn.className = showVP 
+                ? "px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 transition shadow-2xs font-bold" 
+                : "px-2 py-1 rounded-lg bg-slate-100 text-slate-400 transition font-bold";
+        } else if (ind === 'patterns') {
+            showPatterns = !showPatterns;
+            const btn = document.getElementById('btn-toggle-patterns');
+            if (btn) btn.className = showPatterns 
+                ? "px-2 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 transition shadow-2xs font-bold" 
+                : "px-2 py-1 rounded-lg bg-slate-100 text-slate-400 transition font-bold";
+            const banner = document.getElementById('pattern-horizon-banner');
+            if (banner) banner.style.display = showPatterns ? 'block' : 'none';
         }
         fetchCandlestickData();
     }
@@ -3886,10 +3946,95 @@
                     }));
                 }
 
+                // Institutional Volume Profile (POC, VAH, VAL) Overlays
+                if (showVP && data.volume_profile && data.volume_profile.poc > 0) {
+                    const vp = data.volume_profile;
+                    // Point of Control (POC) - Heavy High Volume Node
+                    activePriceLines.push(candleSeries.createPriceLine({
+                        price: vp.poc,
+                        color: '#dc2626',
+                        lineWidth: 2,
+                        lineStyle: LightweightCharts.LineStyle.Solid,
+                        axisLabelVisible: true,
+                        title: `POC ₹${vp.poc}`
+                    }));
+                    // Value Area High (VAH 70%)
+                    activePriceLines.push(candleSeries.createPriceLine({
+                        price: vp.vah,
+                        color: '#6366f1',
+                        lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: true,
+                        title: `VAH ₹${vp.vah}`
+                    }));
+                    // Value Area Low (VAL 70%)
+                    activePriceLines.push(candleSeries.createPriceLine({
+                        price: vp.val,
+                        color: '#6366f1',
+                        lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: true,
+                        title: `VAL ₹${vp.val}`
+                    }));
+                }
+
+                // Classical Chart Pattern Horizon Target & Stop Overlays
+                if (showPatterns && data.pattern_analysis && data.pattern_analysis.has_pattern) {
+                    const pa = data.pattern_analysis;
+                    if (pa.predicted_target > 0) {
+                        activePriceLines.push(candleSeries.createPriceLine({
+                            price: pa.predicted_target,
+                            color: pa.bias === 'BULLISH' ? '#16a34a' : '#e11d48',
+                            lineWidth: 2,
+                            lineStyle: LightweightCharts.LineStyle.Dotted,
+                            axisLabelVisible: true,
+                            title: `Pattern Target ₹${pa.predicted_target}`
+                        }));
+                    }
+                    if (pa.invalidation_price > 0) {
+                        activePriceLines.push(candleSeries.createPriceLine({
+                            price: pa.invalidation_price,
+                            color: '#e11d48',
+                            lineWidth: 1,
+                            lineStyle: LightweightCharts.LineStyle.LargeDashed,
+                            axisLabelVisible: true,
+                            title: `Inval Stop ₹${pa.invalidation_price}`
+                        }));
+                    }
+                }
+
                 if (data.levels) {
                     document.getElementById('quote-r1').innerText = `₹${data.levels.r1.toLocaleString('en-IN')}`;
                     document.getElementById('quote-s1').innerText = `₹${data.levels.s1.toLocaleString('en-IN')}`;
                 }
+            }
+
+            // Update Predictive Pattern Horizon Banner
+            if (data.pattern_analysis) {
+                const pa = data.pattern_analysis;
+                const vp = data.volume_profile || {};
+                const nameEl = document.getElementById('pat-name-text');
+                const biasEl = document.getElementById('pat-badge-bias');
+                const confEl = document.getElementById('pat-badge-conf');
+                const pocEl = document.getElementById('pat-poc-val');
+                const targetEl = document.getElementById('pat-target-val');
+                const invalEl = document.getElementById('pat-inval-val');
+                const forecastEl = document.getElementById('pat-forecast-text');
+
+                if (nameEl) nameEl.innerText = pa.pattern_name.replace(/_/g, ' ');
+                if (biasEl) {
+                    biasEl.innerText = pa.bias;
+                    biasEl.className = pa.bias === 'BULLISH' 
+                        ? 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono'
+                        : (pa.bias === 'BEARISH' 
+                            ? 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono'
+                            : 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-slate-500/20 text-slate-300 border border-slate-500/30 font-mono');
+                }
+                if (confEl) confEl.innerText = `${pa.confidence}% CONF`;
+                if (pocEl) pocEl.innerText = vp.poc > 0 ? `₹${vp.poc.toLocaleString('en-IN')}` : '--';
+                if (targetEl) targetEl.innerText = pa.predicted_target > 0 ? `₹${pa.predicted_target.toLocaleString('en-IN')}` : '--';
+                if (invalEl) invalEl.innerText = pa.invalidation_price > 0 ? `₹${pa.invalidation_price.toLocaleString('en-IN')}` : '--';
+                if (forecastEl) forecastEl.innerText = pa.forecast_text || 'Monitoring pattern development...';
             }
 
             // Update Underlying Option Instrument Live Tracking Card

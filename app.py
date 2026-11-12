@@ -454,7 +454,7 @@ def api_chart_data():
             "MARUTI": ("10999", "NSE_EQ", "EQUITY"),
             "M&M": ("2031", "NSE_EQ", "EQUITY")
         }
-        dhan_interval_map = {"10s": 1, "1m": 1, "3m": 3, "5m": 5, "10m": 10, "15m": 15, "1h": 60, "1d": 60}
+        dhan_interval_map = {"10s": 1, "1m": 1, "3m": 1, "5m": 5, "10m": 5, "15m": 15, "30m": 15, "1h": 60, "4h": 60, "1d": 60}
 
         try:
             from dhan_client import DhanTraderClient, get_dhan_client
@@ -518,6 +518,37 @@ def api_chart_data():
                             volumes = ddata.get("volume", [1000] * len(opens))
                             timestamps = ddata.get("timestamp", [])
 
+                            # Dynamic Institutional Resampling for Non-Standard Timeframes (3m, 10m, 30m, 4h)
+                            resample_mins = {"3m": 3, "10m": 10, "30m": 30, "4h": 240}.get(timeframe, None)
+                            if resample_mins and opens:
+                                resampled = []
+                                current_bucket = None
+                                b_open, b_high, b_low, b_close, b_vol, b_time = 0.0, -1e9, 1e9, 0.0, 0, 0
+                                bucket_seconds = resample_mins * 60
+                                for o, h, l, c, v, t in zip(opens, highs, lows, closes, volumes, timestamps):
+                                    t_sec = int(t)
+                                    bucket_id = t_sec - (t_sec % bucket_seconds)
+                                    if current_bucket is None:
+                                        current_bucket = bucket_id
+                                        b_open, b_high, b_low, b_close, b_vol, b_time = float(o), float(h), float(l), float(c), int(v or 0), bucket_id
+                                    elif bucket_id == current_bucket:
+                                        b_high = max(b_high, float(h))
+                                        b_low = min(b_low, float(l))
+                                        b_close = float(c)
+                                        b_vol += int(v or 0)
+                                    else:
+                                        resampled.append((b_open, b_high, b_low, b_close, b_vol, b_time))
+                                        current_bucket = bucket_id
+                                        b_open, b_high, b_low, b_close, b_vol, b_time = float(o), float(h), float(l), float(c), int(v or 0), bucket_id
+                                if current_bucket is not None:
+                                    resampled.append((b_open, b_high, b_low, b_close, b_vol, b_time))
+                                opens = [b[0] for b in resampled]
+                                highs = [b[1] for b in resampled]
+                                lows = [b[2] for b in resampled]
+                                closes = [b[3] for b in resampled]
+                                volumes = [b[4] for b in resampled]
+                                timestamps = [b[5] for b in resampled]
+
                             cum_vol = 0
                             cum_pv = 0.0
                             seen_times = set()
@@ -553,7 +584,9 @@ def api_chart_data():
                 "5m": ("2d", "5m"),
                 "10m": ("5d", "5m"),
                 "15m": ("5d", "15m"),
+                "30m": ("1mo", "30m"),
                 "1h": ("1mo", "1h"),
+                "4h": ("3mo", "1h"),
                 "1d": ("3mo", "1d"),
             }
             period, interval = tf_specs.get(timeframe, ("2d", "5m"))
@@ -607,6 +640,8 @@ def api_chart_data():
             market_intelligence.cached_spot_prices[asset_key] = (latest_c, time.time())
 
     # Calculate Institutional Indicators (EMA 9, EMA 21) across candles
+    from indicators import IndicatorEngine
+    df_candles = pd.DataFrame(candles) if candles else None
     if candles and len(candles) >= 3:
         try:
             c_series = pd.Series([float(c["close"]) for c in candles])
@@ -617,6 +652,13 @@ def api_chart_data():
                 c["ema21"] = round(float(e21.iloc[idx]), 2)
         except Exception:
             pass
+
+    # Institutional Volume Profile & Classical Chart Pattern Detection
+    vol_profile = IndicatorEngine.calculate_volume_profile(df_candles) if df_candles is not None and not df_candles.empty else {"poc": 0.0, "vah": 0.0, "val": 0.0, "bins": []}
+    pattern_info = IndicatorEngine.detect_chart_patterns(df_candles) if df_candles is not None and not df_candles.empty else {
+        "has_pattern": False, "pattern_name": "CONSOLIDATION", "bias": "NEUTRAL", "stage": "CONSOLIDATION", "confidence": 50,
+        "predicted_target": 0.0, "invalidation_price": 0.0, "forecast_text": "Awaiting candle data", "key_levels": {}
+    }
 
     current_vwap = candles[-1]["vwap"] if candles else spot
     opt_prem = engine.client.get_option_ltp(opt_sec_id, spot, atm_strike, opt_type, expiry_date=expiry_date_iso)
@@ -634,6 +676,8 @@ def api_chart_data():
         "timeframe": timeframe,
         "spot": spot,
         "candles": candles,
+        "volume_profile": vol_profile,
+        "pattern_analysis": pattern_info,
         "levels": {
             "r2": levels["r2"],
             "r1": levels["r1"],
@@ -641,6 +685,9 @@ def api_chart_data():
             "s1": levels["s1"],
             "s2": levels["s2"],
             "vwap": current_vwap,
+            "poc": vol_profile.get("poc", current_vwap),
+            "vah": vol_profile.get("vah", levels["r1"]),
+            "val": vol_profile.get("val", levels["s1"]),
             "orb_high": getattr(engine.strategy, "orb_high", 0.0) or (spot + 25.0),
             "orb_low": getattr(engine.strategy, "orb_low", 0.0) or (spot - 25.0)
         },

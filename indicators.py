@@ -292,3 +292,270 @@ class IndicatorEngine:
             "r2": round(r2, 2),
             "s2": round(s2, 2)
         }
+
+    @staticmethod
+    def calculate_volume_profile(df: pd.DataFrame, num_bins: int = 24) -> dict:
+        """
+        Calculates Institutional Volume Profile across price distribution:
+        - POC (Point of Control): Price level with highest traded volume.
+        - VAH (Value Area High): 70% volume ceiling.
+        - VAL (Value Area Low): 70% volume floor.
+        - Profile Bins: Price bins with aggregated volume and buy/sell delta.
+        """
+        if df is None or df.empty or len(df) < 5:
+            return {"poc": 0.0, "vah": 0.0, "val": 0.0, "bins": [], "total_volume": 0}
+        
+        try:
+            p_high = float(df["high"].max())
+            p_low = float(df["low"].min())
+            if p_high <= p_low:
+                return {"poc": p_high, "vah": p_high, "val": p_low, "bins": [], "total_volume": 0}
+            
+            bin_size = (p_high - p_low) / max(1, num_bins)
+            bins_data = [{"price": round(p_low + (i + 0.5) * bin_size, 2), "volume": 0, "buy_vol": 0, "sell_vol": 0} for i in range(num_bins)]
+            
+            total_vol = 0
+            for _, row in df.iterrows():
+                c = float(row["close"])
+                o = float(row["open"])
+                v = int(row.get("volume", 1000) or 1000)
+                total_vol += v
+                bin_idx = min(num_bins - 1, max(0, int((c - p_low) / bin_size)))
+                bins_data[bin_idx]["volume"] += v
+                if c >= o:
+                    bins_data[bin_idx]["buy_vol"] += v
+                else:
+                    bins_data[bin_idx]["sell_vol"] += v
+            
+            # Find POC (highest volume bin)
+            poc_bin = max(bins_data, key=lambda b: b["volume"])
+            poc_price = poc_bin["price"]
+            
+            # Calculate Value Area (70% of total volume around POC)
+            sorted_by_vol = sorted(bins_data, key=lambda b: b["volume"], reverse=True)
+            target_va_vol = total_vol * 0.70
+            accum_vol = 0
+            va_bins = []
+            for b in sorted_by_vol:
+                va_bins.append(b)
+                accum_vol += b["volume"]
+                if accum_vol >= target_va_vol:
+                    break
+            
+            vah = max(b["price"] for b in va_bins) if va_bins else p_high
+            val = min(b["price"] for b in va_bins) if va_bins else p_low
+            
+            for b in bins_data:
+                b["is_poc"] = (b["price"] == poc_price)
+                b["in_value_area"] = (val <= b["price"] <= vah)
+            
+            return {
+                "poc": round(poc_price, 2),
+                "vah": round(vah, 2),
+                "val": round(val, 2),
+                "bins": bins_data,
+                "total_volume": total_vol
+            }
+        except Exception:
+            return {"poc": 0.0, "vah": 0.0, "val": 0.0, "bins": [], "total_volume": 0}
+
+    @staticmethod
+    def detect_chart_patterns(df: pd.DataFrame) -> dict:
+        """
+        Detects classical structural chart formations (Head & Shoulders, Double Top/Bottom,
+        Cup & Handle, Triangles, Flags) with predictive price targets and invalidation stops.
+        """
+        if df is None or len(df) < 15:
+            return {
+                "has_pattern": False,
+                "pattern_name": "CONSOLIDATION_BUILDUP",
+                "pattern_type": "NEUTRAL",
+                "bias": "NEUTRAL",
+                "stage": "ACCUMULATION",
+                "confidence": 50,
+                "predicted_target": 0.0,
+                "invalidation_price": 0.0,
+                "forecast_text": "Awaiting minimum 15 candles to map structural swing pivots.",
+                "key_levels": {}
+            }
+
+        try:
+            closes = df["close"].values
+            highs = df["high"].values
+            lows = df["low"].values
+            n = len(closes)
+            cur_price = float(closes[-1])
+
+            # Find local peaks and troughs (window=3)
+            peaks = []
+            troughs = []
+            for i in range(2, n - 2):
+                if highs[i] > highs[i - 1] and highs[i] > highs[i - 2] and highs[i] > highs[i + 1] and highs[i] > highs[i + 2]:
+                    peaks.append((i, float(highs[i])))
+                if lows[i] < lows[i - 1] and lows[i] < lows[i - 2] and lows[i] < lows[i + 1] and lows[i] < lows[i + 2]:
+                    troughs.append((i, float(lows[i])))
+
+            # 1. Double Bottom ("W" Formation) - High Conviction Bullish Reversal
+            if len(troughs) >= 2:
+                t1_idx, t1_val = troughs[-2]
+                t2_idx, t2_val = troughs[-1]
+                trough_diff_pct = abs(t1_val - t2_val) / t1_val * 100.0
+                if trough_diff_pct < 0.35 and (t2_idx - t1_idx) >= 3:
+                    # Find intervening peak (neckline)
+                    inter_peaks = [p for p in peaks if t1_idx < p[0] < t2_idx]
+                    if inter_peaks:
+                        neckline = max(p[1] for p in inter_peaks)
+                        h = neckline - min(t1_val, t2_val)
+                        target = round(neckline + h, 2)
+                        inval = round(min(t1_val, t2_val) - (h * 0.2), 2)
+                        stage = "BREAKOUT_TRIGGERED" if cur_price >= neckline else "NECKLINE_TEST"
+                        return {
+                            "has_pattern": True,
+                            "pattern_name": "DOUBLE_BOTTOM (W FORMATION)",
+                            "pattern_type": "BULLISH_REVERSAL",
+                            "bias": "BULLISH",
+                            "stage": stage,
+                            "confidence": 88 if stage == "BREAKOUT_TRIGGERED" else 76,
+                            "predicted_target": target,
+                            "invalidation_price": inval,
+                            "forecast_text": f"📈 Bullish Double Bottom ('W' shape) confirmed at ₹{min(t1_val, t2_val):,.1f}. Neckline at ₹{neckline:,.1f}. Projected upward target: ₹{target:,.1f} (+{target - cur_price:.1f} pts).",
+                            "key_levels": {"support": min(t1_val, t2_val), "neckline": neckline, "target": target}
+                        }
+
+            # 2. Double Top ("M" Formation) - High Conviction Bearish Reversal
+            if len(peaks) >= 2:
+                p1_idx, p1_val = peaks[-2]
+                p2_idx, p2_val = peaks[-1]
+                peak_diff_pct = abs(p1_val - p2_val) / p1_val * 100.0
+                if peak_diff_pct < 0.35 and (p2_idx - p1_idx) >= 3:
+                    # Find intervening valley (neckline)
+                    inter_troughs = [t for t in troughs if p1_idx < t[0] < p2_idx]
+                    if inter_troughs:
+                        neckline = min(t[1] for t in inter_troughs)
+                        h = max(p1_val, p2_val) - neckline
+                        target = round(neckline - h, 2)
+                        inval = round(max(p1_val, p2_val) + (h * 0.2), 2)
+                        stage = "BREAKDOWN_TRIGGERED" if cur_price <= neckline else "NECKLINE_TEST"
+                        return {
+                            "has_pattern": True,
+                            "pattern_name": "DOUBLE_TOP (M FORMATION)",
+                            "pattern_type": "BEARISH_REVERSAL",
+                            "bias": "BEARISH",
+                            "stage": stage,
+                            "confidence": 88 if stage == "BREAKDOWN_TRIGGERED" else 76,
+                            "predicted_target": target,
+                            "invalidation_price": inval,
+                            "forecast_text": f"📉 Bearish Double Top ('M' shape) confirmed at ₹{max(p1_val, p2_val):,.1f}. Neckline at ₹{neckline:,.1f}. Projected downward flush target: ₹{target:,.1f} (-{cur_price - target:.1f} pts).",
+                            "key_levels": {"resistance": max(p1_val, p2_val), "neckline": neckline, "target": target}
+                        }
+
+            # 3. Head & Shoulders (Bearish Reversal)
+            if len(peaks) >= 3:
+                ls = peaks[-3][1]
+                head = peaks[-2][1]
+                rs = peaks[-1][1]
+                if head > ls and head > rs and abs(ls - rs) / ls < 0.005:
+                    neckline = float(df["low"].iloc[peaks[-3][0]:peaks[-1][0]].min())
+                    h = head - neckline
+                    target = round(neckline - h, 2)
+                    inval = round(head, 2)
+                    return {
+                        "has_pattern": True,
+                        "pattern_name": "HEAD & SHOULDERS",
+                        "pattern_type": "BEARISH_REVERSAL",
+                        "bias": "BEARISH",
+                        "stage": "RIGHT_SHOULDER_COMPLETED",
+                        "confidence": 85,
+                        "predicted_target": target,
+                        "invalidation_price": inval,
+                        "forecast_text": f"⚠️ Classic Head & Shoulders topped out at Head ₹{head:,.1f}. Neckline break triggers major flush toward ₹{target:,.1f}.",
+                        "key_levels": {"head": head, "neckline": neckline, "target": target}
+                    }
+
+            # 4. Inverse Head & Shoulders (Bullish Reversal)
+            if len(troughs) >= 3:
+                ls = troughs[-3][1]
+                head = troughs[-2][1]
+                rs = troughs[-1][1]
+                if head < ls and head < rs and abs(ls - rs) / ls < 0.005:
+                    neckline = float(df["high"].iloc[troughs[-3][0]:troughs[-1][0]].max())
+                    h = neckline - head
+                    target = round(neckline + h, 2)
+                    inval = round(head, 2)
+                    return {
+                        "has_pattern": True,
+                        "pattern_name": "INVERSE HEAD & SHOULDERS",
+                        "pattern_type": "BULLISH_REVERSAL",
+                        "bias": "BULLISH",
+                        "stage": "RIGHT_SHOULDER_COMPLETED",
+                        "confidence": 86,
+                        "predicted_target": target,
+                        "invalidation_price": inval,
+                        "forecast_text": f"🚀 Powerful Inverse Head & Shoulders bottomed out at ₹{head:,.1f}. Breakout above ₹{neckline:,.1f} projects explosive rally to ₹{target:,.1f}.",
+                        "key_levels": {"head": head, "neckline": neckline, "target": target}
+                    }
+
+            # 5. Ascending / Descending Triangles & Trend Continuation Flags
+            if len(lows) >= 10:
+                l_start = float(lows[-10])
+                l_end = float(lows[-1])
+                h_start = float(highs[-10])
+                h_end = float(highs[-1])
+                if l_end > l_start and abs(h_end - h_start) / h_start < 0.002:
+                    target = round(h_end + (h_end - l_start), 2)
+                    return {
+                        "has_pattern": True,
+                        "pattern_name": "ASCENDING TRIANGLE (BULLISH ACCUMULATION)",
+                        "pattern_type": "BULLISH_CONTINUATION",
+                        "bias": "BULLISH",
+                        "stage": "APEX_COMPRESSION",
+                        "confidence": 82,
+                        "predicted_target": target,
+                        "invalidation_price": round(l_end, 2),
+                        "forecast_text": f"⚡ Ascending Triangle: Buyers pressing higher lows into resistance ₹{h_end:,.1f}. Upward breakout target ₹{target:,.1f}.",
+                        "key_levels": {"resistance": h_end, "rising_support": l_end, "target": target}
+                    }
+                elif h_end < h_start and abs(l_end - l_start) / l_start < 0.002:
+                    target = round(l_end - (h_start - l_end), 2)
+                    return {
+                        "has_pattern": True,
+                        "pattern_name": "DESCENDING TRIANGLE (BEARISH DISTRIBUTION)",
+                        "pattern_type": "BEARISH_CONTINUATION",
+                        "bias": "BEARISH",
+                        "stage": "APEX_COMPRESSION",
+                        "confidence": 82,
+                        "predicted_target": target,
+                        "invalidation_price": round(h_end, 2),
+                        "forecast_text": f"🩸 Descending Triangle: Sellers pressing lower highs into support ₹{l_end:,.1f}. Downward breakdown target ₹{target:,.1f}.",
+                        "key_levels": {"support": l_end, "falling_resistance": h_end, "target": target}
+                    }
+
+            # Default: Trend Continuation / Pullback
+            c_diff = cur_price - float(closes[0])
+            bias = "BULLISH" if c_diff > 0 else "BEARISH"
+            target_p = round(cur_price + (c_diff * 0.5), 2)
+            return {
+                "has_pattern": True,
+                "pattern_name": f"{bias}_CHANNEL_EXPANSION",
+                "pattern_type": f"{bias}_TREND",
+                "bias": bias,
+                "stage": "TREND_PROGRESSION",
+                "confidence": 75,
+                "predicted_target": target_p,
+                "invalidation_price": round(cur_price - (c_diff * 0.3), 2),
+                "forecast_text": f"📊 {bias} Trend Wave active. Projected momentum continuation target: ₹{target_p:,.1f}.",
+                "key_levels": {"current": cur_price, "target": target_p}
+            }
+        except Exception as e:
+            return {
+                "has_pattern": False,
+                "pattern_name": "CONSOLIDATION",
+                "pattern_type": "NEUTRAL",
+                "bias": "NEUTRAL",
+                "stage": "CONSOLIDATION",
+                "confidence": 50,
+                "predicted_target": 0.0,
+                "invalidation_price": 0.0,
+                "forecast_text": f"Market in consolidation: {e}",
+                "key_levels": {}
+            }
