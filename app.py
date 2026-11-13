@@ -632,12 +632,45 @@ def api_chart_data():
         if candles:
             _chart_candles_cache[cache_key] = (candles, now_ts_sec)
 
-    # Harmonize live spot price with latest candle close for 100% chart accuracy
-    if candles and candles[-1].get("close") and candles[-1]["close"] > 0:
-        latest_c = float(candles[-1]["close"])
-        if chart_target == "underlying" and abs(spot - latest_c) > 0.5:
-            spot = latest_c
-            market_intelligence.cached_spot_prices[asset_key] = (latest_c, time.time())
+    # Keep the rightmost candle synced with the current IST wall-clock bar during market hours
+    tf_seconds_map = {
+        "10s": 10, "1m": 60, "3m": 180, "5m": 300,
+        "10m": 600, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400
+    }
+    tf_sec = tf_seconds_map.get(timeframe)
+    if candles and tf_sec and spot > 0:
+        try:
+            import datetime as _dt_bar
+            now_ist = _dt_bar.datetime.now()
+            hm = now_ist.hour * 60 + now_ist.minute
+            is_mcx = getattr(asset_info, "category", "") == "COMMODITY"
+            in_session = (540 <= hm <= 1410) if is_mcx else (555 <= hm <= 930)
+            if in_session:
+                cur_bar_ts = int(now_ts_sec) - (int(now_ts_sec) % tf_sec)
+                last_ts = int(candles[-1]["time"])
+                if cur_bar_ts > last_ts and (cur_bar_ts - last_ts) <= 3600:
+                    prev_close = float(candles[-1]["close"])
+                    live_c = round(float(spot), 2)
+                    candles.append({
+                        "time": cur_bar_ts,
+                        "open": prev_close,
+                        "high": max(prev_close, live_c),
+                        "low": min(prev_close, live_c),
+                        "close": live_c,
+                        "volume": int(candles[-1].get("volume", 1000)),
+                        "vwap": candles[-1].get("vwap", live_c)
+                    })
+                elif cur_bar_ts == last_ts:
+                    live_c = round(float(spot), 2)
+                    candles[-1]["close"] = live_c
+                    candles[-1]["high"] = max(float(candles[-1]["high"]), live_c)
+                    candles[-1]["low"] = min(float(candles[-1]["low"]), live_c)
+        except Exception:
+            pass
+
+    # Harmonize live spot price only if live spot is missing
+    if candles and spot <= 0 and candles[-1].get("close", 0) > 0:
+        spot = float(candles[-1]["close"])
 
     # Calculate Institutional Indicators (EMA 9, EMA 21) across candles
     from indicators import IndicatorEngine
@@ -690,12 +723,35 @@ def api_chart_data():
     if asset_orb_low <= 0:
         asset_orb_low = round(spot * 0.9985, 2)
 
-    r_step = max(abs(levels["r2"] - levels["r1"]), abs(levels["r1"] - levels["central_pivot"]), round(spot * 0.0025, 2))
-    s_step = max(abs(levels["s1"] - levels["s2"]), abs(levels["central_pivot"] - levels["s1"]), round(spot * 0.0025, 2))
-    r3_val = round(levels.get("r3") or (levels["r2"] + r_step), 2)
-    r4_val = round(levels.get("r4") or (r3_val + r_step), 2)
-    s3_val = round(levels.get("s3") or (levels["s2"] - s_step), 2)
-    s4_val = round(levels.get("s4") or (s3_val - s_step), 2)
+    # Authentic Classic Floor Pivot Points from Previous Session (or Intraday Range) - Flexible Across All Charts
+    pivot_val = levels["central_pivot"]
+    r1_val, r2_val, r3_val, r4_val = levels["r1"], levels["r2"], levels.get("r3", levels["r2"]), levels.get("r2", levels["r1"])
+    s1_val, s2_val, s3_val, s4_val = levels["s1"], levels["s2"], levels.get("s3", levels["s2"]), levels.get("s2", levels["s1"])
+    if candles:
+        try:
+            import datetime as _dt_piv
+            today_str_p = _dt_piv.datetime.now().strftime("%Y-%m-%d")
+            prev_bars = [c for c in candles if _dt_piv.datetime.fromtimestamp(c["time"]).strftime("%Y-%m-%d") < today_str_p]
+            ref_bars = prev_bars if len(prev_bars) >= 5 else candles
+            ref_h = max(float(c["high"]) for c in ref_bars)
+            ref_l = min(float(c["low"]) for c in ref_bars)
+            ref_c = float(ref_bars[-1]["close"])
+            hl_rng = max(ref_h - ref_l, round(spot * 0.006, 2))
+            if (ref_h - ref_l) < hl_rng:
+                mid = (ref_h + ref_l) / 2.0
+                ref_h = mid + hl_rng / 2.0
+                ref_l = mid - hl_rng / 2.0
+            pivot_val = round((ref_h + ref_l + ref_c) / 3.0, 2)
+            r1_val = round((2.0 * pivot_val) - ref_l, 2)
+            s1_val = round((2.0 * pivot_val) - ref_h, 2)
+            r2_val = round(pivot_val + hl_rng, 2)
+            s2_val = round(pivot_val - hl_rng, 2)
+            r3_val = round(ref_h + 2.0 * (pivot_val - ref_l), 2)
+            s3_val = round(ref_l - 2.0 * (ref_h - pivot_val), 2)
+            r4_val = round(r3_val + (hl_rng * 0.5), 2)
+            s4_val = round(s3_val - (hl_rng * 0.5), 2)
+        except Exception:
+            pass
 
     return jsonify({
         "asset": asset_key,
@@ -709,11 +765,11 @@ def api_chart_data():
         "levels": {
             "r4": r4_val,
             "r3": r3_val,
-            "r2": levels["r2"],
-            "r1": levels["r1"],
-            "pivot": levels["central_pivot"],
-            "s1": levels["s1"],
-            "s2": levels["s2"],
+            "r2": r2_val,
+            "r1": r1_val,
+            "pivot": pivot_val,
+            "s1": s1_val,
+            "s2": s2_val,
             "s3": s3_val,
             "s4": s4_val,
             "vwap": current_vwap,

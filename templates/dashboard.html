@@ -3728,7 +3728,7 @@
                 mode: LightweightCharts.CrosshairMode.Normal,
             },
             leftPriceScale: {
-                visible: true,
+                visible: false,
                 borderColor: 'rgba(128, 128, 128, 0.16)',
             },
             rightPriceScale: {
@@ -3761,15 +3761,7 @@
             wickDownColor: '#ff3b30'
         });
 
-        // Transparent Left-Axis Mirror Series so Left Price Scale displays synchronized price numbers
-        leftMirrorSeries = lwChart.addLineSeries({
-            priceScaleId: 'left',
-            color: 'rgba(0, 0, 0, 0)',
-            lineWidth: 1,
-            lastValueVisible: false,
-            priceLineVisible: false,
-            crosshairMarkerVisible: false
-        });
+        leftMirrorSeries = null;
 
         // EMA 9 Line Series (Cyan) - Clean Scale (values shown in legend bar)
         ema9Series = lwChart.addLineSeries({
@@ -3999,7 +3991,7 @@
         ctx.clearRect(0, 0, width, height);
         window._vpRenderedBins = [];
 
-        const leftMargin = 64;
+        const leftMargin = 6;
         const rightMargin = 72;
         const chartPlotLeft = leftMargin;
         const chartPlotRight = width - rightMargin;
@@ -4169,15 +4161,15 @@
             if (maxSellBin && maxSellBin.y > 20 && maxSellBin.y < height - 20) {
                 const sPct = Math.round((maxSellBin.bin.sell_vol / Math.max(1, maxSellBin.bin.volume)) * 100);
                 const msg = spot < maxSellBin.bin.price
-                    ? `⚠️ Supply (${sPct}% Ask): Rejection likely here`
-                    : `🚀 Breakout Zone (${sPct}% Ask cleared)`;
+                    ? `⚠️ Heavy Selling Wall (${sPct}% Sell Vol)`
+                    : `🚀 Sellers Cleared Above (${sPct}% Sell Vol)`;
                 _drawLeftPill(ctx, Math.max(160, rightX - maxSellBin.barWidth - 215), maxSellBin.y - 12, msg, 'rgba(255, 241, 242, 0.92)', '#be123c', 'rgba(244, 63, 94, 0.45)');
             }
             if (maxBuyBin && maxBuyBin.y > 20 && maxBuyBin.y < height - 20 && (!maxSellBin || Math.abs(maxBuyBin.y - maxSellBin.y) > 26)) {
                 const bPct = Math.round((maxBuyBin.bin.buy_vol / Math.max(1, maxBuyBin.bin.volume)) * 100);
                 const msg = spot > maxBuyBin.bin.price
-                    ? `🛡️ Demand Floor (${bPct}% Bid): Buy bounce`
-                    : `⚡ Resistance Flip (${bPct}% Bid)`;
+                    ? `🛡️ Strong Buying Support (${bPct}% Buy Vol)`
+                    : `⚡ Buyers Trapped Below (${bPct}% Buy Vol)`;
                 _drawLeftPill(ctx, Math.max(160, rightX - maxBuyBin.barWidth - 215), maxBuyBin.y + 12, msg, 'rgba(236, 253, 245, 0.92)', '#15803d', 'rgba(34, 197, 94, 0.45)');
             }
         }
