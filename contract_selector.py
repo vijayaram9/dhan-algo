@@ -344,11 +344,18 @@ class ContractSelector:
                 chosen_lots = req_lots
                 advisory_msg = f"⚠️ Lot Sizing Advisory: Position scaled to {chosen_lots} lot{'s' if chosen_lots > 1 else ''} (₹{req_margin:,.2f} margin, {util_pct}% of capital). Safe within 50% ceiling."
         else:
-            # Disciplined sizing: Strictly 1 LOT default for capital protection and risk control
-            chosen_lots = 1
+            # Capital-Scaled Optimal Lot Sizing:
+            # Scales up lots on affordable contracts (up to 12% capital allocation & 2.5% max stop risk, max 5 lots)
+            # and automatically drops to 1 lot on expensive contracts or lower capital.
+            target_alloc = available_capital * 0.12
+            max_risk_budget = available_capital * 0.025
+            risk_per_lot = max(1.0, cost_per_lot * 0.20)
+            lots_by_alloc = int(target_alloc // cost_per_lot) if cost_per_lot > 0 else 1
+            lots_by_risk = int(max_risk_budget // risk_per_lot) if risk_per_lot > 0 else 1
+            chosen_lots = max(1, min(5, lots_by_alloc, lots_by_risk))
             chosen_margin = round(chosen_lots * cost_per_lot, 2)
             util_pct = round((chosen_margin / available_capital) * 100.0, 1) if available_capital > 0 else 100.0
-            advisory_msg = f"Disciplined single lot sizing: 1 lot (₹{chosen_margin:,.2f} margin, {util_pct}% of capital). Capital safeguarded."
+            advisory_msg = f"Optimal dynamic sizing: {chosen_lots} lot{'s' if chosen_lots > 1 else ''} (₹{chosen_margin:,.2f} margin, {util_pct}% of ₹{available_capital:,.0f} capital)."
 
         final_quantity = chosen_lots * base_lot_size
         total_margin = round(final_quantity * estimated_premium, 2)
