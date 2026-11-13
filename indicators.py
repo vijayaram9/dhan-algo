@@ -523,6 +523,7 @@ class IndicatorEngine:
                             "candlestick_bias": c_pat.get("bias", "BULLISH"),
                             "candlestick_desc": c_pat.get("desc", ""),
                             "pattern_name": "DOUBLE_BOTTOM (W FORMATION)",
+                            "pattern_display_name": "Double Bottom ('W' Shape Bullish Reversal)",
                             "pattern_type": "BULLISH_REVERSAL",
                             "bias": "BULLISH",
                             "stage": stage,
@@ -530,6 +531,7 @@ class IndicatorEngine:
                             "predicted_target": target,
                             "invalidation_price": inval,
                             "historical_edge_stat": f"{conf}% documented win-rate on neckline retest",
+                            "pattern_explanation": "Visualized as a 'W' shape: Price tested support twice and rebounded both times, creating twin bottoms with a central peak ('Neckline'). Buyers absorbed all supply. Breaking above the neckline triggers short covering and rapid upward acceleration.",
                             "forecast_text": f"⏱️ [{tf_label}] • {candle_name}. Bullish Double Bottom ('W' shape) confirmed at ₹{min(t1_val, t2_val):,.1f}. Neckline: ₹{neckline:,.1f}. Historical Edge: {conf}% win rate. Projected target: ₹{target:,.1f} (+{target - cur_price:.1f} pts). Invalidation if closes below ₹{inval:,.1f}.",
                             "key_levels": {"support": min(t1_val, t2_val), "neckline": neckline, "target": target}
                         }
@@ -555,6 +557,7 @@ class IndicatorEngine:
                             "candlestick_bias": c_pat.get("bias", "BEARISH"),
                             "candlestick_desc": c_pat.get("desc", ""),
                             "pattern_name": "DOUBLE_TOP (M FORMATION)",
+                            "pattern_display_name": "Double Top ('M' Shape Bearish Reversal)",
                             "pattern_type": "BEARISH_REVERSAL",
                             "bias": "BEARISH",
                             "stage": stage,
@@ -562,6 +565,7 @@ class IndicatorEngine:
                             "predicted_target": target,
                             "invalidation_price": inval,
                             "historical_edge_stat": f"{conf}% documented win-rate on neckline breakdown",
+                            "pattern_explanation": "Visualized as an 'M' shape: Price rallied twice to test resistance and got rejected both times, creating twin peaks with a central valley ('Neckline'). Buyers exhausted their ammo. When the neckline breaks, trapped buyers dump positions, triggering a fast downward flush. The algo halts buying Calls (CE) and targets Put (PE) entries.",
                             "forecast_text": f"⏱️ [{tf_label}] • {candle_name}. Bearish Double Top ('M' shape) rejected at ₹{max(p1_val, p2_val):,.1f}. Neckline: ₹{neckline:,.1f}. Historical Edge: {conf}% flush probability. Projected downward target: ₹{target:,.1f} (-{cur_price - target:.1f} pts). Invalidation if closes above ₹{inval:,.1f}.",
                             "key_levels": {"resistance": max(p1_val, p2_val), "neckline": neckline, "target": target}
                         }
@@ -584,6 +588,7 @@ class IndicatorEngine:
                         "candlestick_bias": c_pat.get("bias", "BEARISH"),
                         "candlestick_desc": c_pat.get("desc", ""),
                         "pattern_name": "HEAD & SHOULDERS",
+                        "pattern_display_name": "Head & Shoulders (Distribution Reversal)",
                         "pattern_type": "BEARISH_REVERSAL",
                         "bias": "BEARISH",
                         "stage": "RIGHT_SHOULDER_COMPLETED",
@@ -591,6 +596,7 @@ class IndicatorEngine:
                         "predicted_target": target,
                         "invalidation_price": inval,
                         "historical_edge_stat": f"{conf}% documented win-rate on breakdown",
+                        "pattern_explanation": "Three successive peaks where the middle peak ('Head') is highest and the outer two ('Shoulders') are lower. Shows heavy institutional distribution. A break of the neckline support unleashes systematic liquidation.",
                         "forecast_text": f"⏱️ [{tf_label}] • {candle_name}. Classic Head & Shoulders topped at Head ₹{head:,.1f}. Historical Edge: {conf}% win rate. Neckline breach triggers major distribution flush toward ₹{target:,.1f}. Invalidation: ₹{inval:,.1f}.",
                         "key_levels": {"head": head, "neckline": neckline, "target": target}
                     }
@@ -613,6 +619,7 @@ class IndicatorEngine:
                         "candlestick_bias": c_pat.get("bias", "BULLISH"),
                         "candlestick_desc": c_pat.get("desc", ""),
                         "pattern_name": "INVERSE HEAD & SHOULDERS",
+                        "pattern_display_name": "Inverse Head & Shoulders (Accumulation Reversal)",
                         "pattern_type": "BULLISH_REVERSAL",
                         "bias": "BULLISH",
                         "stage": "RIGHT_SHOULDER_COMPLETED",
@@ -620,6 +627,7 @@ class IndicatorEngine:
                         "predicted_target": target,
                         "invalidation_price": inval,
                         "historical_edge_stat": f"{conf}% documented win-rate on upward breakout",
+                        "pattern_explanation": "Three successive troughs where the middle trough is lowest. Confirms deep institutional accumulation. Breaking above the overhead neckline triggers aggressive short covering and a high-probability rally.",
                         "forecast_text": f"⏱️ [{tf_label}] • {candle_name}. Powerful Inverse Head & Shoulders bottomed at ₹{head:,.1f}. Historical Edge: {conf}% win rate. Breakout above ₹{neckline:,.1f} projects explosive rally to ₹{target:,.1f}. Invalidation: ₹{inval:,.1f}.",
                         "key_levels": {"head": head, "neckline": neckline, "target": target}
                     }
@@ -640,6 +648,7 @@ class IndicatorEngine:
                         "candlestick_bias": c_pat.get("bias", "BULLISH"),
                         "candlestick_desc": c_pat.get("desc", ""),
                         "pattern_name": "ASCENDING TRIANGLE (BULLISH ACCUMULATION)",
+                        "pattern_display_name": "Ascending Triangle (Bullish Accumulation)",
                         "pattern_type": "BULLISH_CONTINUATION",
                         "bias": "BULLISH",
                         "stage": "APEX_COMPRESSION",
@@ -647,6 +656,7 @@ class IndicatorEngine:
                         "predicted_target": target,
                         "invalidation_price": round(l_end, 2),
                         "historical_edge_stat": f"{conf}% documented breakout probability",
+                        "pattern_explanation": "Buyers are systematically bidding higher lows into a flat resistance ceiling. The compression of volatility near the apex indicates strong smart-money accumulation preceding an aggressive upward expansion.",
                         "forecast_text": f"⏱️ [{tf_label}] • {candle_name}. Ascending Triangle: Buyers pressing higher lows into resistance ₹{h_end:,.1f}. Historical Edge: {conf}% upward continuation target ₹{target:,.1f}. Stop below ₹{l_end:,.1f}.",
                         "key_levels": {"resistance": h_end, "rising_support": l_end, "target": target}
                     }
@@ -660,6 +670,7 @@ class IndicatorEngine:
                         "candlestick_bias": c_pat.get("bias", "BEARISH"),
                         "candlestick_desc": c_pat.get("desc", ""),
                         "pattern_name": "DESCENDING TRIANGLE (BEARISH DISTRIBUTION)",
+                        "pattern_display_name": "Descending Triangle (Bearish Distribution)",
                         "pattern_type": "BEARISH_CONTINUATION",
                         "bias": "BEARISH",
                         "stage": "APEX_COMPRESSION",
@@ -667,6 +678,7 @@ class IndicatorEngine:
                         "predicted_target": target,
                         "invalidation_price": round(h_end, 2),
                         "historical_edge_stat": f"{conf}% documented breakdown probability",
+                        "pattern_explanation": "Sellers are systematically pressing lower highs into a flat support floor. Price compression at the floor signals persistent institutional distribution, often resulting in a decisive breakdown flush.",
                         "forecast_text": f"⏱️ [{tf_label}] • {candle_name}. Descending Triangle: Sellers pressing lower highs into support ₹{l_end:,.1f}. Historical Edge: {conf}% downward flush target ₹{target:,.1f}. Stop above ₹{h_end:,.1f}.",
                         "key_levels": {"support": l_end, "falling_resistance": h_end, "target": target}
                     }
@@ -684,6 +696,7 @@ class IndicatorEngine:
                 "candlestick_bias": c_pat.get("bias", bias),
                 "candlestick_desc": c_pat.get("desc", ""),
                 "pattern_name": f"{bias}_CHANNEL_EXPANSION",
+                "pattern_display_name": f"{bias.capitalize()} Channel Expansion",
                 "pattern_type": f"{bias}_TREND",
                 "bias": bias,
                 "stage": "TREND_PROGRESSION",
@@ -691,6 +704,7 @@ class IndicatorEngine:
                 "predicted_target": target_p,
                 "invalidation_price": inval_p,
                 "historical_edge_stat": f"{conf}% trend momentum probability",
+                "pattern_explanation": f"Price is expanding in a directional {bias.lower()} channel supported by institutional volume flow. The algo trails dynamic stops to maximize ride time.",
                 "forecast_text": f"⏱️ [{tf_label}] • {candle_name}. {bias} Trend Wave active. Projected momentum continuation target: ₹{target_p:,.1f} | Invalidation: ₹{inval_p:,.1f}.",
                 "key_levels": {"current": cur_price, "target": target_p}
             }

@@ -469,7 +469,7 @@ def api_chart_data():
                 intv = dhan_interval_map.get(timeframe, 5)
 
                 # Determine if user is charting an Option Contract or the Underlying
-                if chart_target == "option" or (security_id_param and security_id_param != "0"):
+                if chart_target == "option":
                     target_sec_id = security_id_param or opt_sec_id
                     target_seg = segment_param or ("MCX_COMM" if asset_info.category == "COMMODITY" else ("BSE_FNO" if asset_key == "SENSEX" else "NSE_FNO"))
                     target_itype = instrument_param or ("OPTFUT" if target_seg == "MCX_COMM" else "OPTIDX")
