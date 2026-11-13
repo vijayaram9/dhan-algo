@@ -16,6 +16,9 @@
                 <div class="flex items-baseline space-x-1.5">
                     <span class="text-xl sm:text-2xl font-black font-mono text-slate-900 transition-colors duration-300" id="top-spot-price">₹{{ "%.2f"|format(live_spot|default(24330.0)) }}</span>
                     <span class="text-xs font-mono font-bold text-emerald-600" id="top-spot-change">+45.20 (+0.19%)</span>
+                    <button type="button" onclick="openQuickChartModal(activeAssetKey, document.getElementById('top-asset-name')?.innerText || activeAssetKey)" class="ml-1 px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[10px] font-bold transition flex items-center space-x-1 cursor-pointer" title="Pop out instant Quick Chart with Full Screen mode">
+                        <i class="fa-solid fa-chart-candlestick text-[10px]"></i><span>Pop Chart</span>
+                    </button>
                 </div>
                 <span class="text-[10px] px-2.5 py-0.5 rounded-full font-black uppercase font-mono bg-emerald-50 text-emerald-700 border border-emerald-200" id="top-regime-badge">
                     🟢 MOMENTUM TREND (BUY CE)
@@ -157,7 +160,17 @@
 
     <!-- 1B. REAL CASH & PAPER CAPITAL ALLOCATION HUB -->
     <div class="apple-box p-4 bg-white">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="flex items-center justify-between mb-2.5">
+            <div class="flex items-center space-x-2 text-xs font-bold text-slate-800">
+                <i class="fa-solid fa-wallet text-blue-600"></i>
+                <span>Capital & Risk Allocation Hub</span>
+            </div>
+            <button type="button" onclick="toggleSectionCollapse('capital-hub')" id="capital-hub-toggle-btn" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold font-mono flex items-center space-x-1 transition cursor-pointer">
+                <i id="capital-hub-toggle-icon" class="fa-solid fa-chevron-up text-[10px]"></i>
+                <span id="capital-hub-toggle-text">Collapse</span>
+            </button>
+        </div>
+        <div id="capital-hub-body" class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <!-- 1. Real Dhan Broker Wallet (Live Cash) -->
             <div class="p-4 rounded-2xl bg-slate-50/90 border border-black/[0.04] flex flex-col justify-between">
                 <div>
@@ -1424,11 +1437,13 @@
 
                 <div class="flex flex-wrap items-center gap-2">
                     <!-- Indicator Overlays Switcher (EMA 9/21, VWAP, S/R, Volume Profile, Patterns) - for Algo Desk -->
-                    <div id="algo-chart-controls" class="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl text-xs font-mono font-bold">
+                    <div id="algo-chart-controls" class="flex flex-wrap items-center gap-1 bg-slate-100 p-0.5 rounded-xl text-xs font-mono font-bold">
                         <button onclick="toggleIndicator('ema')" id="btn-toggle-ema" class="px-2 py-1 rounded-lg bg-cyan-50 text-cyan-700 border border-cyan-200 transition shadow-2xs" title="Toggle EMA 9 & EMA 21 Ribbon">EMA 9/21</button>
                         <button onclick="toggleIndicator('vwap')" id="btn-toggle-vwap" class="px-2 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 transition shadow-2xs" title="Toggle Intraday VWAP">VWAP</button>
-                        <button onclick="toggleIndicator('sr')" id="btn-toggle-sr" class="px-2 py-1 rounded-lg bg-white text-slate-800 transition shadow-2xs" title="Toggle Support & Resistance Levels">S/R Levels</button>
+                        <button onclick="toggleIndicator('sr')" id="btn-toggle-sr" class="px-2 py-1 rounded-lg bg-white text-slate-800 border border-slate-200 transition shadow-2xs" title="Toggle Prominent Support, Resistance & CPR Lines">S/R & CPR</button>
+                        <button onclick="toggleIndicator('zones')" id="btn-toggle-zones" class="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 transition shadow-2xs" title="Toggle Buy Zone, Sell Zone & No-Trade Consolidation Zone">Zones</button>
                         <button onclick="toggleIndicator('vp')" id="btn-toggle-vp" class="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 transition shadow-2xs" title="Toggle Volume Profile (POC, VAH, VAL)">Vol Profile</button>
+                        <button onclick="toggleIndicator('vpInsights')" id="btn-toggle-vp-insights" class="px-2 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 transition shadow-2xs" title="Toggle Customized Live Rejection/Bounce Callouts on Volume Profile">VP Insights</button>
                         <button onclick="toggleIndicator('patterns')" id="btn-toggle-patterns" class="px-2 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 transition shadow-2xs" title="Toggle Technical Chart Patterns & Predictive Forecast">Patterns</button>
                         <div class="flex items-center bg-slate-200/80 p-0.5 rounded-lg ml-1">
                             <button onclick="setChartTarget('underlying')" id="chart-target-underlying" class="px-2 py-0.5 rounded transition bg-white text-slate-900 text-[11px]">Spot</button>
@@ -1511,8 +1526,10 @@
 
             <!-- CONTAINER 1: Candlestick Container (Rendered via LightweightCharts for Algo Desk - Authentic Dhan Feed) -->
             <div id="candlestick_chart_container" style="height: 480px; width: 100%; position: relative; display: block; overflow: hidden;">
-                <!-- Authentic Institutional Volume Profile (VPVR) Canvas Overlay -->
+                <!-- Authentic Institutional Volume Profile (VPVR) + Left S/R/CPR + Actionable Zones Canvas Overlay -->
                 <canvas id="vp-overlay-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5;"></canvas>
+                <!-- Interactive Volume Profile Order-Flow Hover Callout -->
+                <div id="vp-insight-tooltip" class="hidden pointer-events-none absolute z-20 max-w-xs p-2.5 rounded-xl border shadow-lg text-[11px] leading-snug backdrop-blur-md transition-opacity" style="background-color: var(--apple-surface); color: var(--apple-text); border-color: var(--apple-border);"></div>
             </div>
 
             <!-- Real-time Quick Quote Bar with Dynamic Levels -->
@@ -2744,6 +2761,8 @@
     let showSR = true;
     let showVP = true;
     let showPatterns = true;
+    let showZones = true;
+    let showVpInsights = true;
 
     // Direct Dhan Terminal URLs mapping
     const dhanTerminalMap = {
@@ -3628,8 +3647,10 @@
         const container = document.getElementById('candlestick_chart_container');
         if (!container) return;
         const existingVpCanvas = document.getElementById('vp-overlay-canvas');
+        const existingVpTooltip = document.getElementById('vp-insight-tooltip');
         container.innerHTML = '';
         if (existingVpCanvas) container.appendChild(existingVpCanvas);
+        if (existingVpTooltip) container.appendChild(existingVpTooltip);
 
         const styles = getComputedStyle(document.documentElement);
         const chartBg = styles.getPropertyValue('--chart-bg').trim() || '#f8f9fb';
@@ -3711,16 +3732,8 @@
             priceLineVisible: false
         });
 
-        // Volume Histogram Series
-        volumeSeries = lwChart.addHistogramSeries({
-            color: '#cbd5e1',
-            priceFormat: { type: 'volume' },
-            priceScaleId: '',
-            scaleMargins: {
-                top: 0.85,
-                bottom: 0,
-            },
-        });
+        // Candid Candles Only (No green/red background histogram bars behind candles)
+        volumeSeries = null;
 
         window.addEventListener('resize', () => {
             if (lwChart && container) {
@@ -3731,29 +3744,106 @@
             }
         });
 
-        // Dynamic Volume Profile Histogram re-rendering on Pan and Zoom
+        // Dynamic Overlay re-rendering on Pan and Zoom
         lwChart.timeScale().subscribeVisibleLogicalRangeChange(() => {
-            if (showVP && window._lastVolumeProfile) {
+            if (window._lastVolumeProfile || window._lastChartLevels) {
                 renderVolumeProfileHistogram(window._lastVolumeProfile);
             }
         });
+
+        // Interactive Mouse Hover for Customized Volume Profile Order-Flow Insights
+        if (!container._vpHoverBound) {
+            container._vpHoverBound = true;
+            container.addEventListener('mousemove', (e) => {
+                const tip = document.getElementById('vp-insight-tooltip');
+                if (!tip || !showVP || !window._vpRenderedBins || window._vpRenderedBins.length === 0) {
+                    if (tip) tip.classList.add('hidden');
+                    return;
+                }
+                const rect = container.getBoundingClientRect();
+                const mx = e.clientX - rect.left;
+                const my = e.clientY - rect.top;
+                const hit = window._vpRenderedBins.find(b => mx >= b.x1 && mx <= b.x2 && my >= b.y1 && my <= b.y2);
+                if (!hit) {
+                    tip.classList.add('hidden');
+                    return;
+                }
+                const pa = window._lastPatternAnalysis || {};
+                const lvls = window._lastChartLevels || {};
+                const spot = window._lastChartSpot || 0;
+                const total = Math.max(1, hit.bin.volume);
+                const buyPct = Math.round((hit.bin.buy_vol / total) * 100);
+                const sellPct = 100 - buyPct;
+                let title = `Node ₹${hit.bin.price.toLocaleString('en-IN')}`;
+                let badge = 'VOLUME NODE';
+                let badgeCls = 'bg-slate-100 text-slate-700';
+                let insight = '';
+
+                if (hit.bin.is_poc) {
+                    badge = '⚡ POC (HIGHEST VOLUME)';
+                    badgeCls = 'bg-rose-100 text-rose-800';
+                    insight = spot >= hit.bin.price
+                        ? `Price is holding ABOVE POC (₹${hit.bin.price}). Institutional fair-value support; look for Call continuation on dips toward ${pa.pattern_display_name || 'trend'}.`
+                        : `Price is trading BELOW POC (₹${hit.bin.price}). POC acts as an overhead ceiling; rejection here favors Put continuation.`;
+                } else if (sellPct >= 58 || (lvls.r1 && hit.bin.price >= lvls.r1 * 0.999)) {
+                    badge = '🔴 REJECTION / SUPPLY NODE';
+                    badgeCls = 'bg-rose-100 text-rose-800';
+                    insight = `Heavy seller absorption (${sellPct}% Ask). If ${activeAssetKey} wicks into ₹${hit.bin.price} with bearish momentum, expect a rejection drop toward POC.`;
+                } else if (buyPct >= 58 || (lvls.s1 && hit.bin.price <= lvls.s1 * 1.001)) {
+                    badge = '🟢 BUY / DEMAND NODE';
+                    badgeCls = 'bg-emerald-100 text-emerald-800';
+                    insight = `Strong buyer defense (${buyPct}% Bid). Pullbacks into ₹${hit.bin.price} with a green reversal candle offer high-probability Call bounces.`;
+                } else {
+                    badge = '⚖️ BALANCED LIQUIDITY';
+                    badgeCls = 'bg-amber-100 text-amber-800';
+                    insight = `Balanced order flow (${buyPct}% Buy / ${sellPct}% Sell). Wait for directional breakout beyond VAH/VAL before entering.`;
+                }
+
+                tip.innerHTML = `
+                    <div class="flex items-center justify-between gap-2 mb-1">
+                        <span class="font-bold font-mono">${title}</span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded font-bold ${badgeCls}">${badge}</span>
+                    </div>
+                    <div class="text-[10px] opacity-85 mb-1 font-mono">Buyers: <b class="text-emerald-600">${buyPct}%</b> | Sellers: <b class="text-rose-600">${sellPct}%</b></div>
+                    <div>${insight}</div>
+                `;
+                tip.style.left = Math.max(12, hit.x1 - 270) + 'px';
+                tip.style.top = Math.max(10, Math.min(rect.height - 110, my - 35)) + 'px';
+                tip.classList.remove('hidden');
+            });
+            container.addEventListener('mouseleave', () => {
+                const tip = document.getElementById('vp-insight-tooltip');
+                if (tip) tip.classList.add('hidden');
+            });
+        }
     }
 
     let activeChartTarget = 'underlying';
 
     // -------------------------------------------------------------------------
-    // INSTITUTIONAL VOLUME PROFILE (VPVR) HISTOGRAM RENDERER
+    // INSTITUTIONAL VOLUME PROFILE + ACTIONABLE ZONES + LEFT S/R/CPR RENDERER
     // -------------------------------------------------------------------------
+    function _drawLeftPill(ctx, x, y, text, bgColor, textColor, borderColor) {
+        ctx.font = 'bold 10px "JetBrains Mono", monospace';
+        const padX = 7;
+        const w = ctx.measureText(text).width + padX * 2;
+        const h = 18;
+        const top = y - h / 2;
+        ctx.fillStyle = bgColor;
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(x, top, w, h, 5) : ctx.rect(x, top, w, h);
+        ctx.fill();
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = textColor;
+        ctx.fillText(text, x + padX, y + 3.5);
+    }
+
     function renderVolumeProfileHistogram(vp) {
         const canvas = document.getElementById('vp-overlay-canvas');
         const container = document.getElementById('candlestick_chart_container');
-        if (!canvas || !container || !candleSeries || !vp || !vp.bins || vp.bins.length === 0) {
-            if (canvas) {
-                const ctx = canvas.getContext('2d');
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }
-            return;
-        }
+        if (!canvas || !container || !candleSeries) return;
 
         const dpr = window.devicePixelRatio || 1;
         const width = container.clientWidth;
@@ -3769,15 +3859,90 @@
         const ctx = canvas.getContext('2d');
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, width, height);
+        window._vpRenderedBins = [];
 
-        if (!showVP) return;
+        const rightMargin = 68;
+        const chartPlotRight = width - rightMargin;
+        const lvls = window._lastChartLevels || {};
+        const pa = window._lastPatternAnalysis || {};
+        const spot = window._lastChartSpot || 0;
+
+        // 1. ACTIONABLE MARKET ZONES (Buy Zone / Sell Zone / Consolidation No-Trade Zone)
+        if (showZones && lvls) {
+            const drawZoneBand = (pHigh, pLow, fillCol, borderCol, labelText, labelTextCol) => {
+                if (!pHigh || !pLow) return;
+                const y1 = candleSeries.priceToCoordinate(pHigh);
+                const y2 = candleSeries.priceToCoordinate(pLow);
+                if (y1 === null || y2 === null) return;
+                const topY = Math.min(y1, y2);
+                const bandH = Math.max(14, Math.abs(y2 - y1));
+                if (topY > height || topY + bandH < 0) return;
+
+                ctx.fillStyle = fillCol;
+                ctx.fillRect(0, topY, chartPlotRight, bandH);
+                ctx.strokeStyle = borderCol;
+                ctx.lineWidth = 1;
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.moveTo(0, topY); ctx.lineTo(chartPlotRight, topY);
+                ctx.moveTo(0, topY + bandH); ctx.lineTo(chartPlotRight, topY + bandH);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.font = 'bold 9.5px "Inter", sans-serif';
+                ctx.fillStyle = labelTextCol;
+                ctx.fillText(labelText, 120, Math.max(14, topY + 13));
+            };
+
+            const vah = vp && vp.vah ? vp.vah : (lvls.r1 || 0);
+            const val = vp && vp.val ? vp.val : (lvls.s1 || 0);
+            const vwap = lvls.vwap || spot;
+
+            // Consolidation / No-Trade Zone around POC / narrow equilibrium
+            if (lvls.pivot && vah && val) {
+                const bandHalf = Math.abs(vah - val) * 0.16;
+                drawZoneBand(lvls.pivot + bandHalf, lvls.pivot - bandHalf, 'rgba(245, 158, 11, 0.08)', 'rgba(245, 158, 11, 0.30)', '⏸️ CONSOLIDATION / NO-TRADE ZONE (Equilibrium)', '#b45309');
+            }
+            // Buy Zone (Support S1 / VAL Demand or Bullish Above VWAP)
+            if (lvls.s1 && lvls.pivot) {
+                const bTop = Math.min(lvls.pivot, lvls.s1 + Math.abs(lvls.pivot - lvls.s1) * 0.38);
+                drawZoneBand(bTop, lvls.s1, 'rgba(22, 163, 74, 0.09)', 'rgba(22, 163, 74, 0.35)', '🟢 BUY ZONE (Demand / Call Bounce)', '#15803d');
+            }
+            // Sell Zone (Resistance R1 / VAH Supply)
+            if (lvls.r1 && lvls.pivot) {
+                const sBot = Math.max(lvls.pivot, lvls.r1 - Math.abs(lvls.r1 - lvls.pivot) * 0.38);
+                drawZoneBand(lvls.r1, sBot, 'rgba(225, 29, 72, 0.09)', 'rgba(225, 29, 72, 0.35)', '🔴 SELL ZONE (Supply / Put Rejection)', '#be123c');
+            }
+        }
+
+        // 2. PROMINENT LEFT-SIDE LABELS FOR R1, S1, CPR (PIVOT), VAH, VAL
+        if (showSR && lvls) {
+            const leftLabels = [
+                { p: lvls.r1, text: `R1 RES ₹${lvls.r1}`, bg: 'rgba(254, 226, 226, 0.94)', fg: '#b91c1c', bd: '#ef4444' },
+                { p: lvls.pivot, text: `CPR / PIVOT ₹${lvls.pivot}`, bg: 'rgba(219, 234, 254, 0.94)', fg: '#1d4ed8', bd: '#3b82f6' },
+                { p: lvls.s1, text: `S1 SUPP ₹${lvls.s1}`, bg: 'rgba(220, 252, 231, 0.94)', fg: '#15803d', bd: '#22c55e' }
+            ];
+            if (vp && vp.vah) leftLabels.push({ p: vp.vah, text: `VAH ₹${vp.vah}`, bg: 'rgba(238, 242, 255, 0.92)', fg: '#4338ca', bd: '#818cf8' });
+            if (vp && vp.val) leftLabels.push({ p: vp.val, text: `VAL ₹${vp.val}`, bg: 'rgba(238, 242, 255, 0.92)', fg: '#4338ca', bd: '#818cf8' });
+
+            const placedY = [];
+            leftLabels.forEach(item => {
+                if (!item.p) return;
+                let y = candleSeries.priceToCoordinate(item.p);
+                if (y === null || y < 12 || y > height - 12) return;
+                while (placedY.some(py => Math.abs(py - y) < 20)) { y += 20; }
+                placedY.push(y);
+                _drawLeftPill(ctx, 8, y, item.text, item.bg, item.fg, item.bd);
+            });
+        }
+
+        // 3. VOLUME PROFILE HISTOGRAM ON RIGHT + CUSTOMIZED CALLOUTS
+        if (!showVP || !vp || !vp.bins || vp.bins.length === 0) return;
 
         const bins = vp.bins;
         let maxVol = 1;
         bins.forEach(b => { if (b.volume > maxVol) maxVol = b.volume; });
 
-        // Offset from right price scale (LightweightCharts price scale is ~68px)
-        const rightMargin = 68;
         const maxBarWidth = Math.min(180, Math.max(75, width * 0.16));
         const rightX = width - rightMargin;
 
@@ -3790,6 +3955,9 @@
             }
         }
 
+        let maxBuyBin = null;
+        let maxSellBin = null;
+
         bins.forEach(bin => {
             const y = candleSeries.priceToCoordinate(bin.price);
             if (y === null || y < -20 || y > height + 20) return;
@@ -3801,39 +3969,65 @@
             const sellW = barWidth - buyW;
             const topY = y - (binHeight / 2);
 
-            // Buy Volume Bar (Left Portion) - Apple System Emerald / Mint
+            window._vpRenderedBins.push({
+                x1: rightX - barWidth - 6,
+                x2: rightX,
+                y1: topY - 2,
+                y2: topY + binHeight + 2,
+                bin: bin,
+                y: y,
+                barWidth: barWidth
+            });
+
+            if (!maxBuyBin || bin.buy_vol > maxBuyBin.buy_vol) maxBuyBin = { bin, y, barWidth };
+            if (!maxSellBin || bin.sell_vol > maxSellBin.sell_vol) maxSellBin = { bin, y, barWidth };
+
             ctx.fillStyle = bin.is_poc 
                 ? 'rgba(239, 68, 68, 0.85)' 
                 : (bin.in_value_area ? 'rgba(52, 199, 89, 0.50)' : 'rgba(148, 163, 184, 0.30)');
             ctx.fillRect(rightX - barWidth, topY, buyW, binHeight);
 
-            // Sell Volume Bar (Right Portion) - Apple System Coral / Red
             ctx.fillStyle = bin.is_poc 
                 ? 'rgba(220, 38, 38, 0.95)' 
                 : (bin.in_value_area ? 'rgba(255, 59, 48, 0.45)' : 'rgba(203, 213, 225, 0.30)');
             ctx.fillRect(rightX - barWidth + buyW, topY, sellW, binHeight);
 
-            // Highlight Point of Control (POC - Highest Traded Volume Floor/Ceiling)
             if (bin.is_poc) {
                 ctx.fillStyle = '#dc2626';
                 ctx.fillRect(rightX - barWidth - 3, topY, 3, binHeight);
 
-                // Dotted projection line extending into chart
-                ctx.strokeStyle = 'rgba(220, 38, 38, 0.45)';
-                ctx.lineWidth = 1;
+                ctx.strokeStyle = 'rgba(220, 38, 38, 0.55)';
+                ctx.lineWidth = 1.5;
                 ctx.setLineDash([4, 4]);
                 ctx.beginPath();
-                ctx.moveTo(40, y);
+                ctx.moveTo(110, y);
                 ctx.lineTo(rightX - barWidth - 4, y);
                 ctx.stroke();
                 ctx.setLineDash([]);
 
-                // POC Label Tag
                 ctx.fillStyle = '#b91c1c';
-                ctx.font = 'bold 9px "JetBrains Mono", monospace';
-                ctx.fillText(`POC ₹${bin.price}`, rightX - barWidth - 75, y + 3);
+                ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
+                ctx.fillText(`POC ₹${bin.price}`, rightX - barWidth - 78, y + 3);
             }
         });
+
+        // 4. CUSTOMIZED LIVE ORDER-FLOW INSIGHT CALLOUTS ON VOLUME PROFILE
+        if (showVpInsights) {
+            if (maxSellBin && maxSellBin.y > 20 && maxSellBin.y < height - 20) {
+                const sPct = Math.round((maxSellBin.bin.sell_vol / Math.max(1, maxSellBin.bin.volume)) * 100);
+                const msg = spot < maxSellBin.bin.price
+                    ? `⚠️ Supply (${sPct}% Ask): Rejection likely here`
+                    : `🚀 Breakout Zone (${sPct}% Ask cleared)`;
+                _drawLeftPill(ctx, Math.max(160, rightX - maxSellBin.barWidth - 215), maxSellBin.y - 12, msg, 'rgba(255, 241, 242, 0.92)', '#be123c', 'rgba(244, 63, 94, 0.45)');
+            }
+            if (maxBuyBin && maxBuyBin.y > 20 && maxBuyBin.y < height - 20 && (!maxSellBin || Math.abs(maxBuyBin.y - maxSellBin.y) > 26)) {
+                const bPct = Math.round((maxBuyBin.bin.buy_vol / Math.max(1, maxBuyBin.bin.volume)) * 100);
+                const msg = spot > maxBuyBin.bin.price
+                    ? `🛡️ Demand Floor (${bPct}% Bid): Buy bounce`
+                    : `⚡ Resistance Flip (${bPct}% Bid)`;
+                _drawLeftPill(ctx, Math.max(160, rightX - maxBuyBin.barWidth - 215), maxBuyBin.y + 12, msg, 'rgba(236, 253, 245, 0.92)', '#15803d', 'rgba(34, 197, 94, 0.45)');
+            }
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -4009,6 +4203,20 @@
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
                 }
             }
+        } else if (ind === 'zones') {
+            showZones = !showZones;
+            const btn = document.getElementById('btn-toggle-zones');
+            if (btn) btn.className = showZones
+                ? "px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 transition shadow-2xs font-bold"
+                : "px-2 py-1 rounded-lg bg-slate-100 text-slate-400 transition font-bold";
+            renderVolumeProfileHistogram(window._lastVolumeProfile);
+        } else if (ind === 'vpInsights') {
+            showVpInsights = !showVpInsights;
+            const btn = document.getElementById('btn-toggle-vp-insights');
+            if (btn) btn.className = showVpInsights
+                ? "px-2 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 transition shadow-2xs font-bold"
+                : "px-2 py-1 rounded-lg bg-slate-100 text-slate-400 transition font-bold";
+            renderVolumeProfileHistogram(window._lastVolumeProfile);
         } else if (ind === 'patterns') {
             showPatterns = !showPatterns;
             const btn = document.getElementById('btn-toggle-patterns');
@@ -4112,13 +4320,6 @@
                     ema21Series.setData([]);
                 }
 
-                const volData = data.candles.map(c => ({
-                    time: c.time,
-                    value: c.volume,
-                    color: c.close >= c.open ? 'rgba(52, 199, 89, 0.4)' : 'rgba(255, 59, 48, 0.4)'
-                }));
-                volumeSeries.setData(volData);
-
                 // Auto-fit when view context changes (asset / timeframe / target / secId)
                 const chartCtxKey = `${activeAssetKey}|${activeTimeframe}|${activeChartTarget}|${activeChartSecId}`;
                 if (window._lastChartCtxKey !== chartCtxKey) {
@@ -4132,18 +4333,51 @@
                 if (vwapQuoteEl && lastCandle.vwap != null) vwapQuoteEl.innerText = `₹${lastCandle.vwap.toLocaleString('en-IN')}`;
             }
 
-            // Render Authentic Institutional Volume Profile (VPVR) Histogram on Canvas Overlay
-            if (showVP && data.volume_profile && data.volume_profile.bins && data.volume_profile.bins.length > 0) {
-                renderVolumeProfileHistogram(data.volume_profile);
-            } else {
-                const vpCanvas = document.getElementById('vp-overlay-canvas');
-                if (vpCanvas) {
-                    const ctx = vpCanvas.getContext('2d');
-                    ctx.clearRect(0, 0, vpCanvas.width, vpCanvas.height);
+            window._lastChartLevels = data.levels || {};
+            window._lastChartSpot = data.spot || 0;
+
+            // Render Zones, Left S/R/CPR Labels & Volume Profile Histogram on Canvas Overlay
+            renderVolumeProfileHistogram(data.volume_profile);
+
+            // Mark Actionable Buy/Sell/No-Trade Zones directly on Candlesticks
+            if (candleSeries && typeof candleSeries.setMarkers === 'function') {
+                if (showZones && data.candles && data.candles.length >= 3) {
+                    const markers = [];
+                    const lastC = data.candles[data.candles.length - 1];
+                    const pa = data.pattern_analysis || {};
+                    const vwapVal = (data.levels && data.levels.vwap) ? data.levels.vwap : lastC.close;
+                    if (pa.bias === 'BULLISH' || (lastC.close > vwapVal && lastC.close >= lastC.open)) {
+                        markers.push({
+                            time: lastC.time,
+                            position: 'belowBar',
+                            color: '#16a34a',
+                            shape: 'arrowUp',
+                            text: 'BUY ZONE'
+                        });
+                    } else if (pa.bias === 'BEARISH' || (lastC.close < vwapVal && lastC.close < lastC.open)) {
+                        markers.push({
+                            time: lastC.time,
+                            position: 'aboveBar',
+                            color: '#e11d48',
+                            shape: 'arrowDown',
+                            text: 'SELL ZONE'
+                        });
+                    } else {
+                        markers.push({
+                            time: lastC.time,
+                            position: 'aboveBar',
+                            color: '#d97706',
+                            shape: 'circle',
+                            text: 'NO-TRADE / CONSOLIDATION'
+                        });
+                    }
+                    candleSeries.setMarkers(markers);
+                } else {
+                    candleSeries.setMarkers([]);
                 }
             }
 
-            // Draw Dynamic Support & Resistance Price Lines on the Candlestick Chart
+            // Draw Prominent Support, Resistance & CPR Price Lines on the Candlestick Chart
             if (candleSeries) {
                 activePriceLines.forEach(l => {
                     try { candleSeries.removePriceLine(l); } catch(e){}
@@ -4151,39 +4385,39 @@
                 activePriceLines = [];
 
                 if (showSR && data.levels) {
-                    // Resistance R1 (Clean Scale - line visible, axis label hidden)
+                    // Prominent Resistance R1 (Left Pill Label + Bold Line)
                     if (data.levels.r1 != null) {
                         activePriceLines.push(candleSeries.createPriceLine({
                             price: data.levels.r1,
-                            color: 'rgba(255, 59, 48, 0.4)',
-                            lineWidth: 1,
+                            color: 'rgba(225, 29, 72, 0.85)',
+                            lineWidth: 2,
                             lineStyle: LightweightCharts.LineStyle.Dashed,
                             axisLabelVisible: false,
                             title: `R1 ₹${data.levels.r1}`
                         }));
                     }
 
-                    // Support S1 (Clean Scale - line visible, axis label hidden)
+                    // Prominent Support S1 (Left Pill Label + Bold Line)
                     if (data.levels.s1 != null) {
                         activePriceLines.push(candleSeries.createPriceLine({
                             price: data.levels.s1,
-                            color: 'rgba(52, 199, 89, 0.4)',
-                            lineWidth: 1,
+                            color: 'rgba(22, 163, 74, 0.85)',
+                            lineWidth: 2,
                             lineStyle: LightweightCharts.LineStyle.Dashed,
                             axisLabelVisible: false,
                             title: `S1 ₹${data.levels.s1}`
                         }));
                     }
 
-                    // Central Pivot (Clean Scale - line visible, axis label hidden)
+                    // Prominent Central Pivot / CPR (Left Pill Label + Bold Line)
                     if (data.levels.pivot != null) {
                         activePriceLines.push(candleSeries.createPriceLine({
                             price: data.levels.pivot,
-                            color: 'rgba(142, 142, 147, 0.4)',
-                            lineWidth: 1,
+                            color: 'rgba(37, 99, 235, 0.80)',
+                            lineWidth: 2,
                             lineStyle: LightweightCharts.LineStyle.Dotted,
                             axisLabelVisible: false,
-                            title: `Pivot ₹${data.levels.pivot}`
+                            title: `CPR ₹${data.levels.pivot}`
                         }));
                     }
                 }
@@ -4591,8 +4825,11 @@
                                         ${opp.lookout_trigger || ''}
                                     </div>
                                 </td>
-                                <td class="py-2.5 px-3 text-right cursor-pointer" onclick="selectAsset('${opp.key}')" title="Click to focus & analyze ${opp.display_name}">
-                                    <div class="text-sm sm:text-base font-black text-slate-950 font-mono tracking-tight">₹${opp.spot.toLocaleString('en-IN', {minimumFractionDigits: 1})}</div>
+                                <td class="py-2.5 px-3 text-right">
+                                    <div class="flex items-center justify-end space-x-1.5">
+                                        <span onclick="selectAsset('${opp.key}')" class="cursor-pointer text-sm sm:text-base font-black text-slate-950 font-mono tracking-tight hover:text-blue-600 transition" title="Focus on main chart">₹${opp.spot.toLocaleString('en-IN', {minimumFractionDigits: 1})}</span>
+                                        <button type="button" onclick="openQuickChartModal('${opp.key}', '${opp.display_name}')" class="px-1.5 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[9px] font-bold transition cursor-pointer" title="Pop out instant Quick Chart (with Full Screen)">📈</button>
+                                    </div>
                                     <div class="flex items-center justify-end space-x-1 mt-0.5">
                                         <span class="text-[9px] font-black font-mono px-1.5 py-0.2 rounded shadow-2xs ${(opp.change_5m_pct || 0) >= 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}">
                                             ${(opp.change_5m_pct || 0) >= 0 ? '▲ +' : '▼ '}${Math.abs(opp.change_5m_pct || 0).toFixed(2)}% (5m)
@@ -6948,7 +7185,7 @@
     // -------------------------------------------------------------------------
     // DESK DENSITY & SECTION COLLAPSE / EXPAND CONTROLLER (UI/UX ON-THE-GO)
     // -------------------------------------------------------------------------
-    const COLLAPSIBLE_SECTIONS = ['premarket', 'desk-ledger', 'global-cues', 'sniper-terminal', 'multi-asset-radar', 'market-news'];
+    const COLLAPSIBLE_SECTIONS = ['capital-hub', 'premarket', 'desk-ledger', 'global-cues', 'sniper-terminal', 'multi-asset-radar', 'market-news'];
 
     function toggleSectionCollapse(sectionId, forceState = null) {
         const bodyEl = document.getElementById(`${sectionId}-body`);
@@ -7054,6 +7291,131 @@
     window.addEventListener('DOMContentLoaded', () => {
         setTimeout(initDeskCollapseStates, 100);
     });
+
+    // -------------------------------------------------------------------------
+    // INSTANT QUICK-CLICK POPUP CHART MODAL (WITH FULL SCREEN SUPPORT)
+    // -------------------------------------------------------------------------
+    let quickLwChart = null;
+    let quickCandleSeries = null;
+    let quickAssetKey = 'NIFTY';
+    let quickTf = '5m';
+
+    async function openQuickChartModal(assetKey, displayName) {
+        quickAssetKey = assetKey || activeAssetKey;
+        const modal = document.getElementById('quick-chart-modal');
+        const titleEl = document.getElementById('quick-chart-title');
+        if (!modal) return;
+        if (titleEl) titleEl.innerText = `${displayName || quickAssetKey} (${quickAssetKey})`;
+        modal.classList.remove('hidden');
+        await loadQuickChartData(quickTf);
+    }
+
+    function closeQuickChartModal() {
+        const modal = document.getElementById('quick-chart-modal');
+        if (document.fullscreenElement && document.exitFullscreen) {
+            try { document.exitFullscreen(); } catch(e){}
+        }
+        if (modal) modal.classList.add('hidden');
+    }
+
+    async function toggleQuickChartFullscreen() {
+        const box = document.getElementById('quick-chart-box');
+        const cont = document.getElementById('quick-chart-canvas');
+        if (!box) return;
+        if (!document.fullscreenElement) {
+            if (box.requestFullscreen) {
+                try { await box.requestFullscreen(); } catch(e){}
+            }
+            box.classList.add('!max-w-none', '!w-screen', '!h-screen', '!rounded-none');
+            if (cont) cont.style.height = (window.innerHeight - 130) + 'px';
+        } else {
+            if (document.exitFullscreen) {
+                try { await document.exitFullscreen(); } catch(e){}
+            }
+            box.classList.remove('!max-w-none', '!w-screen', '!h-screen', '!rounded-none');
+            if (cont) cont.style.height = '420px';
+        }
+        setTimeout(() => {
+            if (quickLwChart && cont) {
+                quickLwChart.applyOptions({ width: cont.clientWidth, height: cont.clientHeight });
+                quickLwChart.timeScale().fitContent();
+            }
+        }, 120);
+    }
+
+    async function loadQuickChartData(tf) {
+        quickTf = tf || '5m';
+        ['1m', '5m', '15m', '1h'].forEach(t => {
+            const b = document.getElementById(`qtf-${t}`);
+            if (b) b.className = t === quickTf
+                ? 'px-2.5 py-1 rounded-lg bg-blue-600 text-white text-xs font-bold font-mono'
+                : 'px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold font-mono hover:bg-slate-200';
+        });
+        const cont = document.getElementById('quick-chart-canvas');
+        if (!cont) return;
+
+        if (!quickLwChart) {
+            const styles = getComputedStyle(document.documentElement);
+            quickLwChart = LightweightCharts.createChart(cont, {
+                width: cont.clientWidth || 760,
+                height: 420,
+                layout: {
+                    background: { color: styles.getPropertyValue('--chart-bg').trim() || '#f8f9fb' },
+                    textColor: styles.getPropertyValue('--chart-text').trim() || '#374151',
+                    fontFamily: 'Inter, -apple-system, sans-serif'
+                },
+                grid: {
+                    vertLines: { color: styles.getPropertyValue('--chart-grid').trim() || 'rgba(15,23,42,0.05)' },
+                    horzLines: { color: styles.getPropertyValue('--chart-grid').trim() || 'rgba(15,23,42,0.05)' }
+                },
+                timeScale: { timeVisible: true }
+            });
+            quickCandleSeries = quickLwChart.addCandlestickSeries({
+                upColor: '#34c759', downColor: '#ff3b30', borderVisible: false, wickUpColor: '#34c759', wickDownColor: '#ff3b30'
+            });
+        }
+
+        try {
+            const res = await fetch(`/api/chart-data?asset=${quickAssetKey}&timeframe=${quickTf}&chart_target=underlying`);
+            const data = await res.json();
+            const spotEl = document.getElementById('quick-chart-spot');
+            if (spotEl && data.spot != null) spotEl.innerText = `₹${data.spot.toLocaleString('en-IN')}`;
+            if (data.candles && data.candles.length > 0 && quickCandleSeries) {
+                quickCandleSeries.setData(data.candles.map(c => ({
+                    time: c.time, open: c.open, high: c.high, low: c.low, close: c.close
+                })));
+                quickLwChart.applyOptions({ width: cont.clientWidth, height: cont.clientHeight });
+                quickLwChart.timeScale().fitContent();
+            }
+        } catch (e) {
+            console.warn('[QuickChart]', e);
+        }
+    }
 </script>
+
+<!-- Instant Quick-Click Popup Chart Modal -->
+<div id="quick-chart-modal" class="fixed inset-0 z-[9990] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 hidden">
+    <div id="quick-chart-box" class="w-full max-w-4xl rounded-2xl border shadow-2xl p-4 sm:p-5 transition-all" style="background-color: var(--apple-surface); color: var(--apple-text); border-color: var(--apple-border);">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b" style="border-color: var(--apple-border);">
+            <div class="flex items-center space-x-2.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span id="quick-chart-title" class="text-sm sm:text-base font-bold font-mono">NIFTY 50</span>
+                <span id="quick-chart-spot" class="text-sm font-black font-mono text-blue-600">₹--</span>
+            </div>
+            <div class="flex items-center space-x-1.5">
+                <button type="button" onclick="loadQuickChartData('1m')" id="qtf-1m" class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold font-mono">1m</button>
+                <button type="button" onclick="loadQuickChartData('5m')" id="qtf-5m" class="px-2.5 py-1 rounded-lg bg-blue-600 text-white text-xs font-bold font-mono">5m</button>
+                <button type="button" onclick="loadQuickChartData('15m')" id="qtf-15m" class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold font-mono">15m</button>
+                <button type="button" onclick="loadQuickChartData('1h')" id="qtf-1h" class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold font-mono">1h</button>
+                <button type="button" onclick="toggleQuickChartFullscreen()" class="ml-2 px-2.5 py-1 rounded-lg bg-slate-200/80 hover:bg-slate-300 text-slate-800 text-xs font-bold flex items-center space-x-1 cursor-pointer">
+                    <i class="fa-solid fa-expand text-[10px]"></i><span>Full Screen</span>
+                </button>
+                <button type="button" onclick="selectAsset(quickAssetKey); closeQuickChartModal();" class="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold cursor-pointer">Load on Main</button>
+                <button type="button" onclick="closeQuickChartModal()" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold cursor-pointer">✕</button>
+            </div>
+        </div>
+        <div id="quick-chart-canvas" style="height: 420px; width: 100%;"></div>
+    </div>
+</div>
 
 {% endblock %}
