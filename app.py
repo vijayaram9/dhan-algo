@@ -2537,6 +2537,37 @@ def api_admin_restart():
     threading.Thread(target=_delayed_restart, daemon=True).start()
     return jsonify({"status": "restarting", "message": "Service restarting under systemd..."})
 
+@app.route("/api/admin/update-token", methods=["POST"])
+def api_admin_update_token():
+    """Updates the Dhan access token in .env and restarts the background service."""
+    new_token = ""
+    if request.is_json and request.json:
+        new_token = request.json.get("token", "").strip()
+    elif request.form:
+        new_token = request.form.get("token", "").strip()
+    if not new_token:
+        return jsonify({"status": "error", "message": "No token provided"}), 400
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        with open(env_path, "w", encoding="utf-8") as f:
+            found = False
+            for line in lines:
+                if line.startswith("DHAN_ACCESS_TOKEN="):
+                    f.write(f"DHAN_ACCESS_TOKEN={new_token}\n")
+                    found = True
+                else:
+                    f.write(line)
+            if not found:
+                f.write(f"DHAN_ACCESS_TOKEN={new_token}\n")
+    os.environ["DHAN_ACCESS_TOKEN"] = new_token
+    def _delayed_restart():
+        time.sleep(1.0)
+        os._exit(0)
+    threading.Thread(target=_delayed_restart, daemon=True).start()
+    return jsonify({"status": "success", "message": "Token updated and restart scheduled"})
+
 @app.route("/webhook-guide")
 def webhook_guide():
     return render_template("webhook_guide.html", config=config)

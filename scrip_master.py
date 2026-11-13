@@ -133,6 +133,15 @@ class ScripMaster:
             return datetime.datetime.now().strftime("%Y-%m-%d")
 
         if pref == "CURRENT_WEEK" or not pref:
+            # 0DTE Expiry-Day Afternoon Protection:
+            # On the day of expiry (0DTE), if current IST time is past 11:30 AM,
+            # buying 0DTE options is suicidal due to extreme theta decay & wide spreads.
+            # Automatically roll forward to the NEXT weekly expiry date!
+            now_hm = datetime.datetime.now().strftime("%H:%M")
+            today_s = datetime.date.today().strftime("%Y-%m-%d")
+            if len(active_expiries) > 1 and active_expiries[0].startswith(today_s) and now_hm >= "11:30":
+                print(f"[0DTE EXPIRY PROTECTION] Asset {asset_key} has 0DTE expiry today ({active_expiries[0]}). Past 11:30 AM IST: Rolling forward to Next Expiry ({active_expiries[1]}) to protect capital from theta decay.")
+                return active_expiries[1]
             return active_expiries[0]
 
         if pref == "NEXT_WEEK":

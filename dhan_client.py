@@ -506,11 +506,12 @@ class DhanTraderClient:
                     pass
 
         # 4. Authentic Exchange Memory Policy:
-        # If Dhan API has a momentary network delay, rate-limit, or off-quote tick,
-        # return the last authentic price flashed from Dhan for this contract.
-        last_flashed = self.get_last_flashed_price(security_id, [sec_key])
-        if last_flashed > 0.05:
-            return last_flashed
+        # If require_live is True (Trade Entry / Order Execution), NEVER use cached memory.
+        # Only return fresh exchange ticks received within the last 5.0 seconds if require_live is False.
+        if not require_live:
+            last_flashed = self.get_last_flashed_price(security_id, [sec_key], max_age=5.0)
+            if last_flashed > 0.05:
+                return last_flashed
 
         # 5. Zero-Tolerance Ground Truth Policy:
         # Live and Paper trading MUST be 100% authentic exchange quotes directly from DhanHQ API.

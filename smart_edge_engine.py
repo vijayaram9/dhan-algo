@@ -1122,13 +1122,11 @@ class NiftySmartEdgeEngine:
                 )
                 if verified_prem <= 0.05:
                     verified_prem = self.client.get_last_flashed_price(
-                        contract.security_id, [contract.custom_symbol, contract.trading_symbol], max_age=15.0
+                        contract.security_id, [contract.custom_symbol, contract.trading_symbol], max_age=3.0
                     )
                 if verified_prem <= 0.05:
-                    print(Fore.RED + f"[GUARDRAIL BLOCKED] Trade entry aborted! Real Dhan quote could not be confirmed for {contract.custom_symbol} within 15s (Zero/Rate-Limited). Refusing synthetic/stale entry.")
+                    print(Fore.RED + f"[GUARDRAIL BLOCKED] Trade entry aborted! Real Dhan quote could not be confirmed for {contract.custom_symbol} within 3s (Zero/Rate-Limited). Refusing synthetic/stale entry.")
                     return
-                # Update contract estimated premium to ground truth verified live LTP
-                contract.estimated_premium = verified_prem
                 # Update contract estimated premium to ground truth verified live LTP
                 contract.estimated_premium = verified_prem
 
@@ -1539,10 +1537,13 @@ class NiftySmartEdgeEngine:
                     else:
                         valid_opps = []
                 elif is_equity_open:
+                    index_keys = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "NIFTYIT"}
+                    has_active_index = any(getattr(p, "asset_key", "") in index_keys for p in self.active_positions)
                     valid_opps = [
                         o for o in all_opps 
                         if o["key"] not in active_assets
                         and o["key"] not in ["CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"]
+                        and not (has_active_index and o["key"] in index_keys)
                         and self.check_trading_schedule(o["key"])[0]
                     ]
                 else:
