@@ -4696,6 +4696,7 @@
                 if (lE21 && _legCandle.ema21 != null) lE21.innerText = `EMA 21: ₹${_legCandle.ema21.toLocaleString('en-IN')}`;
                 if (lVw && _legCandle.vwap != null) lVw.innerText = `VWAP: ₹${_legCandle.vwap.toLocaleString('en-IN')}`;
                 if (lRsi && latestRsi != null) {
+                    window._latestRsi = latestRsi;
                     const rsiState = latestRsi >= 70 ? 'OVERBOUGHT (Caution CE)' : (latestRsi <= 30 ? 'OVERSOLD (Bounce Watch)' : (latestRsi >= 55 ? 'Bullish Momentum' : (latestRsi <= 45 ? 'Bearish Momentum' : 'Neutral')));
                     lRsi.innerText = `RSI(${rP}): ${latestRsi} (${rsiState})`;
                     if (oscSig && showRSI) oscSig.innerText = `RSI(${rP}): ${latestRsi} • ${rsiState}`;
@@ -4730,28 +4731,55 @@
             // Render Zones, Left S/R/CPR Labels & Volume Profile Histogram on Canvas Overlay
             renderVolumeProfileHistogram(data.volume_profile);
 
-            // Mark Actionable Buy/Sell/No-Trade Zones directly on Candlesticks
+            // Mark Actionable Buy/Sell/No-Trade Zones directly on Candlesticks (Strictly aligned with Zones, VWAP, EMA & RSI)
             if (candleSeries && typeof candleSeries.setMarkers === 'function') {
                 if (showZones && data.candles && data.candles.length >= 3) {
                     const markers = [];
                     const lastC = data.candles[data.candles.length - 1];
-                    const pa = data.pattern_analysis || {};
-                    const vwapVal = (data.levels && data.levels.vwap) ? data.levels.vwap : lastC.close;
-                    if (pa.bias === 'BULLISH' || (lastC.close > vwapVal && lastC.close >= lastC.open)) {
+                    const lvls = data.levels || {};
+                    const vp = data.volume_profile || {};
+                    const vwapVal = lvls.vwap || lastC.vwap || lastC.close;
+                    const e9 = lastC.ema9 || lastC.close;
+                    const e21 = lastC.ema21 || lastC.close;
+                    const piv = lvls.pivot || lastC.close;
+                    const vah = vp.vah || lvls.r1 || piv;
+                    const val = vp.val || lvls.s1 || piv;
+                    const bandHalf = (lvls.r1 && lvls.s1) ? Math.max(Math.abs(lvls.r1 - lvls.s1) * 0.14, Math.abs(vah - val) * 0.08) : 0;
+                    const inConsolidation = bandHalf > 0 && Math.abs(lastC.close - piv) <= bandHalf;
+                    const curRsi = (typeof window._latestRsi === 'number') ? window._latestRsi : 50;
+
+                    const isBullishSetup = !inConsolidation && (
+                        (lvls.s1 && lastC.close <= lvls.s1 && (lastC.close >= lastC.open || curRsi <= 38)) ||
+                        (lastC.close > vwapVal && e9 > e21 && curRsi >= 52 && lastC.close >= lastC.open)
+                    );
+                    const isBearishSetup = !inConsolidation && (
+                        (lvls.r1 && lastC.close >= lvls.r1 && (lastC.close < lastC.open || curRsi >= 68)) ||
+                        (lastC.close < vwapVal && e9 < e21 && curRsi <= 45 && lastC.close < lastC.open)
+                    );
+
+                    if (inConsolidation) {
+                        markers.push({
+                            time: lastC.time,
+                            position: 'aboveBar',
+                            color: '#d97706',
+                            shape: 'circle',
+                            text: 'NO-TRADE (CONSOLIDATION)'
+                        });
+                    } else if (isBullishSetup) {
                         markers.push({
                             time: lastC.time,
                             position: 'belowBar',
                             color: '#16a34a',
                             shape: 'arrowUp',
-                            text: 'BUY ZONE'
+                            text: 'BUY ZONE (DEMAND)'
                         });
-                    } else if (pa.bias === 'BEARISH' || (lastC.close < vwapVal && lastC.close < lastC.open)) {
+                    } else if (isBearishSetup) {
                         markers.push({
                             time: lastC.time,
                             position: 'aboveBar',
                             color: '#e11d48',
                             shape: 'arrowDown',
-                            text: 'SELL ZONE'
+                            text: 'SELL ZONE (SUPPLY)'
                         });
                     } else {
                         markers.push({
@@ -4759,7 +4787,7 @@
                             position: 'aboveBar',
                             color: '#d97706',
                             shape: 'circle',
-                            text: 'NO-TRADE / CONSOLIDATION'
+                            text: 'WAIT / MIXED SIGNALS'
                         });
                     }
                     candleSeries.setMarkers(markers);
