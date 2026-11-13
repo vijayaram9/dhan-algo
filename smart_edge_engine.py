@@ -151,7 +151,7 @@ class NiftySmartEdgeEngine:
         self.cooldown_until: Optional[datetime.datetime] = None
         self.in_recovery_mode: bool = False
         self.auto_pilot_enabled: bool = True
-        self.dynamic_min_confluence: int = 72
+        self.dynamic_min_confluence: int = 70
         self._last_3h_audit_ts: float = 0.0
         self.last_3h_audit_summary: dict = {}
         self._asset_cooldowns: dict = {}
@@ -478,13 +478,19 @@ class NiftySmartEdgeEngine:
             )
         strike_val = pos.strike_price if pos.strike_price > 0 else (round(current_spot / 50.0) * 50)
         refreshed_ltp = self.client.get_option_ltp(
-            pos.security_id, current_spot, strike_val, pos.option_type, pos.expiry_date, segment=p_seg
+            pos.security_id, current_spot, strike_val, pos.option_type, pos.expiry_date, segment=p_seg, require_live=True
         )
         if refreshed_ltp > 0.05:
             pos.current_premium = refreshed_ltp
-        elif pos.current_premium <= 0.05:
-            last_flashed = self.client.get_last_flashed_price(pos.security_id, [pos.symbol])
-            pos.current_premium = last_flashed if last_flashed > 0.05 else pos.entry_premium
+        else:
+            # Strict live-price-only exit guardrail: never trigger SL/Target on stale cached premiums
+            now_hm_chk = datetime.datetime.now().strftime("%H:%M")
+            is_comm_chk = p_seg == "MCX_COMM"
+            is_mandatory_eod = (not is_comm_chk and "15:15" <= now_hm_chk < "15:30") or (is_comm_chk and "23:20" <= now_hm_chk <= "23:55")
+            if not is_mandatory_eod:
+                return False, ""
+            if pos.current_premium <= 0.05:
+                pos.current_premium = pos.entry_premium
         pos.pnl = round((pos.current_premium - pos.entry_premium) * pos.quantity, 2)
 
         # Track high & low watermarks
@@ -647,26 +653,27 @@ class NiftySmartEdgeEngine:
                     self.log_sniper_event(msg, "PROFIT")
 
             # 3. Multi-Tiered Dynamic Trailing Stop & Profit Lock for Swing:
-            # Tier 1 (+8% premium gain or +18 pts): Move stop above entry + estimated charges so it is genuinely net-positive!
-            if (prem_gain_pct >= 8.0 or prem_gain >= 18.0) and pos.trailing_step_level < 1:
+            # Tier 1 (+6% premium gain or +12 pts): Lock in +2.5% (or min fee buffer) so winners bank real profit!
+            if (prem_gain_pct >= 6.0 or prem_gain >= 12.0) and pos.trailing_step_level < 1:
                 fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
-                pos.hard_stop_premium = max(pos.hard_stop_premium, round(pos.entry_premium + fee_buf, 2))
+                locked_prem = max(round(pos.entry_premium * 1.025, 2), round(pos.entry_premium + fee_buf, 2))
+                pos.hard_stop_premium = max(pos.hard_stop_premium, locked_prem)
                 pos.is_trailing_active = True
                 pos.trailing_step_level = 1
-                pos.locked_profit_inr = round(fee_buf * pos.quantity, 2)
-                print(f"[SWING TIER 1] 🌊 Net Breakeven+ Locked @ ₹{pos.hard_stop_premium:.2f} (Risk-Free)")
+                pos.locked_profit_inr = round((pos.hard_stop_premium - pos.entry_premium) * pos.quantity, 2)
+                print(f"[SWING TIER 1] 🌊 +2.5% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
 
-            # Tier 2 (+16% premium gain): Lock in at least +10% profit!
-            if (prem_gain_pct >= 16.0 or prem_gain >= 35.0) and pos.trailing_step_level < 2:
-                locked_prem = round(pos.entry_premium * 1.10, 2)
+            # Tier 2 (+10% premium gain or +22 pts): Lock in at least +6% profit!
+            if (prem_gain_pct >= 10.0 or prem_gain >= 22.0) and pos.trailing_step_level < 2:
+                locked_prem = round(pos.entry_premium * 1.06, 2)
                 pos.hard_stop_premium = max(pos.hard_stop_premium, locked_prem)
                 pos.trailing_step_level = 2
                 pos.locked_profit_inr = round((pos.hard_stop_premium - pos.entry_premium) * pos.quantity, 2)
-                print(f"[SWING TIER 2] 🌊 +10% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
+                print(f"[SWING TIER 2] 🌊 +6% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
 
-            # Tier 3 (+25% or higher runner): Trail tightly at 90% of highest watermark!
-            if prem_gain_pct >= 25.0:
-                trail_sl = round(pos.highest_premium * 0.90, 2)
+            # Tier 3 (+16% or higher runner): Lock at least +11% and trail tightly at 90% of highest watermark!
+            if prem_gain_pct >= 16.0:
+                trail_sl = max(round(pos.entry_premium * 1.11, 2), round(pos.highest_premium * 0.90, 2))
                 if trail_sl > pos.hard_stop_premium:
                     pos.hard_stop_premium = trail_sl
                     pos.trailing_step_level = 3
@@ -1572,11 +1579,11 @@ class NiftySmartEdgeEngine:
                         total_c = wins + losses
                         wr = round((wins / total_c) * 100.0, 1) if total_c > 0 else 100.0
                         if total_c >= 3 and (wr < 40.0 or self.consecutive_losses >= 2):
-                            self.dynamic_min_confluence = 82
-                            audit_note = f"3H Audit: WinRate {wr}% ({wins}W/{losses}L) -> Tightened min confluence to 82%."
+                            self.dynamic_min_confluence = 80
+                            audit_note = f"3H Audit: WinRate {wr}% ({wins}W/{losses}L) -> Tightened min confluence to 80%."
                         else:
-                            self.dynamic_min_confluence = 75
-                            audit_note = f"3H Audit: WinRate {wr}% ({wins}W/{losses}L) -> Standard confluence 75% active."
+                            self.dynamic_min_confluence = 70
+                            audit_note = f"3H Audit: WinRate {wr}% ({wins}W/{losses}L) -> Standard confluence 70% active."
                         self.last_3h_audit_summary = {"timestamp": now_dt.strftime("%Y-%m-%d %H:%M:%S"), "wins": wins, "losses": losses, "win_rate": wr, "min_confluence": self.dynamic_min_confluence, "note": audit_note}
                         self.log_sniper_event(f"🔍 {audit_note}", "AUDIT")
                     except Exception:
@@ -1613,8 +1620,8 @@ class NiftySmartEdgeEngine:
                 if is_equity_open and "09:15" <= now_hm_curr < "09:25":
                     valid_opps = []
 
-                # High-Confluence Institutional Selection (Dynamic 72-80% + Trend & Candle Confirmation):
-                min_conf = getattr(self, "dynamic_min_confluence", 72)
+                # High-Confluence Institutional Selection (Dynamic 70-80% + Trend & Candle Confirmation):
+                min_conf = getattr(self, "dynamic_min_confluence", 70)
                 for top_opp in valid_opps:
                     # Check per-instrument 10-minute cooldown
                     is_asset_cd, _ = global_trade_lock.is_cooldown_active(top_opp["key"])

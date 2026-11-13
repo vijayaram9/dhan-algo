@@ -77,11 +77,11 @@ class MultiTimeframeEngine:
     _candles_time = {}
 
     def get_real_candles(self, asset_key: str) -> Optional[pd.DataFrame]:
-        """Fetches authentic 5-minute candles directly from DhanHQ API with a 15s cache."""
+        """Fetches authentic 5-minute candles directly from DhanHQ API with a 75s cache to prevent DH-904 rate limits."""
         import time
         from datetime import date
         now_ts = time.time()
-        if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 15.0:
+        if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 75.0:
             return self._candles_cache[asset_key]
 
         dhan_meta = {
@@ -133,6 +133,8 @@ class MultiTimeframeEngine:
                     return df
         except Exception as e:
             pass
+        if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 300.0:
+            return self._candles_cache[asset_key]
         return None
 
     def calculate_institutional_levels(self, spot: float, asset_key: str) -> dict:
