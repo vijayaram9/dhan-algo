@@ -653,11 +653,11 @@ def api_chart_data():
         except Exception:
             pass
 
-    # Institutional Volume Profile & Classical Chart Pattern Detection
+    # Institutional Volume Profile & Classical Chart Pattern Detection with Timeframe & Candlestick Formations
     vol_profile = IndicatorEngine.calculate_volume_profile(df_candles) if df_candles is not None and not df_candles.empty else {"poc": 0.0, "vah": 0.0, "val": 0.0, "bins": []}
-    pattern_info = IndicatorEngine.detect_chart_patterns(df_candles) if df_candles is not None and not df_candles.empty else {
-        "has_pattern": False, "pattern_name": "CONSOLIDATION", "bias": "NEUTRAL", "stage": "CONSOLIDATION", "confidence": 50,
-        "predicted_target": 0.0, "invalidation_price": 0.0, "forecast_text": "Awaiting candle data", "key_levels": {}
+    pattern_info = IndicatorEngine.detect_chart_patterns(df_candles, timeframe=timeframe) if df_candles is not None and not df_candles.empty else {
+        "has_pattern": False, "timeframe": timeframe.upper(), "candlestick_formation": "Trend Candle", "pattern_name": "CONSOLIDATION", "bias": "NEUTRAL", "stage": "CONSOLIDATION", "confidence": 50,
+        "predicted_target": 0.0, "invalidation_price": 0.0, "historical_edge_stat": "50% Neutral", "forecast_text": f"⏱️ [{timeframe.upper()}] Awaiting candle data", "key_levels": {}
     }
 
     current_vwap = candles[-1]["vwap"] if candles else spot

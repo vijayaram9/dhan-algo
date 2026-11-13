@@ -1357,20 +1357,52 @@
         <div class="apple-box p-5 bg-white">
             <!-- Top Chart Mode & Quick Multi-Asset Instrument Switcher Bar -->
             <div class="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-black/[0.04]">
-                <div class="flex flex-wrap items-center gap-1.5 text-xs font-mono font-bold">
-                    <span class="text-[10px] text-slate-400 font-sans uppercase tracking-wider mr-1">Switch Scrip:</span>
-                    <button onclick="selectAsset('NIFTY')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 transition text-slate-700" id="qpill-NIFTY">NIFTY 50</button>
-                    <button onclick="selectAsset('BANKNIFTY')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 transition text-slate-700" id="qpill-BANKNIFTY">BANK NIFTY</button>
-                    <button onclick="selectAsset('FINNIFTY')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 transition text-slate-700" id="qpill-FINNIFTY">FIN NIFTY</button>
-                    <button onclick="selectAsset('SENSEX')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 transition text-slate-700" id="qpill-SENSEX">SENSEX</button>
-                    <button onclick="selectAsset('CRUDEOILM')" class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 transition" id="qpill-CRUDEOILM">🛢️ CRUDE OIL</button>
-                    <button onclick="selectAsset('NATGASMINI')" class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 transition" id="qpill-NATGASMINI">🔥 NAT GAS</button>
-                    <button onclick="selectAsset('GOLDM')" class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 transition" id="qpill-GOLDM">🪙 GOLD M</button>
-                    <button onclick="selectAsset('RELIANCE')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 transition text-slate-700" id="qpill-RELIANCE">RELIANCE</button>
-                    <button onclick="selectAsset('HDFCBANK')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 transition text-slate-700" id="qpill-HDFCBANK">HDFC BANK</button>
-                    <button onclick="selectAsset('TATASTEEL')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 transition text-slate-700" id="qpill-TATASTEEL">TATA STEEL</button>
-                    <button onclick="selectAsset('BHARTIARTL')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 transition text-slate-700" id="qpill-BHARTIARTL">BHARTI AIRTEL</button>
-                    <button onclick="selectAsset('LT')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 transition text-slate-700" id="qpill-LT">L&T</button>
+                <div class="flex flex-wrap items-center gap-2 text-xs font-mono font-bold">
+                    <!-- Clean Searchable Scrip Dropdown (Universal Navigation) -->
+                    <div class="relative flex items-center">
+                        <i class="fa-solid fa-magnifying-glass absolute left-2.5 text-slate-400 text-xs pointer-events-none"></i>
+                        <select onchange="selectAsset(this.value)" id="chart-scrip-select" class="pl-8 pr-7 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-xs font-mono font-bold text-slate-800 transition focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs">
+                            <optgroup label="⚡ Benchmark Indices">
+                                <option value="NIFTY" selected>NIFTY 50</option>
+                                <option value="BANKNIFTY">BANK NIFTY</option>
+                                <option value="FINNIFTY">FIN NIFTY</option>
+                                <option value="SENSEX">BSE SENSEX</option>
+                                <option value="NIFTYIT">NIFTY IT</option>
+                            </optgroup>
+                            <optgroup label="🛢️ MCX Commodities">
+                                <option value="CRUDEOILM">CRUDE OIL (MINI)</option>
+                                <option value="NATGASMINI">NATURAL GAS (MINI)</option>
+                                <option value="GOLDM">GOLD (MINI)</option>
+                                <option value="SILVERM">SILVER (MINI)</option>
+                            </optgroup>
+                            <optgroup label="🏢 Bluechip Equities">
+                                <option value="RELIANCE">RELIANCE IND</option>
+                                <option value="TCS">TCS</option>
+                                <option value="HDFCBANK">HDFC BANK</option>
+                                <option value="INFY">INFOSYS</option>
+                                <option value="ICICIBANK">ICICI BANK</option>
+                                <option value="SBIN">STATE BANK OF INDIA</option>
+                                <option value="BHARTIARTL">BHARTI AIRTEL</option>
+                                <option value="LT">LARSEN & TOUBRO</option>
+                                <option value="TATASTEEL">TATA STEEL</option>
+                                <option value="MARUTI">MARUTI SUZUKI</option>
+                                <option value="M&M">MAHINDRA & MAHINDRA</option>
+                                <option value="AXISBANK">AXIS BANK</option>
+                                <option value="KOTAKBANK">KOTAK MAHINDRA BANK</option>
+                                <option value="BAJFINANCE">BAJAJ FINANCE</option>
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    <!-- Quick 1-Click Major Asset Switchers -->
+                    <div class="flex items-center gap-1">
+                        <button onclick="selectAsset('NIFTY')" class="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold transition shadow-xs" id="qpill-NIFTY">NIFTY</button>
+                        <button onclick="selectAsset('BANKNIFTY')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 transition text-slate-700" id="qpill-BANKNIFTY">BANK NIFTY</button>
+                        <button onclick="selectAsset('FINNIFTY')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 transition text-slate-700" id="qpill-FINNIFTY">FIN NIFTY</button>
+                        <button onclick="selectAsset('SENSEX')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 transition text-slate-700" id="qpill-SENSEX">SENSEX</button>
+                        <button onclick="selectAsset('CRUDEOILM')" class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 transition" id="qpill-CRUDEOILM">🛢️ CRUDE</button>
+                        <button onclick="selectAsset('GOLDM')" class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 transition" id="qpill-GOLDM">🪙 GOLD</button>
+                    </div>
                 </div>
 
                 <!-- Dual View Mode Toggle: Algo Desk vs Dhan TV Terminal -->
@@ -1398,7 +1430,7 @@
                     <div class="flex items-center space-x-3 text-xs text-slate-400 mt-0.5 font-mono">
                         <span id="chart-ist-clock"><i class="fa-regular fa-clock mr-1 text-blue-600"></i>IST: Live Exchange Feed</span>
                         <span class="text-slate-300">•</span>
-                        <span>Authentic Dhan Candles + EMA 9/21 + VWAP + S/R</span>
+                        <span>Authentic Dhan Candles + EMA 9/21 + VWAP</span>
                     </div>
                 </div>
 
@@ -1439,7 +1471,7 @@
                 </div>
             </div>
 
-            <!-- Technical Chart Pattern & Predictive Horizon Intelligence Banner -->
+            <!-- Technical Chart Pattern & Predictive Horizon Intelligence Banner (Timeframe Specific + Candlestick Formations) -->
             <div id="pattern-horizon-banner" class="mb-3 p-3 rounded-xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border border-indigo-800/40 shadow-sm transition-all">
                 <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5">
                     <div class="flex items-center space-x-2.5">
@@ -1447,12 +1479,13 @@
                             <i class="fa-solid fa-wand-magic-sparkles"></i>
                         </span>
                         <div>
-                            <div class="flex items-center space-x-2">
-                                <span class="text-[10px] uppercase tracking-wider text-indigo-300 font-mono font-bold">Predictive Pattern Horizon</span>
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <span id="pat-badge-tf" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30 font-mono">5M TIMEFRAME</span>
+                                <span id="pat-badge-candle" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">CANDLE: TRENDING</span>
                                 <span id="pat-badge-bias" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">BULLISH</span>
                                 <span id="pat-badge-conf" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-200 border border-indigo-500/30 font-mono">85% CONF</span>
                             </div>
-                            <div class="text-sm font-bold text-white font-mono mt-0.5" id="pat-name-text">
+                            <div class="text-sm font-bold text-white font-mono mt-1" id="pat-name-text">
                                 DOUBLE BOTTOM (W-FORMATION) • REVERSAL CONFIRMATION
                             </div>
                         </div>
@@ -3583,6 +3616,11 @@
             dropEl.value = key;
         }
 
+        const chartSelectEl = document.getElementById('chart-scrip-select');
+        if (chartSelectEl && chartSelectEl.value !== key) {
+            chartSelectEl.value = key;
+        }
+
         fetchMarketIntelligence();
         if (activeChartMode === 'tv') {
             initTradingViewWidget(key, activeTimeframe);
@@ -3721,28 +3759,34 @@
             wickDownColor: '#ff3b30'
         });
 
-        // EMA 9 Line Series (Cyan)
+        // EMA 9 Line Series (Cyan) - Clean Scale (no axis clutter)
         ema9Series = lwChart.addLineSeries({
             color: '#06b6d4',
             lineWidth: 2,
             lineStyle: LightweightCharts.LineStyle.Solid,
-            title: 'EMA 9'
+            title: 'EMA 9',
+            lastValueVisible: false,
+            priceLineVisible: false
         });
 
-        // EMA 21 Line Series (Amber)
+        // EMA 21 Line Series (Amber) - Clean Scale (no axis clutter)
         ema21Series = lwChart.addLineSeries({
             color: '#f59e0b',
             lineWidth: 2,
             lineStyle: LightweightCharts.LineStyle.Solid,
-            title: 'EMA 21'
+            title: 'EMA 21',
+            lastValueVisible: false,
+            priceLineVisible: false
         });
 
-        // Intraday VWAP Line Series
+        // Intraday VWAP Line Series - Clean Scale (no axis clutter)
         vwapSeries = lwChart.addLineSeries({
             color: '#ff9500',
             lineWidth: 2,
             lineStyle: LightweightCharts.LineStyle.Solid,
-            title: 'VWAP'
+            title: 'VWAP',
+            lastValueVisible: false,
+            priceLineVisible: false
         });
 
         // Volume Histogram Series
@@ -3915,33 +3959,33 @@
                 activePriceLines = [];
 
                 if (showSR && data.levels) {
-                    // Resistance R1
+                    // Resistance R1 (Clean Scale - line visible, axis label hidden)
                     activePriceLines.push(candleSeries.createPriceLine({
                         price: data.levels.r1,
-                        color: '#ff3b30',
+                        color: 'rgba(255, 59, 48, 0.4)',
                         lineWidth: 1,
                         lineStyle: LightweightCharts.LineStyle.Dashed,
-                        axisLabelVisible: true,
+                        axisLabelVisible: false,
                         title: `R1 ₹${data.levels.r1}`
                     }));
 
-                    // Support S1
+                    // Support S1 (Clean Scale - line visible, axis label hidden)
                     activePriceLines.push(candleSeries.createPriceLine({
                         price: data.levels.s1,
-                        color: '#34c759',
+                        color: 'rgba(52, 199, 89, 0.4)',
                         lineWidth: 1,
                         lineStyle: LightweightCharts.LineStyle.Dashed,
-                        axisLabelVisible: true,
+                        axisLabelVisible: false,
                         title: `S1 ₹${data.levels.s1}`
                     }));
 
-                    // Central Pivot
+                    // Central Pivot (Clean Scale - line visible, axis label hidden)
                     activePriceLines.push(candleSeries.createPriceLine({
                         price: data.levels.pivot,
-                        color: '#8e8e93',
+                        color: 'rgba(142, 142, 147, 0.4)',
                         lineWidth: 1,
                         lineStyle: LightweightCharts.LineStyle.Dotted,
-                        axisLabelVisible: true,
+                        axisLabelVisible: false,
                         title: `Pivot ₹${data.levels.pivot}`
                     }));
                 }
@@ -3949,46 +3993,46 @@
                 // Institutional Volume Profile (POC, VAH, VAL) Overlays
                 if (showVP && data.volume_profile && data.volume_profile.poc > 0) {
                     const vp = data.volume_profile;
-                    // Point of Control (POC) - Heavy High Volume Node
+                    // Point of Control (POC) - Heavy High Volume Node (Shown on Axis)
                     activePriceLines.push(candleSeries.createPriceLine({
                         price: vp.poc,
                         color: '#dc2626',
-                        lineWidth: 2,
+                        lineWidth: 1.5,
                         lineStyle: LightweightCharts.LineStyle.Solid,
                         axisLabelVisible: true,
                         title: `POC ₹${vp.poc}`
                     }));
-                    // Value Area High (VAH 70%)
+                    // Value Area High (VAH 70% - Clean Scale)
                     activePriceLines.push(candleSeries.createPriceLine({
                         price: vp.vah,
-                        color: '#6366f1',
+                        color: 'rgba(99, 102, 241, 0.35)',
                         lineWidth: 1,
                         lineStyle: LightweightCharts.LineStyle.Dashed,
-                        axisLabelVisible: true,
+                        axisLabelVisible: false,
                         title: `VAH ₹${vp.vah}`
                     }));
-                    // Value Area Low (VAL 70%)
+                    // Value Area Low (VAL 70% - Clean Scale)
                     activePriceLines.push(candleSeries.createPriceLine({
                         price: vp.val,
-                        color: '#6366f1',
+                        color: 'rgba(99, 102, 241, 0.35)',
                         lineWidth: 1,
                         lineStyle: LightweightCharts.LineStyle.Dashed,
-                        axisLabelVisible: true,
+                        axisLabelVisible: false,
                         title: `VAL ₹${vp.val}`
                     }));
                 }
 
-                // Classical Chart Pattern Horizon Target & Stop Overlays
+                // Classical Chart Pattern Horizon Target & Stop Overlays (Clean Axis Focus)
                 if (showPatterns && data.pattern_analysis && data.pattern_analysis.has_pattern) {
                     const pa = data.pattern_analysis;
                     if (pa.predicted_target > 0) {
                         activePriceLines.push(candleSeries.createPriceLine({
                             price: pa.predicted_target,
                             color: pa.bias === 'BULLISH' ? '#16a34a' : '#e11d48',
-                            lineWidth: 2,
+                            lineWidth: 1.5,
                             lineStyle: LightweightCharts.LineStyle.Dotted,
                             axisLabelVisible: true,
-                            title: `Pattern Target ₹${pa.predicted_target}`
+                            title: `Target ₹${pa.predicted_target}`
                         }));
                     }
                     if (pa.invalidation_price > 0) {
@@ -3998,7 +4042,7 @@
                             lineWidth: 1,
                             lineStyle: LightweightCharts.LineStyle.LargeDashed,
                             axisLabelVisible: true,
-                            title: `Inval Stop ₹${pa.invalidation_price}`
+                            title: `Stop ₹${pa.invalidation_price}`
                         }));
                     }
                 }
@@ -4009,10 +4053,12 @@
                 }
             }
 
-            // Update Predictive Pattern Horizon Banner
+            // Update Predictive Pattern Horizon Banner (with Timeframe & Candlestick Formations)
             if (data.pattern_analysis) {
                 const pa = data.pattern_analysis;
                 const vp = data.volume_profile || {};
+                const tfEl = document.getElementById('pat-badge-tf');
+                const candleEl = document.getElementById('pat-badge-candle');
                 const nameEl = document.getElementById('pat-name-text');
                 const biasEl = document.getElementById('pat-badge-bias');
                 const confEl = document.getElementById('pat-badge-conf');
@@ -4021,6 +4067,15 @@
                 const invalEl = document.getElementById('pat-inval-val');
                 const forecastEl = document.getElementById('pat-forecast-text');
 
+                if (tfEl) tfEl.innerText = `⏱️ ${pa.timeframe || activeTimeframe.toUpperCase()} TIMEFRAME`;
+                if (candleEl) {
+                    candleEl.innerText = `🕯️ ${(pa.candlestick_formation || 'TREND CANDLE').toUpperCase()}`;
+                    candleEl.className = pa.candlestick_bias === 'BULLISH' 
+                        ? 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono'
+                        : (pa.candlestick_bias === 'BEARISH'
+                            ? 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono'
+                            : 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono');
+                }
                 if (nameEl) nameEl.innerText = pa.pattern_name.replace(/_/g, ' ');
                 if (biasEl) {
                     biasEl.innerText = pa.bias;
