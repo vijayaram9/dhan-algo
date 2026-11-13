@@ -151,6 +151,9 @@ class NiftySmartEdgeEngine:
         self.cooldown_until: Optional[datetime.datetime] = None
         self.in_recovery_mode: bool = False
         self.auto_pilot_enabled: bool = True
+        self.dynamic_min_confluence: int = 75
+        self._last_3h_audit_ts: float = 0.0
+        self.last_3h_audit_summary: dict = {}
         
         self.recent_audit_records: List[SignalAuditRecord] = []
         self.last_candle_minute: Optional[int] = None
@@ -1543,29 +1546,50 @@ class NiftySmartEdgeEngine:
                 
                 # Seamless Multi-Session Multi-Asset Radar:
                 # Discovers and triggers high-confluence setups across NIFTY, BANKNIFTY, SENSEX, CRUDEOILM, NATGASMINI, GOLDM, and stocks!
+                # 3-Hour Automated Journal & Strategy Self-Audit (every 10800 seconds)
+                now_epoch = time.time()
+                if (now_epoch - getattr(self, "_last_3h_audit_ts", 0.0)) >= 10800:
+                    self._last_3h_audit_ts = now_epoch
+                    try:
+                        closed = [t for t in self.closed_trades_today if t.get("pnl") is not None]
+                        wins = sum(1 for t in closed if float(t.get("pnl", 0)) > 0)
+                        losses = sum(1 for t in closed if float(t.get("pnl", 0)) < 0)
+                        total_c = wins + losses
+                        wr = round((wins / total_c) * 100.0, 1) if total_c > 0 else 100.0
+                        if total_c >= 3 and (wr < 40.0 or self.consecutive_losses >= 2):
+                            self.dynamic_min_confluence = 82
+                            audit_note = f"3H Audit: WinRate {wr}% ({wins}W/{losses}L) -> Tightened min confluence to 82%."
+                        else:
+                            self.dynamic_min_confluence = 75
+                            audit_note = f"3H Audit: WinRate {wr}% ({wins}W/{losses}L) -> Standard confluence 75% active."
+                        self.last_3h_audit_summary = {"timestamp": now_dt.strftime("%Y-%m-%d %H:%M:%S"), "wins": wins, "losses": losses, "win_rate": wr, "min_confluence": self.dynamic_min_confluence, "note": audit_note}
+                        self.log_sniper_event(f"🔍 {audit_note}", "AUDIT")
+                    except Exception:
+                        pass
+
                 now_hm_curr = now_dt.strftime("%H:%M")
                 is_evening_session = (now_hm_curr >= "15:30" or now_hm_curr < "09:15")
                 active_assets = {getattr(p, "asset_key", "") for p in self.active_positions}
-                
+                mcx_keys = {"CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"}
+                index_keys = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "NIFTYIT"}
+                active_index_count = sum(1 for p in self.active_positions if getattr(p, "asset_key", "") in index_keys)
+
                 if is_evening_session:
                     if is_mcx_open:
-                        allowed_targets = ["CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"]
                         valid_opps = [
-                            o for o in all_opps 
-                            if o["key"] in allowed_targets 
-                            and o["key"] not in active_assets 
+                            o for o in all_opps
+                            if o["key"] in mcx_keys
+                            and o["key"] not in active_assets
                             and self.check_trading_schedule(o["key"])[0]
                         ]
                     else:
                         valid_opps = []
                 elif is_equity_open:
-                    index_keys = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "NIFTYIT"}
-                    has_active_index = any(getattr(p, "asset_key", "") in index_keys for p in self.active_positions)
                     valid_opps = [
-                        o for o in all_opps 
+                        o for o in all_opps
                         if o["key"] not in active_assets
-                        and o["key"] not in ["CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"]
-                        and not (has_active_index and o["key"] in index_keys)
+                        and (o["key"] not in mcx_keys or is_mcx_open)
+                        and not (active_index_count >= 2 and o["key"] in index_keys)
                         and self.check_trading_schedule(o["key"])[0]
                     ]
                 else:
@@ -1574,15 +1598,16 @@ class NiftySmartEdgeEngine:
                 if is_equity_open and "09:15" <= now_hm_curr < "09:25":
                     valid_opps = []
 
-                # High-Confluence Institutional Selection (Strict >= 80% + Trend & Candle Confirmation):
+                # High-Confluence Institutional Selection (Dynamic 75-82% + Trend & Candle Confirmation):
+                min_conf = getattr(self, "dynamic_min_confluence", 75)
                 for top_opp in valid_opps:
                     # Check per-instrument cooldown
                     is_asset_cd, _ = global_trade_lock.is_cooldown_active(top_opp["key"])
                     if is_asset_cd:
                         continue
 
-                    # Require high-conviction institutional confluence (score >= 80%)
-                    if not top_opp.get("is_actionable") or top_opp.get("confluence_score", 0) < 80:
+                    # Require high-conviction institutional confluence
+                    if not top_opp.get("is_actionable") or top_opp.get("confluence_score", 0) < min_conf:
                         continue
                     asset_key = top_opp["key"]
                     opp_action = "BUY_CE" if any(x in top_opp["action"].upper() for x in ["CE", "CALL", "BULLISH"]) else ("BUY_PE" if any(x in top_opp["action"].upper() for x in ["PE", "PUT", "BEARISH"]) else None)

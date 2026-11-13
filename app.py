@@ -227,7 +227,7 @@ def api_set_paper_capital():
         payload = request.get_json(silent=True) or {}
         if not payload and request.form:
             payload = request.form.to_dict()
-        amount_raw = payload.get("amount", 25000.0)
+        amount_raw = payload.get("amount", 1500000.0)
         amount = float(amount_raw)
         if amount < 500:
             return jsonify({"success": False, "message": "Paper capital must be at least ₹500."}), 400
@@ -1003,7 +1003,7 @@ def api_clear_trades():
             pass
         if hasattr(engine.client, "set_paper_capital"):
             try:
-                engine.client.set_paper_capital(25000.0)
+                engine.client.set_paper_capital(1500000.0)
             except Exception:
                 pass
         return jsonify({

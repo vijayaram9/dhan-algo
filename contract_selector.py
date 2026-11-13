@@ -362,8 +362,8 @@ class ContractSelector:
         trade_risk_inr = round((planned_loss_per_unit * final_quantity) + 65.0, 2)
 
         # Strict Capital Allocation & Dynamic Risk Budgeting:
-        # 1. Per-Trade Capital Commitment: Safe margin ceiling (max 25% of capital or ₹25,000 for ₹1.5L)
-        max_trade_capital_limit = max(6000.0, min(available_capital * 0.25, 25000.0))
+        # 1. Per-Trade Capital Commitment: Safe margin ceiling (max 20% of capital, capped at ₹3,00,000)
+        max_trade_capital_limit = max(15000.0, min(available_capital * 0.20, 300000.0))
         if total_margin > max_trade_capital_limit:
             rejection = (
                 f"Capital Allocation Shield: Margin of ₹{total_margin:,.2f} exceeds safe limit of ₹{max_trade_capital_limit:,.2f}. "
