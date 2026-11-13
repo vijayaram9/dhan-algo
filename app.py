@@ -395,16 +395,40 @@ def api_chart_data():
     now_ts_sec = time.time()
     candles = []
 
-    # Memory cache with live tick mutation to prevent Dhan DH-904 rate limits
+    # Memory cache with instant in-memory resampling to prevent Dhan DH-904 rate limits on timeframe shifts
+    base_tf_for_cache = "1m" if timeframe in ("10s", "1m", "3m") else ("5m" if timeframe in ("5m", "10m", "15m", "30m", "1h", "4h") else timeframe)
+    base_cache_key = f"{asset_key}_{base_tf_for_cache}_{chart_target}_{security_id_param}"
     if cache_key in _chart_candles_cache:
         cached_c, c_time = _chart_candles_cache[cache_key]
         if (now_ts_sec - c_time < 45.0) and cached_c:
             candles = [dict(c) for c in cached_c]
-            # Mutate active running candle in memory with live exchange spot tick
-            if candles and spot > 0:
-                candles[-1]["close"] = round(spot, 2)
-                candles[-1]["high"] = max(candles[-1]["high"], round(spot, 2))
-                candles[-1]["low"] = min(candles[-1]["low"], round(spot, 2))
+    elif base_cache_key in _chart_candles_cache and timeframe in ("3m", "10m", "15m", "30m", "1h", "4h"):
+        base_c, b_time = _chart_candles_cache[base_cache_key]
+        if (now_ts_sec - b_time < 60.0) and base_c:
+            rs_mins = {"3m": 3, "10m": 10, "15m": 15, "30m": 30, "1h": 60, "4h": 240}[timeframe]
+            b_sec = rs_mins * 60
+            cur_b = None
+            bo = bh = bl = bc = bv = bvw = bt = 0
+            for c in base_c:
+                ts = int(c["time"])
+                bk = ts - (ts % b_sec)
+                if cur_b is None:
+                    cur_b = bk
+                    bo, bh, bl, bc, bv, bvw, bt = c["open"], c["high"], c["low"], c["close"], c.get("volume", 1000), c.get("vwap", c["close"]), bk
+                elif bk == cur_b:
+                    bh = max(bh, c["high"])
+                    bl = min(bl, c["low"])
+                    bc = c["close"]
+                    bv += c.get("volume", 1000)
+                    bvw = c.get("vwap", bc)
+                else:
+                    candles.append({"time": bt, "open": bo, "high": bh, "low": bl, "close": bc, "volume": bv, "vwap": bvw})
+                    cur_b = bk
+                    bo, bh, bl, bc, bv, bvw, bt = c["open"], c["high"], c["low"], c["close"], c.get("volume", 1000), c.get("vwap", c["close"]), bk
+            if cur_b is not None:
+                candles.append({"time": bt, "open": bo, "high": bh, "low": bl, "close": bc, "volume": bv, "vwap": bvw})
+            if candles:
+                _chart_candles_cache[cache_key] = (candles, b_time)
 
     # Pre-calculate active option metadata for possible option charting
     step = asset_info.strike_step
@@ -575,7 +599,26 @@ def api_chart_data():
         except Exception as e:
             print(f"[Dhan Chart Feed Note] {e}")
 
-        # 2. Resilient Fallback: yfinance for Instant Continuity on Rate Limits / Global Cues
+        # 2. Try real cached Dhan bars from MTF Engine first before any external fallback
+        if not candles and chart_target == "underlying":
+            try:
+                from mtf_engine import mtf_engine
+                df_mtf = mtf_engine.get_real_candles(asset_key)
+                if df_mtf is not None and not df_mtf.empty and "time" in df_mtf.columns:
+                    for _, r in df_mtf.iterrows():
+                        candles.append({
+                            "time": int(r["time"]),
+                            "open": round(float(r["open"]), 2),
+                            "high": round(float(r["high"]), 2),
+                            "low": round(float(r["low"]), 2),
+                            "close": round(float(r["close"]), 2),
+                            "volume": int(r.get("volume", 1000)),
+                            "vwap": round(float(r.get("vwap", r["close"])), 2)
+                        })
+            except Exception:
+                pass
+
+        # 3. Resilient Fallback: yfinance ONLY if price scale matches (never mix USD $87 with INR ₹8,300!)
         if not candles and getattr(asset_info, "yfinance_symbol", None):
             tf_specs = {
                 "10s": ("1d", "1m"),
@@ -599,33 +642,38 @@ def api_chart_data():
                     df = yf.Ticker(asset_info.yfinance_symbol).history(period=period, interval=interval)
                     
                     if not df.empty:
-                        cum_vol = 0
-                        cum_pv = 0.0
-                        seen_times = set()
-                        for idx, r in df.iterrows():
-                            ts_epoch = int(idx.timestamp())
-                            if ts_epoch in seen_times:
-                                continue
-                            seen_times.add(ts_epoch)
+                        last_yf_close = float(df["Close"].iloc[-1])
+                        # Reject mismatched-currency fallback (e.g. CL=F USD $88 vs MCX CRUDEOILM INR ₹8350)
+                        if spot > 0 and last_yf_close > 0 and (abs(spot - last_yf_close) / spot) > 0.25:
+                            print(f"[Chart Guard] Rejected yfinance {asset_info.yfinance_symbol} ({last_yf_close}) vs live {asset_key} ({spot}) currency/scale mismatch.")
+                        else:
+                            cum_vol = 0
+                            cum_pv = 0.0
+                            seen_times = set()
+                            for idx, r in df.iterrows():
+                                ts_epoch = int(idx.timestamp())
+                                if ts_epoch in seen_times:
+                                    continue
+                                seen_times.add(ts_epoch)
 
-                            o = round(float(r["Open"]), 2)
-                            h = round(float(r["High"]), 2)
-                            l = round(float(r["Low"]), 2)
-                            c = round(float(r["Close"]), 2)
-                            vol = int(r["Volume"]) if r["Volume"] > 0 else 1250
-                            cum_vol += vol
-                            cum_pv += ((h + l + c) / 3.0) * vol
-                            vwap = round(cum_pv / cum_vol, 2) if cum_vol > 0 else c
+                                o = round(float(r["Open"]), 2)
+                                h = round(float(r["High"]), 2)
+                                l = round(float(r["Low"]), 2)
+                                c = round(float(r["Close"]), 2)
+                                vol = int(r["Volume"]) if r["Volume"] > 0 else 1250
+                                cum_vol += vol
+                                cum_pv += ((h + l + c) / 3.0) * vol
+                                vwap = round(cum_pv / cum_vol, 2) if cum_vol > 0 else c
 
-                            candles.append({
-                                "time": ts_epoch,
-                                "open": o,
-                                "high": h,
-                                "low": l,
-                                "close": c,
-                                "volume": vol,
-                                "vwap": vwap
-                            })
+                                candles.append({
+                                    "time": ts_epoch,
+                                    "open": o,
+                                    "high": h,
+                                    "low": l,
+                                    "close": c,
+                                    "volume": vol,
+                                    "vwap": vwap
+                                })
             except Exception as e:
                 print(f"Chart fetch error for {asset_key} ({timeframe}): {e}")
 
@@ -648,23 +696,23 @@ def api_chart_data():
             if in_session:
                 cur_bar_ts = int(now_ts_sec) - (int(now_ts_sec) % tf_sec)
                 last_ts = int(candles[-1]["time"])
-                if cur_bar_ts > last_ts and (cur_bar_ts - last_ts) <= 3600:
-                    prev_close = float(candles[-1]["close"])
-                    live_c = round(float(spot), 2)
-                    candles.append({
-                        "time": cur_bar_ts,
-                        "open": prev_close,
-                        "high": max(prev_close, live_c),
-                        "low": min(prev_close, live_c),
-                        "close": live_c,
-                        "volume": int(candles[-1].get("volume", 1000)),
-                        "vwap": candles[-1].get("vwap", live_c)
-                    })
-                elif cur_bar_ts == last_ts:
-                    live_c = round(float(spot), 2)
-                    candles[-1]["close"] = live_c
-                    candles[-1]["high"] = max(float(candles[-1]["high"]), live_c)
-                    candles[-1]["low"] = min(float(candles[-1]["low"]), live_c)
+                prev_close = float(candles[-1]["close"])
+                live_c = round(float(spot), 2)
+                if prev_close > 0 and abs(live_c - prev_close) / prev_close <= 0.20:
+                    if cur_bar_ts > last_ts and (cur_bar_ts - last_ts) <= 3600:
+                        candles.append({
+                            "time": cur_bar_ts,
+                            "open": prev_close,
+                            "high": max(prev_close, live_c),
+                            "low": min(prev_close, live_c),
+                            "close": live_c,
+                            "volume": int(candles[-1].get("volume", 1000)),
+                            "vwap": candles[-1].get("vwap", live_c)
+                        })
+                    elif cur_bar_ts == last_ts:
+                        candles[-1]["close"] = live_c
+                        candles[-1]["high"] = max(float(candles[-1]["high"]), live_c)
+                        candles[-1]["low"] = min(float(candles[-1]["low"]), live_c)
         except Exception:
             pass
 

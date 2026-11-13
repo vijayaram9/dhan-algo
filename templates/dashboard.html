@@ -1445,6 +1445,8 @@
                         <button onclick="toggleIndicator('zones')" id="btn-toggle-zones" class="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 transition shadow-2xs" title="Toggle Buy Zone, Sell Zone & No-Trade Consolidation Zone">Zones</button>
                         <button onclick="toggleIndicator('vp')" id="btn-toggle-vp" class="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 transition shadow-2xs" title="Toggle Volume Profile (POC, VAH, VAL)">Vol Profile</button>
                         <button onclick="toggleIndicator('vpInsights')" id="btn-toggle-vp-insights" class="px-2 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 transition shadow-2xs" title="Toggle Customized Live Rejection/Bounce Callouts on Volume Profile">VP Insights</button>
+                        <button onclick="toggleIndicator('volBars')" id="btn-toggle-volbars" class="px-2 py-1 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 transition shadow-2xs" title="Toggle Bottom Volume Histogram Bars">Vol Bars</button>
+                        <button onclick="toggleIndicator('structure')" id="btn-toggle-structure" class="px-2 py-1 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 transition shadow-2xs" title="Toggle Swing Structure (HH / HL / LH / LL)">HH/HL</button>
                         <button onclick="toggleIndicator('rsi')" id="btn-toggle-rsi" class="px-2 py-1 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 transition shadow-2xs" title="Toggle RSI (14) Lower Oscillator Pane">RSI (14)</button>
                         <button onclick="toggleIndicator('macd')" id="btn-toggle-macd" class="px-2 py-1 rounded-lg bg-slate-100 text-slate-600 transition font-bold" title="Toggle MACD (12, 26, 9) Lower Oscillator Pane">MACD</button>
                         <button onclick="toggleIndicator('patterns')" id="btn-toggle-patterns" class="px-2 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 transition shadow-2xs" title="Toggle Technical Chart Patterns & Predictive Forecast">Patterns</button>
@@ -1452,6 +1454,9 @@
                             <button onclick="setChartTarget('underlying')" id="chart-target-underlying" class="px-2 py-0.5 rounded transition bg-white text-slate-900 text-[11px]">Spot</button>
                             <button onclick="setChartTarget('option')" id="chart-target-option" class="px-2 py-0.5 rounded transition text-slate-600 hover:text-slate-900 text-[11px]">Option</button>
                         </div>
+                        <select id="chart-quick-strike-select" onchange="onQuickStrikeSelect(this.value)" class="px-2 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-mono font-bold text-slate-700 cursor-pointer shadow-2xs" title="Quickly load any Option Strike chart">
+                            <option value="">Quick Strike...</option>
+                        </select>
                     </div>
 
                     <!-- Multi-Timeframe Switcher (10s, 1m, 3m, 5m, 10m, 15m, 30m, 1h, 4h, 1D) -->
@@ -1545,6 +1550,7 @@
                 <canvas id="vp-overlay-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5;"></canvas>
                 <!-- Interactive Volume Profile Order-Flow Hover Callout -->
                 <div id="vp-insight-tooltip" class="hidden pointer-events-none absolute z-20 max-w-xs p-2.5 rounded-xl border shadow-lg text-[11px] leading-snug backdrop-blur-md transition-opacity" style="background-color: var(--apple-surface); color: var(--apple-text); border-color: var(--apple-border);"></div>
+                <div id="chart-crosshair-tooltip" class="hidden pointer-events-none absolute top-2 left-2 z-20 max-w-sm p-2.5 rounded-xl border shadow-md text-[10.5px] font-mono leading-snug backdrop-blur-md" style="background-color: rgba(255,255,255,0.92); color: #0f172a; border-color: rgba(148,163,184,0.35);"></div>
             </div>
 
             <!-- CONTAINER 2: Synchronized Lower Oscillator Pane (RSI / MACD) -->
@@ -2812,10 +2818,13 @@
     let showVpInsights = true;
     let showRSI = true;
     let showMACD = false;
+    let showVolBars = true;
+    let showStructure = true;
     let showOscillator = true;
     let rsiPeriod = 14;
     let _chartFetchSeq = 0;
     let _isFetchingChartData = false;
+    let _chartFetchController = null;
 
     // Direct Dhan Terminal URLs mapping
     const dhanTerminalMap = {
@@ -3813,8 +3822,55 @@
             priceLineVisible: false
         });
 
-        // Candid Candles Only (No green/red background histogram bars behind candles)
-        volumeSeries = null;
+        // Bottom Volume Histogram Series (pinned to bottom 18% of main chart with volume scale)
+        volumeSeries = lwChart.addHistogramSeries({
+            priceFormat: { type: 'volume' },
+            priceScaleId: 'vol',
+            lastValueVisible: false,
+            priceLineVisible: false
+        });
+        lwChart.priceScale('vol').applyOptions({
+            scaleMargins: { top: 0.82, bottom: 0 }
+        });
+
+        // Rich Crosshair Tooltip: OHLC, Body vs Wick, Volume (K/M), HH/HL/CHoCH, 5m/10m/20m Momentum, & Pattern
+        lwChart.subscribeCrosshairMove((param) => {
+            const tip = document.getElementById('chart-crosshair-tooltip');
+            if (!tip) return;
+            if (!param || !param.time || !param.seriesData) {
+                tip.classList.add('hidden');
+                return;
+            }
+            const bar = param.seriesData.get(candleSeries);
+            if (!bar) {
+                tip.classList.add('hidden');
+                return;
+            }
+            const meta = (window._chartCandlesMeta && window._chartCandlesMeta[param.time]) || {};
+            const o = bar.open, h = bar.high, l = bar.low, c = bar.close;
+            const body = Math.abs(c - o).toFixed(2);
+            const uWick = Math.max(0, h - Math.max(o, c)).toFixed(2);
+            const lWick = Math.max(0, Math.min(o, c) - l).toFixed(2);
+            const rawVol = meta.volume || 0;
+            const volStr = rawVol >= 1000000 ? `${(rawVol / 1000000).toFixed(2)}M` : (rawVol >= 1000 ? `${(rawVol / 1000).toFixed(1)}K` : `${rawVol}`);
+            const structTag = meta.structure ? `<span class="px-1.5 py-0.2 rounded bg-sky-100 text-sky-800 font-bold">${meta.structure}</span>` : '';
+            const chochTag = meta.choch ? `<span class="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-bold">${meta.choch}</span>` : '';
+            const momLine = meta.momentumText ? `<div class="mt-1 text-[9.5px] text-slate-600">${meta.momentumText}</div>` : '';
+            const pat = window._lastPatternAnalysis;
+            const patLine = (pat && pat.has_pattern) ? `<div class="mt-1 text-[9.5px] font-bold text-purple-700">Pattern: ${pat.pattern_name} (${pat.candlestick_formation || pat.bias})</div>` : '';
+
+            tip.innerHTML = `
+                <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="font-bold ${c >= o ? 'text-emerald-700' : 'text-rose-700'}">O:${o} H:${h} L:${l} C:${c}</span>
+                    ${structTag} ${chochTag}
+                </div>
+                <div class="text-[9.5px] text-slate-600 mt-0.5">
+                    Body: <b>${body}</b> | Upper Wick: <b>${uWick}</b> | Lower Wick: <b>${lWick}</b> | Vol: <b>${volStr}</b>
+                </div>
+                ${momLine}${patLine}
+            `;
+            tip.classList.remove('hidden');
+        });
 
         // Synchronized Lower Oscillator Sub-Pane (RSI 14 / MACD)
         const rsiContainer = document.getElementById('rsi_chart_container');
@@ -4411,6 +4467,18 @@
             if (bR) bR.className = "px-2 py-1 rounded-lg bg-slate-100 text-slate-600 transition font-bold";
             const oscTitle = document.getElementById('oscillator-pane-title');
             if (oscTitle) oscTitle.innerText = "MACD (12, 26, 9) TREND CONVERGENCE • Blue: MACD | Orange: Signal";
+        } else if (ind === 'volBars') {
+            showVolBars = !showVolBars;
+            const btn = document.getElementById('btn-toggle-volbars');
+            if (btn) btn.className = showVolBars
+                ? "px-2 py-1 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 transition shadow-2xs font-bold"
+                : "px-2 py-1 rounded-lg bg-slate-100 text-slate-400 transition font-bold";
+        } else if (ind === 'structure') {
+            showStructure = !showStructure;
+            const btn = document.getElementById('btn-toggle-structure');
+            if (btn) btn.className = showStructure
+                ? "px-2 py-1 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 transition shadow-2xs font-bold"
+                : "px-2 py-1 rounded-lg bg-slate-100 text-slate-400 transition font-bold";
         } else if (ind === 'patterns') {
             showPatterns = !showPatterns;
             const btn = document.getElementById('btn-toggle-patterns');
@@ -4491,13 +4559,28 @@
         fetchCandlestickData(secId);
     }
 
+    function onQuickStrikeSelect(val) {
+        if (!val) {
+            setChartTarget('underlying');
+            return;
+        }
+        const parts = val.split('|');
+        if (parts.length >= 3) {
+            chartOptionStrike(parts[0], parts[1], parts[2]);
+        }
+    }
+
     // Fetch Candlestick Data with Timeframe, Indicators & S/R Overlays
     async function fetchCandlestickData(secId = null) {
         const fetchSeq = ++_chartFetchSeq;
         _isFetchingChartData = true;
+        if (_chartFetchController) {
+            try { _chartFetchController.abort(); } catch(e) {}
+        }
+        _chartFetchController = new AbortController();
         try {
             const secParam = secId ? `&security_id=${secId}` : (activeChartSecId ? `&security_id=${activeChartSecId}` : '');
-            const res = await fetch(`/api/chart-data?asset=${activeAssetKey}&timeframe=${activeTimeframe}&chart_target=${activeChartTarget}${secParam}`);
+            const res = await fetch(`/api/chart-data?asset=${activeAssetKey}&timeframe=${activeTimeframe}&chart_target=${activeChartTarget}${secParam}`, { signal: _chartFetchController.signal });
             const data = await res.json();
             if (fetchSeq !== _chartFetchSeq) return;
 
@@ -4727,13 +4810,97 @@
             window._lastChartLevels = data.levels || {};
             window._lastChartSpot = data.spot || 0;
 
+            // Populate Quick Option Strike Picker on Chart Header
+            const qsSel = document.getElementById('chart-quick-strike-select');
+            if (qsSel && data.option_chain && Array.isArray(data.option_chain.rows)) {
+                const curVal = qsSel.value;
+                let optsHtml = '<option value="">Quick Strike...</option>';
+                data.option_chain.rows.forEach(r => {
+                    if (r.ce_security_id) {
+                        optsHtml += `<option value="${r.strike}|CE|${r.ce_security_id}">${r.strike} CE (₹${Number(r.ce_ltp || 0).toFixed(1)})</option>`;
+                    }
+                    if (r.pe_security_id) {
+                        optsHtml += `<option value="${r.strike}|PE|${r.pe_security_id}">${r.strike} PE (₹${Number(r.pe_ltp || 0).toFixed(1)})</option>`;
+                    }
+                });
+                qsSel.innerHTML = optsHtml;
+                if (activeChartTarget === 'option' && curVal) qsSel.value = curVal;
+                else if (activeChartTarget === 'underlying') qsSel.value = '';
+            }
+
+            // Populate Bottom Volume Histogram & Compute HH/HL/LH/LL + CHoCH + 5m/10m/20m Momentum Metadata
+            window._chartCandlesMeta = {};
+            const structMarkers = [];
+            if (data.candles && data.candles.length > 0) {
+                if (volumeSeries) {
+                    if (showVolBars) {
+                        const volData = data.candles.map(c => ({
+                            time: c.time,
+                            value: Number(c.volume || 0),
+                            color: c.close >= c.open ? 'rgba(22, 163, 74, 0.35)' : 'rgba(225, 29, 72, 0.35)'
+                        }));
+                        volumeSeries.setData(volData);
+                    } else {
+                        volumeSeries.setData([]);
+                    }
+                }
+
+                let prevSwingHigh = null, prevSwingLow = null, lastTrend = null;
+                for (let idx = 0; idx < data.candles.length; idx++) {
+                    const c = data.candles[idx];
+                    let structTag = '';
+                    let chochTag = '';
+                    if (idx >= 2 && idx <= data.candles.length - 3) {
+                        const isSH = c.high >= data.candles[idx - 1].high && c.high >= data.candles[idx - 2].high && c.high >= data.candles[idx + 1].high && c.high >= data.candles[idx + 2].high;
+                        const isSL = c.low <= data.candles[idx - 1].low && c.low <= data.candles[idx - 2].low && c.low <= data.candles[idx + 1].low && c.low <= data.candles[idx + 2].low;
+                        if (isSH) {
+                            structTag = (prevSwingHigh === null || c.high >= prevSwingHigh) ? 'HH' : 'LH';
+                            if (lastTrend === 'DOWN' && structTag === 'HH') chochTag = 'CHoCH ↑';
+                            lastTrend = structTag === 'HH' ? 'UP' : 'DOWN';
+                            prevSwingHigh = c.high;
+                            structMarkers.push({ time: c.time, position: 'aboveBar', color: structTag === 'HH' ? '#0284c7' : '#d97706', shape: 'circle', text: structTag });
+                        } else if (isSL) {
+                            structTag = (prevSwingLow === null || c.low >= prevSwingLow) ? 'HL' : 'LL';
+                            if (lastTrend === 'UP' && structTag === 'LL') chochTag = 'CHoCH ↓';
+                            lastTrend = structTag === 'HL' ? 'UP' : 'DOWN';
+                            prevSwingLow = c.low;
+                            structMarkers.push({ time: c.time, position: 'belowBar', color: structTag === 'HL' ? '#059669' : '#e11d48', shape: 'circle', text: structTag });
+                        }
+                    }
+
+                    // Rolling Buy/Sell Momentum across last 5m (1 bar), 10m (2 bars), 20m (4 bars)
+                    const calcBuyPct = (nBars) => {
+                        let bV = 0, tV = 0;
+                        const start = Math.max(0, idx - nBars + 1);
+                        for (let j = start; j <= idx; j++) {
+                            const cc = data.candles[j];
+                            const v = Number(cc.volume || 1);
+                            tV += v;
+                            if (cc.close >= cc.open) bV += v;
+                        }
+                        return tV > 0 ? Math.round((bV / tV) * 100) : 50;
+                    };
+                    const m5 = calcBuyPct(1), m10 = calcBuyPct(2), m20 = calcBuyPct(4);
+                    const momBias = (m5 >= 60 && m10 >= 55) ? 'Buying Momentum' : ((m5 <= 40 && m10 <= 45) ? 'Selling Momentum' : 'Balanced / CHoCH Watch');
+                    window._chartCandlesMeta[c.time] = {
+                        volume: Number(c.volume || 0),
+                        structure: structTag,
+                        choch: chochTag,
+                        momentumText: `5m:${m5}% Buy | 10m:${m10}% Buy | 20m:${m20}% Buy • ${momBias}`
+                    };
+                }
+            }
+
             // Render Zones, Left S/R/CPR Labels & Volume Profile Histogram on Canvas Overlay
             renderVolumeProfileHistogram(data.volume_profile);
 
-            // Mark Actionable Buy/Sell/No-Trade Zones directly on Candlesticks (Strictly aligned with Zones, VWAP, EMA & RSI)
+            // Mark Actionable Buy/Sell/No-Trade Zones + HH/HL/LH/LL Swing Structure on Candlesticks
             if (candleSeries && typeof candleSeries.setMarkers === 'function') {
+                const markers = [];
+                if (showStructure && structMarkers.length > 0) {
+                    structMarkers.slice(-14).forEach(m => markers.push(m));
+                }
                 if (showZones && data.candles && data.candles.length >= 3) {
-                    const markers = [];
                     const lastC = data.candles[data.candles.length - 1];
                     const lvls = data.levels || {};
                     const vp = data.volume_profile || {};
@@ -4789,9 +4956,11 @@
                             text: 'WAIT / MIXED SIGNALS'
                         });
                     }
+                    markers.sort((a, b) => a.time - b.time);
                     candleSeries.setMarkers(markers);
                 } else {
-                    candleSeries.setMarkers([]);
+                    markers.sort((a, b) => a.time - b.time);
+                    candleSeries.setMarkers(markers);
                 }
             }
 
