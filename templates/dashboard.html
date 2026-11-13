@@ -1404,18 +1404,6 @@
                         <button onclick="selectAsset('GOLDM')" class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 transition" id="qpill-GOLDM">🪙 GOLD</button>
                     </div>
                 </div>
-
-                <!-- Dual View Mode Toggle: Algo Desk vs Dhan TV Terminal -->
-                <div class="flex items-center bg-slate-100 p-0.5 rounded-xl text-xs font-mono font-bold shadow-inner">
-                    <button onclick="toggleChartMode('algo')" id="btn-chart-mode-algo" class="px-3 py-1.5 rounded-lg transition bg-blue-600 text-white shadow-xs flex items-center space-x-1.5" title="Lightweight Charts with Authentic Dhan Feed & Algo Overlays">
-                        <i class="fa-solid fa-bolt text-[11px] text-amber-300"></i>
-                        <span>Algo Desk</span>
-                    </button>
-                    <button onclick="toggleChartMode('tv')" id="btn-chart-mode-tv" class="px-3 py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900 flex items-center space-x-1.5" title="Interactive TradingView Embed">
-                        <i class="fa-solid fa-chart-line text-[11px]"></i>
-                        <span>TradingView</span>
-                    </button>
-                </div>
             </div>
 
             <!-- Chart Header: Scrip, IST Timestamp, and Multi-Timeframe Controls -->
@@ -1521,14 +1509,11 @@
                 </div>
             </div>
 
-            <!-- CONTAINER 1: Candlestick Container (Rendered via LightweightCharts for Algo Desk - Default) -->
+            <!-- CONTAINER 1: Candlestick Container (Rendered via LightweightCharts for Algo Desk - Authentic Dhan Feed) -->
             <div id="candlestick_chart_container" style="height: 480px; width: 100%; position: relative; display: block; overflow: hidden;">
                 <!-- Authentic Institutional Volume Profile (VPVR) Canvas Overlay -->
                 <canvas id="vp-overlay-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5;"></canvas>
             </div>
-
-            <!-- CONTAINER 2: Dhan TV Terminal (Advanced TradingView Real-Time Widget) -->
-            <div id="tradingview_chart_container" style="height: 580px; width: 100%; border-radius: 12px; overflow: hidden; background: #ffffff; display: none;"></div>
 
             <!-- Real-time Quick Quote Bar with Dynamic Levels -->
             <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2.5 mt-3 pt-3 border-t border-black/[0.04] text-xs font-mono">
@@ -3500,138 +3485,7 @@
         }
     }
 
-    // Switch Selected Trading Asset (Adaptive for any stock, commodity, or radar recommendation)
-    let activeChartMode = 'algo'; // 'algo' = Lightweight Charts Algo Desk, 'tv' = TradingView Embed
-    let tvWidget = null;
-
-    const TV_SYMBOL_MAP = {
-        'NIFTY': 'NSE:NIFTY',
-        'BANKNIFTY': 'NSE:BANKNIFTY',
-        'FINNIFTY': 'NSE:FINNIFTY',
-        'SENSEX': 'BSE:SENSEX',
-        'CRUDEOILM': 'MCX:CRUDEOIL1!',
-        'NATGASMINI': 'MCX:NATURALGAS1!',
-        'GOLDM': 'MCX:GOLD1!',
-        'SILVERM': 'MCX:SILVER1!',
-        'RELIANCE': 'NSE:RELIANCE',
-        'TCS': 'NSE:TCS',
-        'HDFCBANK': 'NSE:HDFCBANK',
-        'ICICIBANK': 'NSE:ICICIBANK',
-        'INFY': 'NSE:INFY',
-        'SBIN': 'NSE:SBIN',
-        'BHARTIARTL': 'NSE:BHARTIARTL',
-        'LT': 'NSE:LT',
-        'AXISBANK': 'NSE:AXISBANK',
-        'KOTAKBANK': 'NSE:KOTAKBANK',
-        'TATASTEEL': 'NSE:TATASTEEL',
-        'BAJFINANCE': 'NSE:BAJFINANCE',
-        'MARUTI': 'NSE:MARUTI',
-        'M&M': 'NSE:MM'
-    };
-
-    const TV_INTERVAL_MAP = {
-        '10s': '1S',
-        '1m': '1',
-        '3m': '3',
-        '5m': '5',
-        '10m': '10',
-        '15m': '15',
-        '1h': '60',
-        '1d': 'D'
-    };
-
-    function initTradingViewWidget(symbolKey = 'NIFTY', interval = '5m') {
-        const container = document.getElementById('tradingview_chart_container');
-        if (!container) return;
-        
-        const tvSymbol = TV_SYMBOL_MAP[symbolKey] || `NSE:${symbolKey}`;
-        const tvInterval = TV_INTERVAL_MAP[interval] || '5';
-
-        container.innerHTML = '';
-        
-        try {
-            if (typeof TradingView !== 'undefined' && TradingView.widget) {
-                tvWidget = new TradingView.widget({
-                    "autosize": true,
-                    "symbol": tvSymbol,
-                    "interval": tvInterval,
-                    "timezone": "Asia/Kolkata",
-                    "theme": "light",
-                    "style": "1",
-                    "locale": "en",
-                    "toolbar_bg": "#f8fafc",
-                    "enable_publishing": false,
-                    "hide_top_toolbar": false,
-                    "hide_side_toolbar": false,
-                    "withdateranges": true,
-                    "allow_symbol_change": true,
-                    "save_image": false,
-                    "watchlist": [
-                        "NSE:NIFTY",
-                        "NSE:BANKNIFTY",
-                        "NSE:FINNIFTY",
-                        "BSE:SENSEX",
-                        "MCX:CRUDEOIL1!",
-                        "MCX:NATURALGAS1!",
-                        "MCX:GOLD1!",
-                        "NSE:RELIANCE",
-                        "NSE:HDFCBANK",
-                        "NSE:TATASTEEL",
-                        "NSE:BHARTIARTL",
-                        "NSE:LT"
-                    ],
-                    "details": true,
-                    "hotlist": false,
-                    "calendar": false,
-                    "studies": [
-                        "STD;Pivot%Points%Standard",
-                        "STD;EMA",
-                        "STD;VWAP"
-                    ],
-                    "container_id": "tradingview_chart_container"
-                });
-            }
-        } catch (e) {
-            console.warn("[TradingView Widget Note]", e);
-        }
-    }
-
-    function toggleChartMode(mode) {
-        activeChartMode = mode;
-        const tvCont = document.getElementById('tradingview_chart_container');
-        const lwCont = document.getElementById('candlestick_chart_container');
-        const btnTv = document.getElementById('btn-chart-mode-tv');
-        const btnAlgo = document.getElementById('btn-chart-mode-algo');
-        const algoControls = document.getElementById('algo-chart-controls');
-        const badge = document.getElementById('chart-mode-badge');
-
-        if (mode === 'tv') {
-            if (tvCont) tvCont.style.display = 'block';
-            if (lwCont) lwCont.style.display = 'none';
-            if (algoControls) algoControls.style.display = 'none';
-            if (btnTv) btnTv.className = 'px-3 py-1.5 rounded-lg transition bg-blue-600 text-white shadow-xs flex items-center space-x-1.5';
-            if (btnAlgo) btnAlgo.className = 'px-3 py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900 flex items-center space-x-1.5';
-            if (badge) {
-                badge.innerText = 'TradingView Live';
-                badge.className = 'text-[9px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-mono font-bold';
-            }
-            initTradingViewWidget(activeAssetKey, activeTimeframe);
-        } else {
-            if (tvCont) tvCont.style.display = 'none';
-            if (lwCont) lwCont.style.display = 'block';
-            if (algoControls) algoControls.style.display = 'flex';
-            if (btnTv) btnTv.className = 'px-3 py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900 flex items-center space-x-1.5';
-            if (btnAlgo) btnAlgo.className = 'px-3 py-1.5 rounded-lg transition bg-blue-600 text-white shadow-xs flex items-center space-x-1.5';
-            if (badge) {
-                badge.innerText = 'Algo Desk + S/R';
-                badge.className = 'text-[9px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-mono font-bold';
-            }
-            if (!lwChart) {
-                initCandlestickChart();
-            }
-            fetchCandlestickData();
-        }
-    }
+    // Switch Selected Trading Asset (Native Dhan-Powered Algo Desk Chart)
 
     function selectAsset(key, isUserClick = true) {
         if (isUserClick) {
@@ -3691,11 +3545,7 @@
         }
 
         fetchMarketIntelligence();
-        if (activeChartMode === 'tv') {
-            initTradingViewWidget(key, activeTimeframe);
-        } else {
-            fetchCandlestickData();
-        }
+        fetchCandlestickData();
         fetchStatus();
         runBacktest(activeBacktestDays);
         if (typeof validateLots === 'function') {
@@ -3720,11 +3570,7 @@
         const tfTag = document.getElementById('chart-timeframe-tag');
         if (tfTag) tfTag.innerText = tf.toUpperCase();
         
-        if (activeChartMode === 'tv') {
-            initTradingViewWidget(activeAssetKey, tf);
-        } else {
-            fetchCandlestickData();
-        }
+        fetchCandlestickData();
     }
 
     // Toggle Auto-Pilot
@@ -3781,20 +3627,27 @@
     function initCandlestickChart() {
         const container = document.getElementById('candlestick_chart_container');
         if (!container) return;
+        const existingVpCanvas = document.getElementById('vp-overlay-canvas');
         container.innerHTML = '';
+        if (existingVpCanvas) container.appendChild(existingVpCanvas);
+
+        const styles = getComputedStyle(document.documentElement);
+        const chartBg = styles.getPropertyValue('--chart-bg').trim() || '#f8f9fb';
+        const chartGrid = styles.getPropertyValue('--chart-grid').trim() || 'rgba(15, 23, 42, 0.05)';
+        const chartText = styles.getPropertyValue('--chart-text').trim() || '#374151';
 
         const initialChartWidth = (container.clientWidth > 100) ? container.clientWidth : (container.parentElement ? container.parentElement.clientWidth : 800);
         lwChart = LightweightCharts.createChart(container, {
             width: initialChartWidth,
-            height: 420,
+            height: 480,
             layout: {
-                background: { color: '#ffffff' },
-                textColor: '#64748b',
+                background: { color: chartBg },
+                textColor: chartText,
                 fontFamily: 'Inter, -apple-system, sans-serif'
             },
             grid: {
-                vertLines: { color: 'rgba(0, 0, 0, 0.03)' },
-                horzLines: { color: 'rgba(0, 0, 0, 0.03)' }
+                vertLines: { color: chartGrid },
+                horzLines: { color: chartGrid }
             },
             crosshair: {
                 mode: LightweightCharts.CrosshairMode.Normal,
@@ -3984,37 +3837,28 @@
     }
 
     // -------------------------------------------------------------------------
-    // APPLE STYLE FULL-SCREEN CHART CONTROLLER
+    // APPLE STYLE FULL-SCREEN CHART CONTROLLER (Native Fullscreen + Fallback)
     // -------------------------------------------------------------------------
-    function toggleFullScreenChart() {
+    function _syncFullscreenChartUI(isFS) {
         const card = document.getElementById('chart-main-card');
         const chartContainer = document.getElementById('candlestick_chart_container');
-        const tvContainer = document.getElementById('tradingview_chart_container');
         const icon = document.getElementById('chart-fullscreen-icon');
         const text = document.getElementById('chart-fullscreen-text');
         if (!card) return;
 
-        window._isChartFullscreen = !window._isChartFullscreen;
-
-        if (window._isChartFullscreen) {
-            // Enter Apple macOS Fullscreen Sheet
-            card.classList.add('fixed', 'inset-0', 'z-50', 'bg-white', 'p-6', 'overflow-y-auto', 'shadow-2xl');
-            card.classList.remove('apple-box');
+        window._isChartFullscreen = isFS;
+        if (isFS) {
+            card.classList.add('fixed', 'inset-0', 'z-[9999]', 'p-6', 'overflow-y-auto', 'shadow-2xl');
+            card.style.backgroundColor = 'var(--apple-surface)';
             if (icon) icon.className = "fa-solid fa-compress text-[11px]";
             if (text) text.innerText = "Exit Full Screen";
-
-            const fsHeight = (window.innerHeight - 200) + 'px';
-            if (chartContainer) chartContainer.style.height = fsHeight;
-            if (tvContainer) tvContainer.style.height = fsHeight;
+            if (chartContainer) chartContainer.style.height = Math.max(480, window.innerHeight - 230) + 'px';
         } else {
-            // Exit Fullscreen
-            card.classList.remove('fixed', 'inset-0', 'z-50', 'bg-white', 'p-6', 'overflow-y-auto', 'shadow-2xl');
-            card.classList.add('apple-box');
+            card.classList.remove('fixed', 'inset-0', 'z-[9999]', 'p-6', 'overflow-y-auto', 'shadow-2xl');
+            card.style.backgroundColor = '';
             if (icon) icon.className = "fa-solid fa-expand text-[11px]";
             if (text) text.innerText = "Full Screen";
-
             if (chartContainer) chartContainer.style.height = '480px';
-            if (tvContainer) tvContainer.style.height = '580px';
         }
 
         setTimeout(() => {
@@ -4028,15 +3872,52 @@
             if (showVP && window._lastVolumeProfile) {
                 renderVolumeProfileHistogram(window._lastVolumeProfile);
             }
-        }, 150);
+        }, 120);
     }
 
-    // ESC Key listener to exit fullscreen gracefully
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && window._isChartFullscreen) {
-            toggleFullScreenChart();
+    async function toggleFullScreenChart() {
+        const card = document.getElementById('chart-main-card');
+        if (!card) return;
+        const enterFS = !window._isChartFullscreen;
+
+        if (enterFS) {
+            if (card.requestFullscreen) {
+                try { await card.requestFullscreen(); } catch (e) {}
+            }
+            _syncFullscreenChartUI(true);
+        } else {
+            if (document.fullscreenElement && document.exitFullscreen) {
+                try { await document.exitFullscreen(); } catch (e) {}
+            }
+            _syncFullscreenChartUI(false);
+        }
+    }
+
+    document.addEventListener('fullscreenchange', () => {
+        if (!document.fullscreenElement && window._isChartFullscreen) {
+            _syncFullscreenChartUI(false);
+        } else if (document.fullscreenElement) {
+            _syncFullscreenChartUI(true);
         }
     });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && window._isChartFullscreen && !document.fullscreenElement) {
+            _syncFullscreenChartUI(false);
+        }
+    });
+
+    window.applyChartTheme = function(themeName) {
+        if (!lwChart) return;
+        const styles = getComputedStyle(document.documentElement);
+        const bg = styles.getPropertyValue('--chart-bg').trim() || '#f8f9fb';
+        const grid = styles.getPropertyValue('--chart-grid').trim() || 'rgba(15, 23, 42, 0.05)';
+        const textCol = styles.getPropertyValue('--chart-text').trim() || '#374151';
+        lwChart.applyOptions({
+            layout: { background: { color: bg }, textColor: textCol },
+            grid: { vertLines: { color: grid }, horzLines: { color: grid } }
+        });
+    };
 
     // -------------------------------------------------------------------------
     // APPLE STYLE PATTERN ANATOMY & RELEVANCE MODAL CONTROLLER
@@ -4605,7 +4486,7 @@
                     const liveSpot = parseFloat(currentActiveOpp.spot);
                     const spotEl = document.getElementById('quote-spot');
                     if (spotEl) spotEl.innerText = `₹${liveSpot.toLocaleString('en-IN')}`;
-                    if (candleSeries && window._latestCandle && activeChartMode === 'algo') {
+                    if (candleSeries && window._latestCandle) {
                         const liveCandle = {
                             time: window._latestCandle.time,
                             open: window._latestCandle.open,
@@ -6988,14 +6869,10 @@
             switchMasterMarketSegment('COMMODITY');
         }
 
-        if (activeChartMode === 'tv') {
-            setTimeout(() => initTradingViewWidget(activeAssetKey, activeTimeframe), 250);
-        } else {
-            setTimeout(() => {
-                if (!lwChart) initCandlestickChart();
-                fetchCandlestickData();
-            }, 100);
-        }
+        setTimeout(() => {
+            if (!lwChart) initCandlestickChart();
+            fetchCandlestickData();
+        }, 100);
         fetchCandlestickData();
         fetchOpportunities();
         fetchSniperScan();

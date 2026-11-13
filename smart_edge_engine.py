@@ -44,6 +44,7 @@ class SmartEdgePosition:
     target_2_spot: float = 0.0
     highest_premium: float = 0.0
     highest_spot: float = 0.0
+    lowest_spot: float = 0.0
     entry_time_iso: str = ""
     signal_time_iso: str = ""
     expiry_date: str = ""
@@ -482,11 +483,13 @@ class NiftySmartEdgeEngine:
             pos.current_premium = last_flashed if last_flashed > 0.05 else pos.entry_premium
         pos.pnl = round((pos.current_premium - pos.entry_premium) * pos.quantity, 2)
 
-        # Track high watermarks
+        # Track high & low watermarks
         if pos.current_premium > pos.highest_premium:
             pos.highest_premium = pos.current_premium
         if current_spot > pos.highest_spot:
             pos.highest_spot = current_spot
+        if current_spot > 0 and (pos.lowest_spot <= 0 or current_spot < pos.lowest_spot):
+            pos.lowest_spot = current_spot
 
         # ---------------------------------------------------------------------
         # 1. SPECIALIZED TRADE STYLE MONITORS & MULTI-TIERED TRAILING PROFIT LOCKS
@@ -759,7 +762,8 @@ class NiftySmartEdgeEngine:
                 risk_pts = pos.underlying_structural_sl - pos.underlying_entry_spot
                 if risk_pts > 0 and (pos.underlying_entry_spot - current_spot) >= risk_pts:
                     pos.is_trailing_active = True
-                    new_sl = pos.highest_spot + pos.atr_at_entry
+                    low_ref = pos.lowest_spot if pos.lowest_spot > 0 else current_spot
+                    new_sl = low_ref + pos.atr_at_entry
                     if new_sl < pos.underlying_structural_sl:
                         pos.underlying_structural_sl = new_sl
 
@@ -1338,6 +1342,9 @@ class NiftySmartEdgeEngine:
             else:
                 mtf_thesis = cond_list
 
+            _ak = str(getattr(contract, "asset_key", "NIFTY") or "NIFTY").upper()
+            _dyn_atr = 95.0 if "SENSEX" in _ak else (65.0 if "BANKNIFTY" in _ak else (30.0 if "FINNIFTY" in _ak else (22.0 if "NIFTY" in _ak else round(max(4.0, spot * 0.004), 1))))
+
             new_pos = SmartEdgePosition(
                 position_id=pos_id,
                 security_id=contract.security_id,
@@ -1354,10 +1361,11 @@ class NiftySmartEdgeEngine:
                 target_2_spot=signal.target_2_spot,
                 highest_premium=contract.estimated_premium,
                 highest_spot=spot,
+                lowest_spot=spot,
                 entry_time_iso=exec_time_str,
                 signal_time_iso=sig_time_str,
                 expiry_date=contract.expiry_date,
-                atr_at_entry=25.0,
+                atr_at_entry=_dyn_atr,
                 strike_price=contract.strike_price,
                 trade_style=trade_style,
                 target_premium=target_premium,
@@ -1562,15 +1570,19 @@ class NiftySmartEdgeEngine:
                     ]
                 else:
                     valid_opps = []
-                # High-Confluence Institutional Selection:
+                # Opening Bell Noise Shield: Avoid 09:15 - 09:25 opening spread whipsaws
+                if is_equity_open and "09:15" <= now_hm_curr < "09:25":
+                    valid_opps = []
+
+                # High-Confluence Institutional Selection (Strict >= 80% + Trend & Candle Confirmation):
                 for top_opp in valid_opps:
                     # Check per-instrument cooldown
                     is_asset_cd, _ = global_trade_lock.is_cooldown_active(top_opp["key"])
                     if is_asset_cd:
                         continue
 
-                    # Require strong institutional confluence (score >= 70%)
-                    if not top_opp.get("is_actionable") or top_opp.get("confluence_score", 0) < 70:
+                    # Require high-conviction institutional confluence (score >= 80%)
+                    if not top_opp.get("is_actionable") or top_opp.get("confluence_score", 0) < 80:
                         continue
                     asset_key = top_opp["key"]
                     opp_action = "BUY_CE" if any(x in top_opp["action"].upper() for x in ["CE", "CALL", "BULLISH"]) else ("BUY_PE" if any(x in top_opp["action"].upper() for x in ["PE", "PUT", "BEARISH"]) else None)
@@ -1583,23 +1595,33 @@ class NiftySmartEdgeEngine:
                     mtf_lvls = mtf_engine.calculate_institutional_levels(opp_spot, asset_key)
                     real_vwap = mtf_lvls.get("vwap", opp_spot)
                     # Strict VWAP Directional Alignment:
-                    # Never buy Calls below VWAP (resisting ceiling). Never buy Puts above VWAP (supporting floor).
                     if opp_action == "BUY_CE" and opp_spot < real_vwap:
                         continue
                     if opp_action == "BUY_PE" and opp_spot > real_vwap:
                         continue
 
-                    # Candlestick breakdown check: Only reject if candle is aggressively breaking against trend
+                    # Fail-Closed Candle & EMA 9/21 Alignment Check:
                     df_bars = mtf_engine.get_real_candles(asset_key)
-                    if df_bars is not None and len(df_bars) >= 2:
-                        b_close = df_bars["close"].iloc[-1]
-                        prev_low = df_bars["low"].iloc[-2]
-                        prev_high = df_bars["high"].iloc[-2]
-                        # Don't buy CE if price is breaking below previous bar's low with heavy selling
-                        if opp_action == "BUY_CE" and b_close < (prev_low - (opp_spot * 0.0008)):
+                    if df_bars is None or len(df_bars) < 21:
+                        continue
+                    b_close = float(df_bars["close"].iloc[-1])
+                    b_open = float(df_bars["open"].iloc[-1])
+                    prev_low = float(df_bars["low"].iloc[-2])
+                    prev_high = float(df_bars["high"].iloc[-2])
+                    ema9_val = float(df_bars["close"].ewm(span=9, adjust=False).mean().iloc[-1])
+                    ema21_val = float(df_bars["close"].ewm(span=21, adjust=False).mean().iloc[-1])
+
+                    if opp_action == "BUY_CE":
+                        # Must have bullish EMA cascade, green/rising candle, and not breaking prev low
+                        if not (ema9_val > ema21_val and b_close >= b_open and b_close > ema9_val):
                             continue
-                        # Don't buy PE if price is breaking above previous bar's high with heavy buying
-                        if opp_action == "BUY_PE" and b_close > (prev_high + (opp_spot * 0.0008)):
+                        if b_close < (prev_low - (opp_spot * 0.0005)):
+                            continue
+                    elif opp_action == "BUY_PE":
+                        # Must have bearish EMA cascade, red/falling candle, and not breaking prev high
+                        if not (ema9_val < ema21_val and b_close <= b_open and b_close < ema9_val):
+                            continue
+                        if b_close > (prev_high + (opp_spot * 0.0005)):
                             continue
                     opp_spot = top_opp["spot"]
                     opp_contract = contract_selector.select_contract(

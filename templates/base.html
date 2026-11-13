@@ -14,149 +14,232 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Chart.js for High-Performance Native Charting -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <!-- Lightweight Charts (Native Financial Candlestick Engine - Zero Popups, Zero Fallbacks) -->
+    <!-- Lightweight Charts (Native Financial Candlestick Engine - Genuine Dhan Feed) -->
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
-    <!-- TradingView Advanced Real-Time Charting Library (Matches Dhan tv.dhan.co) -->
-    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
 
     <style>
-        :root {
-            --apple-canvas: #f5f5f7;
-            --apple-surface: #ffffff;
-            --apple-surface-secondary: #fbfbfd;
-            --apple-border: rgba(0, 0, 0, 0.06);
-            --apple-text: #1d1d1f;
-            --apple-muted: #86868b;
+        /* Curated Eye-Comfort Themes (Apple HIG + Modern Fintech) */
+        :root, [data-theme="daylight"] {
+            --apple-canvas: #eff1f5;
+            --apple-surface: #f8f9fb;
+            --apple-surface-secondary: #eef0f4;
+            --apple-header: rgba(248, 249, 251, 0.92);
+            --apple-border: rgba(15, 23, 42, 0.08);
+            --apple-text: #111827;
+            --apple-text-secondary: #374151;
+            --apple-muted: #4b5563;
             --apple-blue: #0071e3;
-            --apple-green: #34c759;
-            --apple-red: #ff3b30;
-            --apple-amber: #ff9500;
+            --apple-green: #16a34a;
+            --apple-red: #dc2626;
+            --apple-amber: #d97706;
+            --chart-bg: #f8f9fb;
+            --chart-grid: rgba(15, 23, 42, 0.05);
+            --chart-text: #374151;
+        }
+
+        [data-theme="paper"] {
+            --apple-canvas: #f2ede2;
+            --apple-surface: #faf7f0;
+            --apple-surface-secondary: #efe9dc;
+            --apple-header: rgba(250, 247, 240, 0.94);
+            --apple-border: rgba(41, 37, 36, 0.09);
+            --apple-text: #1c1917;
+            --apple-text-secondary: #44403c;
+            --apple-muted: #57534e;
+            --apple-blue: #1d4ed8;
+            --apple-green: #15803d;
+            --apple-red: #b91c1c;
+            --apple-amber: #b45309;
+            --chart-bg: #faf7f0;
+            --chart-grid: rgba(41, 37, 36, 0.05);
+            --chart-text: #44403c;
+        }
+
+        [data-theme="mist"] {
+            --apple-canvas: #e6ecf2;
+            --apple-surface: #f3f6fa;
+            --apple-surface-secondary: #e5ebf3;
+            --apple-header: rgba(243, 246, 250, 0.93);
+            --apple-border: rgba(15, 23, 42, 0.09);
+            --apple-text: #0f172a;
+            --apple-text-secondary: #334155;
+            --apple-muted: #475569;
+            --apple-blue: #0284c7;
+            --apple-green: #059669;
+            --apple-red: #e11d48;
+            --apple-amber: #d97706;
+            --chart-bg: #f3f6fa;
+            --chart-grid: rgba(15, 23, 42, 0.05);
+            --chart-text: #334155;
+        }
+
+        [data-theme="midnight"] {
+            --apple-canvas: #0b0f17;
+            --apple-surface: #131a26;
+            --apple-surface-secondary: #1b2434;
+            --apple-header: rgba(19, 26, 38, 0.92);
+            --apple-border: rgba(255, 255, 255, 0.09);
+            --apple-text: #f1f5f9;
+            --apple-text-secondary: #cbd5e1;
+            --apple-muted: #94a3b8;
+            --apple-blue: #38bdf8;
+            --apple-green: #34d399;
+            --apple-red: #fb7185;
+            --apple-amber: #fbbf24;
+            --chart-bg: #131a26;
+            --chart-grid: rgba(255, 255, 255, 0.05);
+            --chart-text: #cbd5e1;
         }
 
         body {
-            background-color: var(--apple-canvas);
-            color: var(--apple-text);
+            background-color: var(--apple-canvas) !important;
+            color: var(--apple-text) !important;
             font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Text', "Segoe UI", Roboto, sans-serif;
             min-height: 100vh;
             overflow-x: hidden;
             letter-spacing: -0.011em;
             -webkit-font-smoothing: antialiased;
+            transition: background-color 0.25s ease, color 0.25s ease;
         }
 
         .font-mono {
             font-family: 'JetBrains Mono', -apple-system-ui-monospace, monospace;
         }
 
-        /* Apple High-End Minimalist Card Standard (No heavy borders) */
+        /* Apple High-End Minimalist Card Standard */
         .apple-box {
-            background: #ffffff;
-            border: 1px solid rgba(0, 0, 0, 0.05);
+            background-color: var(--apple-surface) !important;
+            color: var(--apple-text) !important;
+            border: 1px solid var(--apple-border) !important;
             border-radius: 1.25rem;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02), 0 1px 3px rgba(0, 0, 0, 0.01);
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02);
+            transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .apple-box:hover {
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Global Contrast & Theme Adaptation for Soft Light & Midnight Modes */
+        .apple-box .bg-white, .bg-white\/95 {
+            background-color: var(--apple-surface) !important;
+        }
+        .apple-box .bg-slate-50, .apple-box .bg-slate-100 {
+            background-color: var(--apple-surface-secondary) !important;
+        }
+        .text-slate-900 {
+            color: var(--apple-text) !important;
+        }
+        .text-slate-800, .text-slate-700, .text-slate-600 {
+            color: var(--apple-text-secondary) !important;
+        }
+        .text-slate-500, .text-slate-400 {
+            color: var(--apple-muted) !important;
+        }
+        [data-theme="midnight"] .border-slate-200,
+        [data-theme="midnight"] .border-slate-200\/90,
+        [data-theme="midnight"] .border-slate-200\/80,
+        [data-theme="midnight"] .border-slate-100,
+        [data-theme="midnight"] .border-black\/\[0\.04\] {
+            border-color: rgba(255, 255, 255, 0.09) !important;
+        }
+        [data-theme="midnight"] .bg-slate-100,
+        [data-theme="midnight"] .bg-slate-50,
+        [data-theme="midnight"] .bg-white {
+            background-color: var(--apple-surface-secondary) !important;
+        }
+        [data-theme="midnight"] #pattern-horizon-banner {
+            background: linear-gradient(135deg, #161f2e, #1a2438) !important;
         }
 
         /* Apple-style thin smooth scrollbars */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(0, 0, 0, 0.15);
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(0, 0, 0, 0.25);
-        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.25); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(128, 128, 128, 0.45); }
 
         /* Apple Segmented Controls */
         .apple-seg-btn {
             background: transparent;
-            color: #6e6e73;
+            color: var(--apple-muted);
             border-radius: 0.75rem;
             transition: all 0.18s ease;
         }
         .apple-seg-btn:hover {
-            color: #1d1d1f;
+            color: var(--apple-text);
         }
         .apple-seg-btn.active {
-            background: #ffffff;
-            color: #1d1d1f;
+            background: var(--apple-surface);
+            color: var(--apple-text);
             font-weight: 700;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
         }
 
         /* Subtle Pills */
         .apple-pill-subtle {
-            background: #eef1f5;
-            color: #48484a;
-            border: 1px solid rgba(0, 0, 0, 0.03);
+            background: var(--apple-surface-secondary);
+            color: var(--apple-text-secondary);
+            border: 1px solid var(--apple-border);
             transition: all 0.15s ease;
         }
         .apple-pill-subtle:hover {
-            background: #e2e6eb;
-            color: #1d1d1f;
+            filter: brightness(0.95);
+            color: var(--apple-text);
         }
         .apple-pill-subtle.active {
-            background: #1d1d1f;
+            background: var(--apple-blue);
             color: #ffffff;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+            box-shadow: 0 2px 6px rgba(0, 113, 227, 0.25);
         }
 
         /* Tick flash */
         @keyframes tick-up {
-            0% { background-color: rgba(52, 199, 89, 0.25); }
+            0% { background-color: rgba(52, 199, 89, 0.22); }
             100% { background-color: transparent; }
         }
         @keyframes tick-down {
-            0% { background-color: rgba(255, 59, 48, 0.25); }
+            0% { background-color: rgba(255, 59, 48, 0.22); }
             100% { background-color: transparent; }
         }
         .flash-up { animation: tick-up 0.7s ease-out; }
         .flash-down { animation: tick-down 0.7s ease-out; }
 
-        /* Sleek scrollbar */
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
-        ::-webkit-scrollbar-track { background: #f5f5f7; }
-        ::-webkit-scrollbar-thumb { background: #d2d2d7; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #86868b; }
-        /* Solid Apple Header Guarantee */
+        /* Translucent Apple Frosted Header */
         header {
-            background-color: #ffffff !important;
+            background-color: var(--apple-header) !important;
+            backdrop-filter: blur(18px) saturate(180%);
+            -webkit-backdrop-filter: blur(18px) saturate(180%);
+            border-color: var(--apple-border) !important;
             z-index: 1000 !important;
         }
     </style>
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('algo_ui_theme') || 'daylight';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
 </head>
-<body class="flex flex-col selection:bg-blue-600 selection:text-white bg-[#f5f5f7]">
+<body class="flex flex-col selection:bg-blue-600 selection:text-white">
 
-    <!-- Grand Apple Solid Header (Sleek, Minimal, Zero Collision) -->
-    <header class="sticky top-0 z-50 px-4 md:px-8 py-3 bg-white border-b border-gray-200/80 shadow-xs" style="background-color: #ffffff !important; z-index: 1000;">
-        <div class="max-w-7xl mx-auto flex justify-between items-center relative z-20">
-            <!-- Brand & Tagline with Sacred Sarva Dharma Logo of Bhagawan Sri Sathya Sai Baba -->
-            <div class="flex items-center space-x-3">
-                <!-- Authentic Sri Sathya Sai Sarva Dharma Page Logo -->
+    <!-- Grand Apple Frosted Header (Sleek, Single-Line, Zero Collision) -->
+    <header class="sticky top-0 z-50 px-4 md:px-6 py-2.5 border-b shadow-xs">
+        <div class="max-w-[1440px] mx-auto flex flex-wrap xl:flex-nowrap justify-between items-center gap-2 relative z-20">
+            <!-- Brand & Tagline with Sacred Sarva Dharma Logo -->
+            <div class="flex items-center space-x-2.5 flex-shrink-0">
                 <div class="relative group cursor-pointer flex-shrink-0" onclick="playDeityChant('SAIBABA')" 
-                    title="Sacred Sarva Dharma Symbol of Bhagawan Sri Sathya Sai Baba (Sarva Dharma Samanvaya — Unity of All Faiths, Truth & Universal Love). Click to play Bhagawan's Divine Chants.">
-                    <div class="w-10 h-10 md:w-11 md:h-11 rounded-full p-[2px] bg-gradient-to-tr from-amber-400 via-yellow-200 to-orange-500 shadow-md hover:scale-105 transition-transform duration-200 flex items-center justify-center">
-                        <img src="/static/images/sarva_dharma_icon.png" alt="Sathya Sai Sarva Dharma Emblem" class="w-full h-full rounded-full object-contain bg-white shadow-2xs">
+                    title="Sacred Sarva Dharma Symbol of Bhagawan Sri Sathya Sai Baba. Click to play Divine Chants.">
+                    <div class="w-9 h-9 rounded-full p-[2px] bg-gradient-to-tr from-amber-400 via-yellow-200 to-orange-500 shadow-sm hover:scale-105 transition-transform duration-200 flex items-center justify-center">
+                        <img src="/static/images/sarva_dharma_icon.png" alt="Sathya Sai Sarva Dharma Emblem" class="w-full h-full rounded-full object-contain bg-white">
                     </div>
                 </div>
 
-                <div>
-                    <div class="flex items-center space-x-2">
-                        <span class="font-bold text-base md:text-lg tracking-tight text-slate-900 flex items-center space-x-1">
-                            <span>Vijay Sai's Dhan Algo</span>
-                        </span>
-                        <!-- Live Trading Mode Pill -->
-                        <span id="nav-mode-badge" class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider font-mono {% if config.trading_mode == 'LIVE' %}bg-rose-50 text-rose-600 border border-rose-200{% else %}bg-emerald-50 text-emerald-700 border border-emerald-200{% endif %}">
-                            {{ config.trading_mode }}
-                        </span>
+                <div class="flex items-center space-x-2 whitespace-nowrap">
+                    <span class="font-bold text-sm md:text-base tracking-tight text-slate-900 whitespace-nowrap">
+                        Vijay Sai's Dhan Algo
+                    </span>
+                    <span id="nav-mode-badge" class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider font-mono {% if config.trading_mode == 'LIVE' %}bg-rose-500/15 text-rose-600 border border-rose-500/30{% else %}bg-emerald-500/15 text-emerald-700 border border-emerald-500/30{% endif %}">
+                        {{ config.trading_mode }}
+                    </span>
                         <!-- Dhan API Connection Status Pill (Server Ground-Truth) -->
                         {% if is_dhan_connected %}
                         <button onclick="openDhanTokenModal()" id="nav-dhan-badge" class="text-[10px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 hover:border-emerald-300 transition flex items-center space-x-1.5 shadow-2xs" title="Click to manage or refresh your Dhan API session">
@@ -169,83 +252,102 @@
                             <span id="nav-dhan-text">Check Token</span>
                         </button>
                         {% endif %}
-                    </div>
                 </div>
             </div>
 
             <!-- Clean Minimal Nav Links -->
-            <nav class="hidden md:flex items-center space-x-1 text-xs font-semibold text-slate-600">
-                <a href="/" class="px-3 py-1.5 rounded-lg text-slate-900 bg-slate-100 font-bold flex items-center space-x-1.5">
+            <nav class="hidden md:flex items-center space-x-1 text-xs font-semibold text-slate-600 flex-shrink-0">
+                <a href="/" class="px-3 py-1.5 rounded-lg text-slate-900 bg-slate-100 font-bold flex items-center space-x-1.5 whitespace-nowrap">
                     <i class="fa-solid fa-layer-group text-blue-600 text-[11px]"></i><span>Desk</span>
                 </a>
-                <a href="/journal" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition flex items-center space-x-1.5">
-                    <i class="fa-solid fa-book-bookmark text-slate-400 text-[11px]"></i><span>Journal & Taxes</span>
+                <a href="/journal" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition flex items-center space-x-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-book-bookmark text-[11px]"></i><span>Journal</span>
                 </a>
-                <a href="/webhook-guide" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition flex items-center space-x-1.5">
-                    <i class="fa-solid fa-satellite-dish text-slate-400 text-[11px]"></i><span>Webhooks</span>
+                <a href="/webhook-guide" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition flex items-center space-x-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-satellite-dish text-[11px]"></i><span>Webhooks</span>
                 </a>
-                <a href="/settings" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition flex items-center space-x-1.5">
-                    <i class="fa-solid fa-sliders text-slate-400 text-[11px]"></i><span>Settings</span>
+                <a href="/settings" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition flex items-center space-x-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-sliders text-[11px]"></i><span>Settings</span>
                 </a>
             </nav>
 
-            <!-- Quick Push Alert, Auspicious Bell, Daily Mantra & Account ID -->
-            <div class="flex items-center space-x-1.5 md:space-x-2">
+            <!-- Theme Selector, Live Balances & Actions -->
+            <div class="flex items-center space-x-1.5 flex-shrink-0">
+                <!-- Curated Eye-Comfort Theme Switcher -->
+                <div class="relative flex items-center">
+                    <select id="ui-theme-selector" onchange="setAlgoTheme(this.value)" title="Switch Eye-Comfort Theme (Soft Daylight, Warm Paper, Slate Mist, Midnight Pro)"
+                        class="px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-100 text-slate-800 border border-black/[0.06] cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+                        <option value="daylight">🌤️ Soft Daylight</option>
+                        <option value="paper">📜 Warm Paper</option>
+                        <option value="mist">🌫️ Slate Mist</option>
+                        <option value="midnight">🌙 Midnight Pro</option>
+                    </select>
+                </div>
+
                 <!-- Auspicious Temple Bell Chime -->
                 <button onclick="ringTempleBell(true)" id="btn-temple-bell" 
-                    class="px-2.5 py-1 rounded-xl text-xs font-semibold text-amber-900 bg-gradient-to-r from-amber-50 to-yellow-100 hover:from-amber-100 hover:to-yellow-200 border border-amber-300 shadow-2xs hover:shadow-xs transition flex items-center space-x-1.5 active:scale-95" 
-                    title="Ring Auspicious Temple Bell (Ghanta Nada) for clarity & divine blessings. Rings automatically at 09:00 (MCX) and 09:15 (NSE).">
+                    class="px-2 py-1 rounded-xl text-xs font-semibold text-amber-900 bg-gradient-to-r from-amber-50 to-yellow-100 hover:from-amber-100 hover:to-yellow-200 border border-amber-300 shadow-2xs transition flex items-center space-x-1 active:scale-95" 
+                    title="Ring Auspicious Temple Bell (Ghanta Nada)">
                     <span class="text-sm">🔔</span>
-                    <span class="hidden xl:inline font-bold">Temple Bell</span>
                 </button>
 
                 <!-- Daily Sacred Vedic Mantra Pill -->
                 <button onclick="openDevotionalModal()" id="btn-daily-mantra" 
-                    class="px-2.5 py-1 rounded-xl text-xs font-semibold text-orange-950 bg-gradient-to-r from-orange-50 via-amber-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100 border border-amber-300 shadow-2xs hover:shadow-xs transition flex items-center space-x-1.5 active:scale-95" 
-                    title="Today's Vedic Mantra & Divine Trading Wisdom. Click to read and hear sacred chants.">
+                    class="px-2 py-1 rounded-xl text-xs font-semibold text-orange-950 bg-gradient-to-r from-orange-50 via-amber-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100 border border-amber-300 shadow-2xs transition flex items-center space-x-1 active:scale-95" 
+                    title="Today's Vedic Mantra & Divine Trading Wisdom">
                     <span class="text-sm">🕉️</span>
-                    <span id="nav-mantra-title" class="hidden sm:inline font-bold">Daily Mantra</span>
+                    <span id="nav-mantra-title" class="hidden 2xl:inline font-bold">Mantra</span>
                 </button>
 
                 <!-- Live Dhan Real Cash Balance -->
-                <div class="hidden sm:flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-slate-100 border border-black/[0.04] text-xs font-mono" title="Live cash balance in your Dhan broker trading account. Reflects wallet deposits/top-ups in real-time.">
-                    <span class="text-[10px] font-sans font-bold text-slate-500 uppercase tracking-tight">Dhan Cash:</span>
+                <div class="hidden sm:flex items-center space-x-1.5 px-2.5 py-1 rounded-xl bg-slate-100 border border-black/[0.05] text-xs font-mono whitespace-nowrap" title="Live cash balance in your Dhan broker trading account">
+                    <span class="text-[10px] font-sans font-bold text-slate-500 uppercase">Cash:</span>
                     <span id="nav-dhan-cash" class="font-black text-slate-900">₹{{"%.2f"|format(real_cash_balance|default(0.0))}}</span>
-                    <button onclick="syncDhanFunds(this)" title="Sync live Dhan wallet balance" class="text-slate-400 hover:text-blue-600 transition ml-0.5">
+                    <button onclick="syncDhanFunds(this)" title="Sync live Dhan wallet balance" class="text-slate-500 hover:text-blue-600 transition">
                         <i id="nav-funds-sync-icon" class="fa-solid fa-arrows-rotate text-[10px]"></i>
                     </button>
                 </div>
 
-                <!-- Live 1-Second Net P&L Stream (Realized + Unrealized) -->
-                <div id="nav-live-net-pnl-pill" class="flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-slate-100 border border-black/[0.04] text-xs font-mono transition-colors duration-200" title="Real-time Net P&L updating second-by-second (Realized + Open Position).">
+                <!-- Live 1-Second Net P&L Stream -->
+                <div id="nav-live-net-pnl-pill" class="flex items-center space-x-1.5 px-2.5 py-1 rounded-xl bg-slate-100 border border-black/[0.05] text-xs font-mono whitespace-nowrap transition-colors duration-200" title="Real-time Net P&L">
                     <div id="nav-pnl-dot" class="w-2 h-2 rounded-full bg-slate-400"></div>
-                    <span class="text-[10px] font-sans font-bold text-slate-500 uppercase tracking-tight">Net P&L:</span>
+                    <span class="text-[10px] font-sans font-bold text-slate-500 uppercase">P&L:</span>
                     <span id="nav-live-net-pnl-val" class="font-black text-slate-700">₹0.00</span>
                 </div>
 
-                <button onclick="clearSystemCache(this)" title="Instantly clear in-memory feed caches and free system memory" 
-                    class="px-2 py-1 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition flex items-center space-x-1 cursor-pointer">
+                <button onclick="clearSystemCache(this)" title="Clear in-memory feed caches" 
+                    class="px-2 py-1 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition flex items-center cursor-pointer">
                     <i class="fa-solid fa-broom text-amber-600 text-[11px]" id="clear-cache-icon"></i>
-                    <span class="hidden xl:inline">Clear Cache</span>
                 </button>
                 <button onclick="triggerQuickPush()" title="Send Push Notification to paired phone" 
-                    class="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition flex items-center space-x-1">
+                    class="px-2 py-1 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition flex items-center cursor-pointer">
                     <i class="fa-solid fa-mobile-screen-button text-blue-600 text-[11px]"></i>
-                    <span class="hidden sm:inline">Push Alert</span>
                 </button>
-                <!-- Mobile Access Link & QR Code Button -->
-                <button onclick="openMobileAccessModal()" title="Access dashboard on iPhone, Android or iPad over Wi-Fi or 4G/5G" 
-                    class="px-2.5 py-1 rounded-lg text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition flex items-center space-x-1 shadow-2xs active:scale-95">
-                    <i class="fa-solid fa-mobile-screen text-blue-600 text-[11px]"></i>
-                    <span class="hidden sm:inline font-bold">Mobile Link</span>
+                <button onclick="openMobileAccessModal()" title="Mobile Link & QR Code" 
+                    class="px-2.5 py-1 rounded-lg text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition flex items-center space-x-1 active:scale-95">
+                    <i class="fa-solid fa-qrcode text-blue-600 text-[11px]"></i>
+                    <span class="hidden 2xl:inline font-bold">Mobile</span>
                 </button>
-                <div class="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-100 text-xs text-slate-600 font-mono">
-                    <span class="text-slate-400">ID:</span>
+                <div class="hidden lg:flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-100 text-[11px] text-slate-600 font-mono whitespace-nowrap">
                     <span class="font-bold text-slate-900">{{ config.client_id }}</span>
                 </div>
             </div>
         </div>
     </header>
+    <script>
+        function setAlgoTheme(themeName) {
+            document.documentElement.setAttribute('data-theme', themeName);
+            localStorage.setItem('algo_ui_theme', themeName);
+            if (typeof window.applyChartTheme === 'function') {
+                window.applyChartTheme(themeName);
+            }
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            const sel = document.getElementById('ui-theme-selector');
+            const saved = localStorage.getItem('algo_ui_theme') || 'daylight';
+            if (sel) sel.value = saved;
+        });
+    </script>
 
     <!-- Main Content Canvas -->
     <main class="flex-1 px-4 md:px-8 py-5 max-w-7xl mx-auto w-full relative">
