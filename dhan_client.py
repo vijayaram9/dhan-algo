@@ -203,11 +203,11 @@ class DhanTraderClient:
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    val = float(data.get("paper_capital", 1500000.0))
-                    return 1500000.0 if val < 1000000.0 else val
+                    val = float(data.get("paper_capital", 150000.0))
+                    return 150000.0 if val < 150000.0 else val
             except Exception:
                 pass
-        return 1500000.0
+        return 150000.0
 
     def set_paper_capital(self, amount: float):
         import os

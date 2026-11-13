@@ -151,9 +151,10 @@ class NiftySmartEdgeEngine:
         self.cooldown_until: Optional[datetime.datetime] = None
         self.in_recovery_mode: bool = False
         self.auto_pilot_enabled: bool = True
-        self.dynamic_min_confluence: int = 75
+        self.dynamic_min_confluence: int = 72
         self._last_3h_audit_ts: float = 0.0
         self.last_3h_audit_summary: dict = {}
+        self._asset_cooldowns: dict = {}
         
         self.recent_audit_records: List[SignalAuditRecord] = []
         self.last_candle_minute: Optional[int] = None
@@ -646,13 +647,14 @@ class NiftySmartEdgeEngine:
                     self.log_sniper_event(msg, "PROFIT")
 
             # 3. Multi-Tiered Dynamic Trailing Stop & Profit Lock for Swing:
-            # Tier 1 (+8% premium gain or +18 pts): Move stop to Breakeven (+1.5 pts). Trade is 100% Risk-Free!
+            # Tier 1 (+8% premium gain or +18 pts): Move stop above entry + estimated charges so it is genuinely net-positive!
             if (prem_gain_pct >= 8.0 or prem_gain >= 18.0) and pos.trailing_step_level < 1:
-                pos.hard_stop_premium = max(pos.hard_stop_premium, round(pos.entry_premium + 1.5, 2))
+                fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
+                pos.hard_stop_premium = max(pos.hard_stop_premium, round(pos.entry_premium + fee_buf, 2))
                 pos.is_trailing_active = True
                 pos.trailing_step_level = 1
-                pos.locked_profit_inr = round(1.5 * pos.quantity, 2)
-                print(f"[SWING TIER 1] 🌊 Breakeven Locked @ ₹{pos.hard_stop_premium:.2f} (Risk-Free)")
+                pos.locked_profit_inr = round(fee_buf * pos.quantity, 2)
+                print(f"[SWING TIER 1] 🌊 Net Breakeven+ Locked @ ₹{pos.hard_stop_premium:.2f} (Risk-Free)")
 
             # Tier 2 (+16% premium gain): Lock in at least +10% profit!
             if (prem_gain_pct >= 16.0 or prem_gain >= 35.0) and pos.trailing_step_level < 2:
@@ -672,8 +674,10 @@ class NiftySmartEdgeEngine:
 
             # Check Hard / Trailing Premium Stop
             if pos.current_premium <= pos.hard_stop_premium:
-                if pos.hard_stop_premium > pos.entry_premium:
+                if pos.hard_stop_premium > pos.entry_premium and pos.pnl > 120.0:
                     return True, f"🔒 Swing Trailing Profit Locked: Exited @ ₹{pos.current_premium:.2f} (Secured +₹{pos.pnl:.2f})!"
+                elif pos.hard_stop_premium > pos.entry_premium:
+                    return True, f"🛡️ Swing Breakeven/Slippage Stop: Exited @ ₹{pos.current_premium:.2f} (Gross ₹{pos.pnl:+.2f})"
                 else:
                     return True, f"Layer 2 Hard Premium Stop Hit @ ₹{pos.current_premium:.2f} (-20% stop: ₹{pos.hard_stop_premium:.2f})"
 
@@ -741,9 +745,14 @@ class NiftySmartEdgeEngine:
                 if pos.underlying_structural_sl > 0 and current_spot <= (pos.underlying_structural_sl - structural_buffer) and pos.current_premium <= pos.entry_premium and elapsed_seconds >= 60.0:
                     return True, f"Layer 1 Structural Invalidation: {asset_k} {current_spot:.1f} broke swing low {pos.underlying_structural_sl:.1f} (buffer: {structural_buffer:.1f}pts)"
 
-                # Target 1 (1.5R) reached (CE: underlying rises to or above target; requires minimum 15s)
+                # Target 1 (1.5R) reached (CE: underlying rises to or above target; require >= ₹220 gross to clear brokerage+taxes)
                 if pos.target_1_spot > pos.underlying_entry_spot and current_spot >= pos.target_1_spot and elapsed_seconds >= 15.0:
-                    return True, f"Target 1 (1.5R) Reached @ Spot {current_spot:.1f} (Target: {pos.target_1_spot:.1f})"
+                    if pos.pnl >= 220.0:
+                        return True, f"Target 1 (1.5R) Reached @ Spot {current_spot:.1f} (Target: {pos.target_1_spot:.1f})"
+                    else:
+                        fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
+                        pos.hard_stop_premium = max(pos.hard_stop_premium, round(pos.entry_premium + fee_buf, 2))
+                        pos.is_trailing_active = True
 
                 # Trailing Stop: 1 ATR movement after 1R
                 risk_pts = pos.underlying_entry_spot - pos.underlying_structural_sl
@@ -758,9 +767,14 @@ class NiftySmartEdgeEngine:
                 if pos.underlying_structural_sl > 0 and current_spot >= (pos.underlying_structural_sl + structural_buffer) and pos.current_premium <= pos.entry_premium and elapsed_seconds >= 60.0:
                     return True, f"Layer 1 Structural Invalidation: {asset_k} {current_spot:.1f} broke swing high {pos.underlying_structural_sl:.1f} (buffer: {structural_buffer:.1f}pts)"
 
-                # Target 1 (1.5R) reached (PE: underlying falls to or below target; requires minimum 15s)
+                # Target 1 (1.5R) reached (PE: underlying falls to or below target; require >= ₹220 gross to clear brokerage+taxes)
                 if 0 < pos.target_1_spot < pos.underlying_entry_spot and current_spot <= pos.target_1_spot and elapsed_seconds >= 15.0:
-                    return True, f"Target 1 (1.5R) Reached @ Spot {current_spot:.1f} (Target: {pos.target_1_spot:.1f})"
+                    if pos.pnl >= 220.0:
+                        return True, f"Target 1 (1.5R) Reached @ Spot {current_spot:.1f} (Target: {pos.target_1_spot:.1f})"
+                    else:
+                        fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
+                        pos.hard_stop_premium = max(pos.hard_stop_premium, round(pos.entry_premium + fee_buf, 2))
+                        pos.is_trailing_active = True
 
                 risk_pts = pos.underlying_structural_sl - pos.underlying_entry_spot
                 if risk_pts > 0 and (pos.underlying_entry_spot - current_spot) >= risk_pts:
@@ -885,15 +899,16 @@ class NiftySmartEdgeEngine:
         else:
             self.active_positions = [p for p in self.active_positions if getattr(p, "position_id", "") != getattr(pos, "position_id", "")]
 
-        # Release Global Trade Lock & engage configured Cooldown (default 300s)
+        # Release Global Trade Lock & engage 10-minute per-asset cooldown (so other instruments stay active!)
         try:
             from global_trade_lock import global_trade_lock
-            base_cd = int(getattr(config, "cooldown_seconds", 60))
-            # Anti-revenge-trading: Stand down 5 minutes after any loss so the engine never re-enters into adverse chop
-            cd_secs = max(base_cd, 300) if pos.pnl < 0 else max(base_cd, 60)
-            self.cooldown_until = datetime.datetime.now() + datetime.timedelta(seconds=cd_secs)
-            global_trade_lock.release_lock(position_id=getattr(pos, "position_id", ""), cooldown_seconds=cd_secs)
-            print(Fore.CYAN + f"[GlobalTradeLock] Lock released. Cooldown active for {cd_secs}s.")
+            closed_asset = getattr(pos, "asset_key", "")
+            if closed_asset:
+                if not hasattr(self, "_asset_cooldowns"):
+                    self._asset_cooldowns = {}
+                self._asset_cooldowns[closed_asset] = datetime.datetime.now() + datetime.timedelta(seconds=600)
+            global_trade_lock.release_lock(position_id=getattr(pos, "position_id", ""), cooldown_seconds=0)
+            print(Fore.CYAN + f"[GlobalTradeLock] Lock released. 10m per-asset cooldown set for {closed_asset}; other assets remain active.")
         except Exception as e:
             print(f"[GlobalTradeLock Exit Error] {e}")
 
@@ -1598,12 +1613,13 @@ class NiftySmartEdgeEngine:
                 if is_equity_open and "09:15" <= now_hm_curr < "09:25":
                     valid_opps = []
 
-                # High-Confluence Institutional Selection (Dynamic 75-82% + Trend & Candle Confirmation):
-                min_conf = getattr(self, "dynamic_min_confluence", 75)
+                # High-Confluence Institutional Selection (Dynamic 72-80% + Trend & Candle Confirmation):
+                min_conf = getattr(self, "dynamic_min_confluence", 72)
                 for top_opp in valid_opps:
-                    # Check per-instrument cooldown
+                    # Check per-instrument 10-minute cooldown
                     is_asset_cd, _ = global_trade_lock.is_cooldown_active(top_opp["key"])
-                    if is_asset_cd:
+                    asset_cd_until = getattr(self, "_asset_cooldowns", {}).get(top_opp["key"])
+                    if is_asset_cd or (asset_cd_until is not None and datetime.datetime.now() < asset_cd_until):
                         continue
 
                     # Require high-conviction institutional confluence
