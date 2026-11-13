@@ -3,50 +3,50 @@
 {% block content %}
 <div class="space-y-4">
 
-    <!-- 0. TOP GLANCEABLE LIVE SCRIP & INSTITUTIONAL LEVELS HUD (ZERO SCROLLING NEEDED) -->
-    <div id="top-glance-hud" class="apple-box p-3 sm:p-4 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg border border-slate-700/80 sticky top-14 z-30 mb-2">
+    <!-- 0. TOP GLANCEABLE LIVE SCRIP & INSTITUTIONAL LEVELS HUD (Clean Light Minimalist Design) -->
+    <div id="top-glance-hud" class="apple-box p-3 sm:p-4 bg-white/95 backdrop-blur-md text-slate-900 shadow-xs border border-slate-200/90 sticky top-14 z-30 mb-2">
         <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2.5">
             <!-- Left: Live Spot, Price Tick & Trend Direction -->
             <div class="flex flex-wrap items-center gap-2.5">
                 <div class="flex items-center space-x-2">
-                    <span class="w-3 h-3 rounded-full bg-emerald-400 animate-ping" id="top-spot-pulse"></span>
-                    <span class="text-sm sm:text-base font-black font-mono tracking-tight text-white" id="top-asset-name">NIFTY 50</span>
-                    <span class="text-[10px] px-2 py-0.5 rounded font-bold font-mono bg-blue-500/20 text-blue-300 border border-blue-400/30" id="top-asset-exchange">NSE</span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" id="top-spot-pulse"></span>
+                    <span class="text-sm sm:text-base font-black font-mono tracking-tight text-slate-900" id="top-asset-name">NIFTY 50</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200" id="top-asset-exchange">NSE</span>
                 </div>
                 <div class="flex items-baseline space-x-1.5">
-                    <span class="text-xl sm:text-2xl font-black font-mono text-emerald-400 transition-colors duration-300" id="top-spot-price">₹{{ "%.2f"|format(live_spot|default(24330.0)) }}</span>
-                    <span class="text-xs font-mono font-bold text-emerald-300" id="top-spot-change">+45.20 (+0.19%)</span>
+                    <span class="text-xl sm:text-2xl font-black font-mono text-slate-900 transition-colors duration-300" id="top-spot-price">₹{{ "%.2f"|format(live_spot|default(24330.0)) }}</span>
+                    <span class="text-xs font-mono font-bold text-emerald-600" id="top-spot-change">+45.20 (+0.19%)</span>
                 </div>
-                <span class="text-[10px] px-2.5 py-0.5 rounded-full font-black uppercase font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40" id="top-regime-badge">
+                <span class="text-[10px] px-2.5 py-0.5 rounded-full font-black uppercase font-mono bg-emerald-50 text-emerald-700 border border-emerald-200" id="top-regime-badge">
                     🟢 MOMENTUM TREND (BUY CE)
                 </span>
             </div>
 
             <!-- Center: Institutional Floor Trader Pivots, VWAP & Range (At a Single Glance!) -->
             <div class="grid grid-cols-3 sm:grid-cols-6 gap-1.5 text-[11px] font-mono w-full lg:w-auto">
-                <div class="px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-center" title="Intraday Volume-Weighted Average Price">
-                    <div class="text-[9px] text-slate-400 font-sans">VWAP</div>
-                    <div class="font-bold text-amber-300" id="top-level-vwap">₹23,790</div>
+                <div class="px-2 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-center" title="Intraday Volume-Weighted Average Price">
+                    <div class="text-[9px] text-slate-400 font-sans uppercase">VWAP</div>
+                    <div class="font-bold text-amber-600" id="top-level-vwap">₹--</div>
                 </div>
-                <div class="px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-center" title="Central Pivot Point">
-                    <div class="text-[9px] text-slate-400 font-sans">PIVOT (PP)</div>
-                    <div class="font-bold text-blue-300" id="top-level-pp">₹23,780</div>
+                <div class="px-2 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-center" title="Central Pivot Point">
+                    <div class="text-[9px] text-slate-400 font-sans uppercase">PIVOT (PP)</div>
+                    <div class="font-bold text-blue-600" id="top-level-pp">₹--</div>
                 </div>
-                <div class="px-2 py-1 rounded-lg bg-rose-500/10 border border-rose-500/30 text-center" title="Resistance 1">
-                    <div class="text-[9px] text-rose-300 font-sans">RES 1 (R1)</div>
-                    <div class="font-bold text-rose-300" id="top-level-r1">₹23,845</div>
+                <div class="px-2 py-1 rounded-lg bg-rose-50/70 border border-rose-200/80 text-center" title="Resistance 1">
+                    <div class="text-[9px] text-rose-500 font-sans uppercase">RES 1 (R1)</div>
+                    <div class="font-bold text-rose-700" id="top-level-r1">₹--</div>
                 </div>
-                <div class="px-2 py-1 rounded-lg bg-rose-500/10 border border-rose-500/30 text-center" title="Resistance 2">
-                    <div class="text-[9px] text-rose-300 font-sans">RES 2 (R2)</div>
-                    <div class="font-bold text-rose-300" id="top-level-r2">₹23,890</div>
+                <div class="px-2 py-1 rounded-lg bg-rose-50/70 border border-rose-200/80 text-center" title="Resistance 2">
+                    <div class="text-[9px] text-rose-500 font-sans uppercase">RES 2 (R2)</div>
+                    <div class="font-bold text-rose-700" id="top-level-r2">₹--</div>
                 </div>
-                <div class="px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-center" title="Support 1">
-                    <div class="text-[9px] text-emerald-300 font-sans">SUPP 1 (S1)</div>
-                    <div class="font-bold text-emerald-300" id="top-level-s1">₹23,745</div>
+                <div class="px-2 py-1 rounded-lg bg-emerald-50/70 border border-emerald-200/80 text-center" title="Support 1">
+                    <div class="text-[9px] text-emerald-500 font-sans uppercase">SUPP 1 (S1)</div>
+                    <div class="font-bold text-emerald-700" id="top-level-s1">₹--</div>
                 </div>
-                <div class="px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-center" title="Support 2">
-                    <div class="text-[9px] text-emerald-300 font-sans">SUPP 2 (S2)</div>
-                    <div class="font-bold text-emerald-300" id="top-level-s2">₹23,700</div>
+                <div class="px-2 py-1 rounded-lg bg-emerald-50/70 border border-emerald-200/80 text-center" title="Support 2">
+                    <div class="text-[9px] text-emerald-500 font-sans uppercase">SUPP 2 (S2)</div>
+                    <div class="font-bold text-emerald-700" id="top-level-s2">₹--</div>
                 </div>
             </div>
 
@@ -1479,43 +1479,43 @@
                 </div>
             </div>
 
-            <!-- Technical Chart Pattern & Predictive Horizon Intelligence Banner (Timeframe Specific + Candlestick Formations) -->
-            <div id="pattern-horizon-banner" class="mb-3 p-3 rounded-xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border border-indigo-800/40 shadow-sm transition-all">
+            <!-- Technical Chart Pattern & Predictive Horizon Intelligence Banner (Clean Light Minimalist Design) -->
+            <div id="pattern-horizon-banner" class="mb-3 p-3.5 rounded-2xl bg-gradient-to-r from-slate-50 via-blue-50/30 to-slate-50 text-slate-900 border border-slate-200/90 shadow-2xs transition-all">
                 <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5">
                     <div class="flex items-center space-x-2.5">
-                        <span class="p-1.5 rounded-lg bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs">
+                        <span class="p-2 rounded-xl bg-blue-50 border border-blue-200/80 text-blue-600 text-xs shadow-2xs">
                             <i class="fa-solid fa-wand-magic-sparkles"></i>
                         </span>
                         <div>
                             <div class="flex flex-wrap items-center gap-1.5">
-                                <span id="pat-badge-tf" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30 font-mono">5M TIMEFRAME</span>
-                                <span id="pat-badge-candle" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">CANDLE: TRENDING</span>
-                                <span id="pat-badge-bias" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">BULLISH</span>
-                                <span id="pat-badge-conf" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-200 border border-indigo-500/30 font-mono">85% CONF</span>
-                                <button onclick="openPatternExplanationModal()" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-white/10 hover:bg-white/20 text-indigo-200 border border-white/20 transition cursor-pointer flex items-center space-x-1" title="View in-depth trader explanation of this pattern"><i class="fa-solid fa-circle-question text-[10px]"></i><span>Why This Matters</span></button>
+                                <span id="pat-badge-tf" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200 font-mono">5M TIMEFRAME</span>
+                                <span id="pat-badge-candle" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200 font-mono">CANDLE: TRENDING</span>
+                                <span id="pat-badge-bias" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">BULLISH</span>
+                                <span id="pat-badge-conf" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono">85% CONF</span>
+                                <button onclick="openPatternExplanationModal()" class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition cursor-pointer flex items-center space-x-1 shadow-2xs" title="View in-depth trader explanation of this pattern"><i class="fa-solid fa-circle-question text-[10px] text-blue-600"></i><span>Why This Matters</span></button>
                             </div>
-                            <div class="text-sm font-bold text-white font-mono mt-1" id="pat-name-text">
+                            <div class="text-sm font-bold text-slate-900 font-mono mt-1" id="pat-name-text">
                                 DOUBLE BOTTOM (W-FORMATION) • REVERSAL CONFIRMATION
                             </div>
                         </div>
                     </div>
                     
-                    <div class="flex items-center gap-3 text-xs font-mono">
-                        <div class="text-left bg-black/30 px-2.5 py-1 rounded-lg border border-white/10">
-                            <div class="text-[9px] text-amber-300 uppercase">POC (Vol Node)</div>
-                            <div class="text-xs font-bold text-amber-300" id="pat-poc-val">₹--</div>
+                    <div class="flex items-center gap-2 text-xs font-mono">
+                        <div class="text-left bg-white px-3 py-1.5 rounded-xl border border-amber-200 shadow-2xs">
+                            <div class="text-[9px] text-slate-400 font-sans uppercase">POC (Vol Node)</div>
+                            <div class="text-xs font-bold text-amber-700" id="pat-poc-val">₹--</div>
                         </div>
-                        <div class="text-left bg-black/30 px-2.5 py-1 rounded-lg border border-white/10">
-                            <div class="text-[9px] text-emerald-400 uppercase">Projected Target</div>
-                            <div class="text-xs font-bold text-emerald-400" id="pat-target-val">₹--</div>
+                        <div class="text-left bg-white px-3 py-1.5 rounded-xl border border-emerald-200 shadow-2xs">
+                            <div class="text-[9px] text-slate-400 font-sans uppercase">Projected Target</div>
+                            <div class="text-xs font-bold text-emerald-700" id="pat-target-val">₹--</div>
                         </div>
-                        <div class="text-left bg-black/30 px-2.5 py-1 rounded-lg border border-white/10">
-                            <div class="text-[9px] text-rose-400 uppercase">Invalidation Stop</div>
-                            <div class="text-xs font-bold text-rose-400" id="pat-inval-val">₹--</div>
+                        <div class="text-left bg-white px-3 py-1.5 rounded-xl border border-rose-200 shadow-2xs">
+                            <div class="text-[9px] text-slate-400 font-sans uppercase">Invalidation Stop</div>
+                            <div class="text-xs font-bold text-rose-700" id="pat-inval-val">₹--</div>
                         </div>
                     </div>
                 </div>
-                <div class="mt-2 pt-2 border-t border-white/10 text-[11px] text-indigo-100/90 font-sans flex items-center justify-between">
+                <div class="mt-2.5 pt-2 border-t border-slate-200/80 text-[11px] text-slate-700 font-sans flex items-center justify-between">
                     <span id="pat-forecast-text">Analyzing live candlestick structures across multi-timeframe horizon...</span>
                     <span class="text-[10px] text-slate-400 font-mono">Real-time Dhan Feed</span>
                 </div>
@@ -4354,30 +4354,27 @@
                 const invalEl = document.getElementById('pat-inval-val');
                 const forecastEl = document.getElementById('pat-forecast-text');
 
-                if (tfEl) tfEl.innerText = `⏱️ ${pa.timeframe || activeTimeframe.toUpperCase()} TIMEFRAME`;
+                if (tfEl) {
+                    tfEl.innerText = `⏱️ ${pa.timeframe || activeTimeframe.toUpperCase()} TIMEFRAME`;
+                    tfEl.className = 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200 font-mono';
+                }
                 if (candleEl) {
                     candleEl.innerText = `🕯️ ${(pa.candlestick_formation || 'TREND CANDLE').toUpperCase()}`;
                     candleEl.className = pa.candlestick_bias === 'BULLISH' 
-                        ? 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono'
+                        ? 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono'
                         : (pa.candlestick_bias === 'BEARISH'
-                            ? 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono'
-                            : 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono');
+                            ? 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200 font-mono'
+                            : 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200 font-mono');
                 }
                 if (nameEl) nameEl.innerText = pa.pattern_display_name || pa.pattern_name.replace(/_/g, ' ');
                 if (biasEl) {
                     biasEl.innerText = pa.bias;
                     biasEl.className = pa.bias === 'BULLISH' 
-                        ? 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono'
+                        ? 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono'
                         : (pa.bias === 'BEARISH' 
-                            ? 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono'
-                            : 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-slate-500/20 text-slate-300 border border-slate-500/30 font-mono');
+                            ? 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200 font-mono'
+                            : 'text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200 font-mono');
                 }
-                if (confEl) confEl.innerText = `${pa.confidence}% CONF`;
-                if (pocEl) pocEl.innerText = vp.poc > 0 ? `₹${vp.poc.toLocaleString('en-IN')}` : '--';
-                if (targetEl) targetEl.innerText = pa.predicted_target > 0 ? `₹${pa.predicted_target.toLocaleString('en-IN')}` : '--';
-                if (invalEl) invalEl.innerText = pa.invalidation_price > 0 ? `₹${pa.invalidation_price.toLocaleString('en-IN')}` : '--';
-                if (forecastEl) forecastEl.innerText = pa.forecast_text || 'Monitoring pattern development...';
-            }
                 if (confEl) confEl.innerText = `${pa.confidence}% CONF`;
                 if (pocEl) pocEl.innerText = vp.poc > 0 ? `₹${vp.poc.toLocaleString('en-IN')}` : '--';
                 if (targetEl) targetEl.innerText = pa.predicted_target > 0 ? `₹${pa.predicted_target.toLocaleString('en-IN')}` : '--';
