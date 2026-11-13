@@ -669,6 +669,27 @@ def api_chart_data():
         asset_key, spot, asset_info.strike_step, strikes_count=5, selected_expiry=expiry_date_iso
     )
 
+    # Compute asset-specific Opening Range (ORB High / Low) from today's candles
+    asset_orb_high = 0.0
+    asset_orb_low = 0.0
+    if candles:
+        try:
+            import datetime as _dt_orb
+            today_ist_date = _dt_orb.datetime.now().strftime("%Y-%m-%d")
+            today_bars = [
+                c for c in candles
+                if _dt_orb.datetime.fromtimestamp(c["time"]).strftime("%Y-%m-%d") == today_ist_date
+            ]
+            orb_bars = today_bars[:3] if len(today_bars) >= 3 else (today_bars or candles[-3:])
+            asset_orb_high = round(max(float(c["high"]) for c in orb_bars), 2)
+            asset_orb_low = round(min(float(c["low"]) for c in orb_bars), 2)
+        except Exception:
+            pass
+    if asset_orb_high <= 0:
+        asset_orb_high = round(spot * 1.0015, 2)
+    if asset_orb_low <= 0:
+        asset_orb_low = round(spot * 0.9985, 2)
+
     return jsonify({
         "asset": asset_key,
         "display_name": (formatted_option_symbol if chart_target == "option" else asset_info.display_name),
@@ -688,8 +709,8 @@ def api_chart_data():
             "poc": vol_profile.get("poc", current_vwap),
             "vah": vol_profile.get("vah", levels["r1"]),
             "val": vol_profile.get("val", levels["s1"]),
-            "orb_high": getattr(engine.strategy, "orb_high", 0.0) or (spot + 25.0),
-            "orb_low": getattr(engine.strategy, "orb_low", 0.0) or (spot - 25.0)
+            "orb_high": asset_orb_high,
+            "orb_low": asset_orb_low
         },
         "active_option": {
             "symbol": formatted_option_symbol,
