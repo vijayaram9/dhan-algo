@@ -1025,7 +1025,7 @@ Write-Host "EMAIL_SENT_SUCCESSFULLY"
                         pass
 
     # 3. If neither SMTP nor Outlook COM is active:
-    return True, f"Trading Journal PDF compiled at {os.path.basename(doc_path)}. To send directly via email on AWS EC2, add SMTP_USER & SMTP_PASS (e.g. Gmail App Password) to .env, or download the PDF directly."
+    return False, f"Email NOT sent: SMTP_USER and SMTP_PASS (e.g. Gmail App Password) are not configured on the AWS server (.env). PDF compiled at {os.path.basename(doc_path)} — use Download PDF in the meantime."
 
 
 if __name__ == "__main__":
