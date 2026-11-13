@@ -690,6 +690,13 @@ def api_chart_data():
     if asset_orb_low <= 0:
         asset_orb_low = round(spot * 0.9985, 2)
 
+    r_step = max(abs(levels["r2"] - levels["r1"]), abs(levels["r1"] - levels["central_pivot"]), round(spot * 0.0025, 2))
+    s_step = max(abs(levels["s1"] - levels["s2"]), abs(levels["central_pivot"] - levels["s1"]), round(spot * 0.0025, 2))
+    r3_val = round(levels.get("r3") or (levels["r2"] + r_step), 2)
+    r4_val = round(levels.get("r4") or (r3_val + r_step), 2)
+    s3_val = round(levels.get("s3") or (levels["s2"] - s_step), 2)
+    s4_val = round(levels.get("s4") or (s3_val - s_step), 2)
+
     return jsonify({
         "asset": asset_key,
         "display_name": (formatted_option_symbol if chart_target == "option" else asset_info.display_name),
@@ -700,11 +707,15 @@ def api_chart_data():
         "volume_profile": vol_profile,
         "pattern_analysis": pattern_info,
         "levels": {
+            "r4": r4_val,
+            "r3": r3_val,
             "r2": levels["r2"],
             "r1": levels["r1"],
             "pivot": levels["central_pivot"],
             "s1": levels["s1"],
             "s2": levels["s2"],
+            "s3": s3_val,
+            "s4": s4_val,
             "vwap": current_vwap,
             "poc": vol_profile.get("poc", current_vwap),
             "vah": vol_profile.get("vah", levels["r1"]),

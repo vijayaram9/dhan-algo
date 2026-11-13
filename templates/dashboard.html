@@ -1548,11 +1548,23 @@
                 <div id="vp-insight-tooltip" class="hidden pointer-events-none absolute z-20 max-w-xs p-2.5 rounded-xl border shadow-lg text-[11px] leading-snug backdrop-blur-md transition-opacity" style="background-color: var(--apple-surface); color: var(--apple-text); border-color: var(--apple-border);"></div>
             </div>
 
-            <!-- CONTAINER 2: Synchronized Lower Oscillator Pane (RSI 14 / MACD) -->
+            <!-- CONTAINER 2: Synchronized Lower Oscillator Pane (RSI / MACD) -->
             <div id="oscillator-pane-wrapper" class="mt-1.5 pt-1.5 border-t border-black/[0.05]">
-                <div class="flex items-center justify-between px-2 mb-0.5 text-[10px] font-mono font-bold text-slate-600">
-                    <span id="oscillator-pane-title">RSI (14) MOMENTUM OSCILLATOR • Overbought &gt; 70 | Oversold &lt; 30</span>
-                    <span id="oscillator-live-signal" class="px-2 py-0.5 rounded bg-slate-100 text-slate-700">--</span>
+                <div class="flex flex-wrap items-center justify-between gap-2 px-2 mb-0.5 text-[10px] font-mono font-bold text-slate-600">
+                    <div class="flex items-center gap-2">
+                        <span id="oscillator-pane-title">RSI (14) MOMENTUM OSCILLATOR • Overbought &gt; 70 | Oversold &lt; 30</span>
+                        <select id="rsi-period-select" onchange="setRsiPeriod(this.value)" class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] font-mono text-slate-700 cursor-pointer" title="Configure RSI Lookback Period">
+                            <option value="7">RSI 7</option>
+                            <option value="14" selected>RSI 14</option>
+                            <option value="21">RSI 21</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span id="oscillator-live-signal" class="px-2 py-0.5 rounded bg-slate-100 text-slate-700">--</span>
+                        <button type="button" onclick="toggleOscillatorPane(false)" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 transition cursor-pointer" title="Hide Oscillator & Expand Main Chart">
+                            <i class="fa-solid fa-chevron-up mr-0.5"></i> Hide
+                        </button>
+                    </div>
                 </div>
                 <div id="rsi_chart_container" style="height: 100px; width: 100%; position: relative;"></div>
             </div>
@@ -2776,6 +2788,7 @@
     let oiChartInstance = null;
     let lwChart = null;
     let candleSeries = null;
+    let leftMirrorSeries = null;
     let vwapSeries = null;
     let volumeSeries = null;
     let ema9Series = null;
@@ -2800,6 +2813,10 @@
     let showVpInsights = true;
     let showRSI = true;
     let showMACD = false;
+    let showOscillator = true;
+    let rsiPeriod = 14;
+    let _chartFetchSeq = 0;
+    let _isFetchingChartData = false;
 
     // Direct Dhan Terminal URLs mapping
     const dhanTerminalMap = {
@@ -3719,6 +3736,7 @@
             },
             timeScale: {
                 borderColor: 'rgba(128, 128, 128, 0.16)',
+                rightOffset: 6,
                 timeVisible: true,
                 secondsVisible: false,
                 tickMarkFormatter: (time, tickMarkType, locale) => {
@@ -3743,12 +3761,21 @@
             wickDownColor: '#ff3b30'
         });
 
+        // Transparent Left-Axis Mirror Series so Left Price Scale displays synchronized price numbers
+        leftMirrorSeries = lwChart.addLineSeries({
+            priceScaleId: 'left',
+            color: 'rgba(0, 0, 0, 0)',
+            lineWidth: 1,
+            lastValueVisible: false,
+            priceLineVisible: false,
+            crosshairMarkerVisible: false
+        });
+
         // EMA 9 Line Series (Cyan) - Clean Scale (values shown in legend bar)
         ema9Series = lwChart.addLineSeries({
             color: '#06b6d4',
             lineWidth: 2,
             lineStyle: LightweightCharts.LineStyle.Solid,
-            title: 'EMA 9',
             lastValueVisible: false,
             priceLineVisible: false
         });
@@ -3758,7 +3785,6 @@
             color: '#f59e0b',
             lineWidth: 2,
             lineStyle: LightweightCharts.LineStyle.Solid,
-            title: 'EMA 21',
             lastValueVisible: false,
             priceLineVisible: false
         });
@@ -3768,7 +3794,6 @@
             color: '#ff9500',
             lineWidth: 2,
             lineStyle: LightweightCharts.LineStyle.Solid,
-            title: 'VWAP',
             lastValueVisible: false,
             priceLineVisible: false
         });
@@ -3844,14 +3869,24 @@
             }
         });
 
-        // Dynamic Overlay & Oscillator re-rendering on Pan and Zoom
+        const _scheduleOverlayRedraw = () => {
+            if (window._vpRedrawRaf) cancelAnimationFrame(window._vpRedrawRaf);
+            window._vpRedrawRaf = requestAnimationFrame(() => {
+                if (window._lastVolumeProfile || window._lastChartLevels) {
+                    renderVolumeProfileHistogram(window._lastVolumeProfile);
+                }
+            });
+        };
+
+        // Dynamic Overlay & Oscillator re-rendering on Pan and Zoom (Horizontal + Vertical)
         lwChart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
             if (oscChart && range) {
                 try { oscChart.timeScale().setVisibleLogicalRange(range); } catch(e){}
             }
-            if (window._lastVolumeProfile || window._lastChartLevels) {
-                renderVolumeProfileHistogram(window._lastVolumeProfile);
-            }
+            _scheduleOverlayRedraw();
+        });
+        ['wheel', 'mouseup', 'touchend'].forEach(evt => {
+            container.addEventListener(evt, _scheduleOverlayRedraw, { passive: true });
         });
 
         // Interactive Mouse Hover for Customized Volume Profile Order-Flow Insights
@@ -3964,66 +3999,81 @@
         ctx.clearRect(0, 0, width, height);
         window._vpRenderedBins = [];
 
-        const rightMargin = 68;
+        const leftMargin = 64;
+        const rightMargin = 72;
+        const chartPlotLeft = leftMargin;
         const chartPlotRight = width - rightMargin;
+        const chartPlotW = Math.max(100, chartPlotRight - chartPlotLeft);
         const lvls = window._lastChartLevels || {};
         const pa = window._lastPatternAnalysis || {};
         const spot = window._lastChartSpot || 0;
 
         // 1. ACTIONABLE MARKET ZONES (Buy Zone / Sell Zone / Consolidation No-Trade Zone)
         if (showZones && lvls) {
+            const placedZoneLabelY = [];
             const drawZoneBand = (pHigh, pLow, fillCol, borderCol, labelText, labelTextCol) => {
                 if (!pHigh || !pLow) return;
                 const y1 = candleSeries.priceToCoordinate(pHigh);
                 const y2 = candleSeries.priceToCoordinate(pLow);
                 if (y1 === null || y2 === null) return;
                 const topY = Math.min(y1, y2);
-                const bandH = Math.max(14, Math.abs(y2 - y1));
+                const rawH = Math.abs(y2 - y1);
+                const bandH = Math.max(8, rawH);
                 if (topY > height || topY + bandH < 0) return;
 
                 ctx.fillStyle = fillCol;
-                ctx.fillRect(0, topY, chartPlotRight, bandH);
+                ctx.fillRect(chartPlotLeft, topY, chartPlotW, bandH);
                 ctx.strokeStyle = borderCol;
                 ctx.lineWidth = 1;
                 ctx.setLineDash([3, 3]);
                 ctx.beginPath();
-                ctx.moveTo(0, topY); ctx.lineTo(chartPlotRight, topY);
-                ctx.moveTo(0, topY + bandH); ctx.lineTo(chartPlotRight, topY + bandH);
+                ctx.moveTo(chartPlotLeft, topY); ctx.lineTo(chartPlotRight, topY);
+                ctx.moveTo(chartPlotLeft, topY + bandH); ctx.lineTo(chartPlotRight, topY + bandH);
                 ctx.stroke();
                 ctx.setLineDash([]);
 
-                ctx.font = 'bold 9.5px "Inter", sans-serif';
-                ctx.fillStyle = labelTextCol;
-                ctx.fillText(labelText, 120, Math.max(14, topY + 13));
+                // Draw zone label cleanly without overlapping adjacent zone labels
+                if (bandH >= 15) {
+                    let ly = Math.max(14, Math.min(height - 10, topY + 12));
+                    if (!placedZoneLabelY.some(py => Math.abs(py - ly) < 16)) {
+                        placedZoneLabelY.push(ly);
+                        ctx.font = 'bold 9.5px "Inter", sans-serif';
+                        ctx.fillStyle = labelTextCol;
+                        ctx.fillText(labelText, chartPlotLeft + 150, ly);
+                    }
+                }
             };
 
             const vah = vp && vp.vah ? vp.vah : (lvls.r1 || 0);
             const val = vp && vp.val ? vp.val : (lvls.s1 || 0);
-            const vwap = lvls.vwap || spot;
 
-            // Consolidation / No-Trade Zone around POC / narrow equilibrium
-            if (lvls.pivot && vah && val) {
-                const bandHalf = Math.abs(vah - val) * 0.16;
-                drawZoneBand(lvls.pivot + bandHalf, lvls.pivot - bandHalf, 'rgba(245, 158, 11, 0.08)', 'rgba(245, 158, 11, 0.30)', '⏸️ CONSOLIDATION / NO-TRADE ZONE (Equilibrium)', '#b45309');
+            // Sell Zone (Supply: R1 to R2)
+            if (lvls.r2 && lvls.r1) {
+                drawZoneBand(lvls.r2, lvls.r1, 'rgba(225, 29, 72, 0.08)', 'rgba(225, 29, 72, 0.30)', '🔴 SELL / SUPPLY ZONE (R1–R2)', '#be123c');
             }
-            // Buy Zone (Support S1 / VAL Demand or Bullish Above VWAP)
-            if (lvls.s1 && lvls.pivot) {
-                const bTop = Math.min(lvls.pivot, lvls.s1 + Math.abs(lvls.pivot - lvls.s1) * 0.38);
-                drawZoneBand(bTop, lvls.s1, 'rgba(22, 163, 74, 0.09)', 'rgba(22, 163, 74, 0.35)', '🟢 BUY ZONE (Demand / Call Bounce)', '#15803d');
+            // Consolidation / No-Trade Zone around Central Pivot
+            if (lvls.pivot && lvls.r1 && lvls.s1) {
+                const bandHalf = Math.max(Math.abs(lvls.r1 - lvls.s1) * 0.14, Math.abs(vah - val) * 0.08);
+                drawZoneBand(lvls.pivot + bandHalf, lvls.pivot - bandHalf, 'rgba(245, 158, 11, 0.07)', 'rgba(245, 158, 11, 0.28)', '⏸️ CONSOLIDATION / NO-TRADE ZONE', '#b45309');
             }
-            // Sell Zone (Resistance R1 / VAH Supply)
-            if (lvls.r1 && lvls.pivot) {
-                const sBot = Math.max(lvls.pivot, lvls.r1 - Math.abs(lvls.r1 - lvls.pivot) * 0.38);
-                drawZoneBand(lvls.r1, sBot, 'rgba(225, 29, 72, 0.09)', 'rgba(225, 29, 72, 0.35)', '🔴 SELL ZONE (Supply / Put Rejection)', '#be123c');
+            // Buy Zone (Demand: S1 to S2)
+            if (lvls.s1 && lvls.s2) {
+                drawZoneBand(lvls.s1, lvls.s2, 'rgba(22, 163, 74, 0.08)', 'rgba(22, 163, 74, 0.30)', '🟢 BUY / DEMAND ZONE (S1–S2)', '#15803d');
             }
         }
 
-        // 2. PROMINENT LEFT-SIDE LABELS FOR R1, S1, CPR (PIVOT), VAH, VAL
+        // 2. MULTI-LEVEL SUPPORT & RESISTANCE LEFT-SIDE PILLS (R1–R4, CPR, S1–S4, VAH, VAL)
         if (showSR && lvls) {
             const leftLabels = [
-                { p: lvls.r1, text: `R1 RES ₹${lvls.r1}`, bg: 'rgba(254, 226, 226, 0.94)', fg: '#b91c1c', bd: '#ef4444' },
-                { p: lvls.pivot, text: `CPR / PIVOT ₹${lvls.pivot}`, bg: 'rgba(219, 234, 254, 0.94)', fg: '#1d4ed8', bd: '#3b82f6' },
-                { p: lvls.s1, text: `S1 SUPP ₹${lvls.s1}`, bg: 'rgba(220, 252, 231, 0.94)', fg: '#15803d', bd: '#22c55e' }
+                { p: lvls.r4, text: `R4 ₹${lvls.r4}`, bg: 'rgba(254, 226, 226, 0.88)', fg: '#991b1b', bd: '#f87171' },
+                { p: lvls.r3, text: `R3 ₹${lvls.r3}`, bg: 'rgba(254, 226, 226, 0.90)', fg: '#991b1b', bd: '#ef4444' },
+                { p: lvls.r2, text: `R2 ₹${lvls.r2}`, bg: 'rgba(254, 226, 226, 0.92)', fg: '#b91c1c', bd: '#ef4444' },
+                { p: lvls.r1, text: `R1 RES ₹${lvls.r1}`, bg: 'rgba(254, 226, 226, 0.95)', fg: '#b91c1c', bd: '#dc2626' },
+                { p: lvls.pivot, text: `CPR ₹${lvls.pivot}`, bg: 'rgba(219, 234, 254, 0.95)', fg: '#1d4ed8', bd: '#3b82f6' },
+                { p: lvls.s1, text: `S1 SUPP ₹${lvls.s1}`, bg: 'rgba(220, 252, 231, 0.95)', fg: '#15803d', bd: '#16a34a' },
+                { p: lvls.s2, text: `S2 ₹${lvls.s2}`, bg: 'rgba(220, 252, 231, 0.92)', fg: '#15803d', bd: '#22c55e' },
+                { p: lvls.s3, text: `S3 ₹${lvls.s3}`, bg: 'rgba(220, 252, 231, 0.90)', fg: '#166534', bd: '#22c55e' },
+                { p: lvls.s4, text: `S4 ₹${lvls.s4}`, bg: 'rgba(220, 252, 231, 0.88)', fg: '#166534', bd: '#4ade80' }
             ];
             if (vp && vp.vah) leftLabels.push({ p: vp.vah, text: `VAH ₹${vp.vah}`, bg: 'rgba(238, 242, 255, 0.92)', fg: '#4338ca', bd: '#818cf8' });
             if (vp && vp.val) leftLabels.push({ p: vp.val, text: `VAL ₹${vp.val}`, bg: 'rgba(238, 242, 255, 0.92)', fg: '#4338ca', bd: '#818cf8' });
@@ -4033,20 +4083,20 @@
                 if (!item.p) return;
                 let y = candleSeries.priceToCoordinate(item.p);
                 if (y === null || y < 12 || y > height - 12) return;
-                while (placedY.some(py => Math.abs(py - y) < 20)) { y += 20; }
+                if (placedY.some(py => Math.abs(py - y) < 20)) return;
                 placedY.push(y);
-                _drawLeftPill(ctx, 8, y, item.text, item.bg, item.fg, item.bd);
+                _drawLeftPill(ctx, chartPlotLeft + 6, y, item.text, item.bg, item.fg, item.bd);
             });
         }
 
-        // 3. VOLUME PROFILE HISTOGRAM ON RIGHT + CUSTOMIZED CALLOUTS
+        // 3. COMPACT TRANSLUCENT VOLUME PROFILE HISTOGRAM ON RIGHT + CUSTOMIZED CALLOUTS
         if (!showVP || !vp || !vp.bins || vp.bins.length === 0) return;
 
         const bins = vp.bins;
         let maxVol = 1;
         bins.forEach(b => { if (b.volume > maxVol) maxVol = b.volume; });
 
-        const maxBarWidth = Math.min(180, Math.max(75, width * 0.16));
+        const maxBarWidth = Math.min(95, Math.max(46, width * 0.09));
         const rightX = width - rightMargin;
 
         let binHeight = 11;
@@ -4343,17 +4393,27 @@
                 ? "px-2 py-1 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 transition shadow-2xs font-bold"
                 : "px-2 py-1 rounded-lg bg-slate-100 text-slate-600 transition font-bold";
         } else if (ind === 'rsi') {
+            if (showOscillator && showRSI) {
+                toggleOscillatorPane(false);
+                return;
+            }
             showRSI = true;
             showMACD = false;
+            toggleOscillatorPane(true);
             const bR = document.getElementById('btn-toggle-rsi');
             const bM = document.getElementById('btn-toggle-macd');
             if (bR) bR.className = "px-2 py-1 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 transition shadow-2xs font-bold";
             if (bM) bM.className = "px-2 py-1 rounded-lg bg-slate-100 text-slate-600 transition font-bold";
             const oscTitle = document.getElementById('oscillator-pane-title');
-            if (oscTitle) oscTitle.innerText = "RSI (14) MOMENTUM OSCILLATOR • Overbought > 70 | Oversold < 30";
+            if (oscTitle) oscTitle.innerText = `RSI (${rsiPeriod}) MOMENTUM OSCILLATOR • Overbought > 70 | Oversold < 30`;
         } else if (ind === 'macd') {
+            if (showOscillator && showMACD) {
+                toggleOscillatorPane(false);
+                return;
+            }
             showMACD = true;
             showRSI = false;
+            toggleOscillatorPane(true);
             const bR = document.getElementById('btn-toggle-rsi');
             const bM = document.getElementById('btn-toggle-macd');
             if (bM) bM.className = "px-2 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 transition shadow-2xs font-bold";
@@ -4370,6 +4430,46 @@
             if (banner) banner.style.display = showPatterns ? 'block' : 'none';
         }
         fetchCandlestickData();
+    }
+
+    function toggleOscillatorPane(forceState = null) {
+        showOscillator = (forceState !== null) ? Boolean(forceState) : !showOscillator;
+        const wrap = document.getElementById('oscillator-pane-wrapper');
+        const mainCont = document.getElementById('candlestick_chart_container');
+        if (wrap) wrap.style.display = showOscillator ? 'block' : 'none';
+        if (!showOscillator) {
+            const bR = document.getElementById('btn-toggle-rsi');
+            const bM = document.getElementById('btn-toggle-macd');
+            if (bR) bR.className = "px-2 py-1 rounded-lg bg-slate-100 text-slate-500 transition font-bold";
+            if (bM) bM.className = "px-2 py-1 rounded-lg bg-slate-100 text-slate-500 transition font-bold";
+        }
+        const isFs = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+        if (mainCont && lwChart && !isFs) {
+            const targetH = showOscillator ? 375 : 475;
+            mainCont.style.height = `${targetH}px`;
+            lwChart.applyOptions({ width: mainCont.clientWidth, height: targetH });
+        }
+        if (showOscillator && oscChart) {
+            const rsiCont = document.getElementById('rsi_chart_container');
+            if (rsiCont) oscChart.applyOptions({ width: rsiCont.clientWidth, height: 100 });
+        }
+        requestAnimationFrame(() => {
+            if (window._lastVolumeProfile || window._lastChartLevels) {
+                renderVolumeProfileHistogram(window._lastVolumeProfile);
+            }
+        });
+    }
+
+    function setRsiPeriod(p) {
+        const parsed = parseInt(p, 10);
+        if (!isNaN(parsed) && parsed >= 2 && parsed <= 50) {
+            rsiPeriod = parsed;
+            const oscTitle = document.getElementById('oscillator-pane-title');
+            if (oscTitle && showRSI) oscTitle.innerText = `RSI (${rsiPeriod}) MOMENTUM OSCILLATOR • Overbought > 70 | Oversold < 30`;
+            const bR = document.getElementById('btn-toggle-rsi');
+            if (bR) bR.innerText = `RSI (${rsiPeriod})`;
+            fetchCandlestickData();
+        }
     }
 
     function setChartTarget(target) {
@@ -4402,10 +4502,13 @@
 
     // Fetch Candlestick Data with Timeframe, Indicators & S/R Overlays
     async function fetchCandlestickData(secId = null) {
+        const fetchSeq = ++_chartFetchSeq;
+        _isFetchingChartData = true;
         try {
             const secParam = secId ? `&security_id=${secId}` : (activeChartSecId ? `&security_id=${activeChartSecId}` : '');
             const res = await fetch(`/api/chart-data?asset=${activeAssetKey}&timeframe=${activeTimeframe}&chart_target=${activeChartTarget}${secParam}`);
             const data = await res.json();
+            if (fetchSeq !== _chartFetchSeq) return;
 
             // Store latest quant data globally for live dynamic interactions
             window._lastVolumeProfile = data.volume_profile;
@@ -4442,6 +4545,9 @@
                     close: c.close
                 }));
                 candleSeries.setData(cData);
+                if (leftMirrorSeries) {
+                    leftMirrorSeries.setData(cData.map(c => ({ time: c.time, value: c.close })));
+                }
 
                 if (showVWAP) {
                     const vData = data.candles.map(c => ({
@@ -4518,28 +4624,29 @@
                     }
                 }
 
-                // Compute RSI (14) & MACD (12, 26, 9) for Synchronized Lower Oscillator Pane
+                // Compute RSI (configurable period) & MACD (12, 26, 9) for Synchronized Lower Oscillator Pane
                 let latestRsi = null;
                 let latestMacd = null;
-                if (data.candles.length >= 15) {
+                const rP = rsiPeriod || 14;
+                if (data.candles.length >= rP + 1) {
                     const rsiOut = [];
                     let avgGain = 0, avgLoss = 0;
                     for (let i = 1; i < data.candles.length; i++) {
                         const chg = data.candles[i].close - data.candles[i - 1].close;
                         const gain = chg > 0 ? chg : 0;
                         const loss = chg < 0 ? -chg : 0;
-                        if (i <= 14) {
-                            avgGain += gain / 14;
-                            avgLoss += loss / 14;
-                            if (i === 14) {
+                        if (i <= rP) {
+                            avgGain += gain / rP;
+                            avgLoss += loss / rP;
+                            if (i === rP) {
                                 const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
                                 const rVal = Number((100 - 100 / (1 + rs)).toFixed(2));
                                 rsiOut.push({ time: data.candles[i].time, value: rVal });
                                 latestRsi = rVal;
                             }
                         } else {
-                            avgGain = (avgGain * 13 + gain) / 14;
-                            avgLoss = (avgLoss * 13 + loss) / 14;
+                            avgGain = (avgGain * (rP - 1) + gain) / rP;
+                            avgLoss = (avgLoss * (rP - 1) + loss) / rP;
                             const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
                             const rVal = Number((100 - 100 / (1 + rs)).toFixed(2));
                             rsiOut.push({ time: data.candles[i].time, value: rVal });
@@ -4598,8 +4705,8 @@
                 if (lVw && _legCandle.vwap != null) lVw.innerText = `VWAP: ₹${_legCandle.vwap.toLocaleString('en-IN')}`;
                 if (lRsi && latestRsi != null) {
                     const rsiState = latestRsi >= 70 ? 'OVERBOUGHT (Caution CE)' : (latestRsi <= 30 ? 'OVERSOLD (Bounce Watch)' : (latestRsi >= 55 ? 'Bullish Momentum' : (latestRsi <= 45 ? 'Bearish Momentum' : 'Neutral')));
-                    lRsi.innerText = `RSI(14): ${latestRsi} (${rsiState})`;
-                    if (oscSig && showRSI) oscSig.innerText = `RSI: ${latestRsi} • ${rsiState}`;
+                    lRsi.innerText = `RSI(${rP}): ${latestRsi} (${rsiState})`;
+                    if (oscSig && showRSI) oscSig.innerText = `RSI(${rP}): ${latestRsi} • ${rsiState}`;
                 }
                 if (lMacd && latestMacd != null) {
                     lMacd.classList.toggle('hidden', !showMACD);
@@ -4607,15 +4714,20 @@
                     if (oscSig && showMACD) oscSig.innerText = `MACD: ${latestMacd.mV >= latestMacd.sV ? 'Bullish Crossover' : 'Bearish Crossover'} (${latestMacd.hV})`;
                 }
 
-                // Auto-fit when view context changes (asset / timeframe / target / secId)
+                // Auto-fit & reset Y-axis autoScale whenever asset/timeframe/target changes so switching scrips never blanks the chart
                 const chartCtxKey = `${activeAssetKey}|${activeTimeframe}|${activeChartTarget}|${activeChartSecId}`;
                 if (window._lastChartCtxKey !== chartCtxKey) {
+                    try {
+                        lwChart.priceScale('right').applyOptions({ autoScale: true });
+                        lwChart.priceScale('left').applyOptions({ autoScale: true });
+                        if (oscChart) oscChart.priceScale('right').applyOptions({ autoScale: true });
+                    } catch(e) {}
                     lwChart.timeScale().fitContent();
                     window._lastChartCtxKey = chartCtxKey;
                 }
 
                 const lastCandle = data.candles[data.candles.length - 1];
-                window._latestCandle = { ...lastCandle };
+                window._latestCandle = { ...lastCandle, _assetKey: activeAssetKey, _tf: activeTimeframe };
                 const vwapQuoteEl = document.getElementById('quote-vwap');
                 if (vwapQuoteEl && lastCandle.vwap != null) vwapQuoteEl.innerText = `₹${lastCandle.vwap.toLocaleString('en-IN')}`;
             }
@@ -4672,41 +4784,29 @@
                 activePriceLines = [];
 
                 if (showSR && data.levels) {
-                    // Prominent Resistance R1 (Left Pill Label + Bold Line)
-                    if (data.levels.r1 != null) {
-                        activePriceLines.push(candleSeries.createPriceLine({
-                            price: data.levels.r1,
-                            color: 'rgba(225, 29, 72, 0.85)',
-                            lineWidth: 2,
-                            lineStyle: LightweightCharts.LineStyle.Dashed,
-                            axisLabelVisible: false,
-                            title: `R1 ₹${data.levels.r1}`
-                        }));
-                    }
-
-                    // Prominent Support S1 (Left Pill Label + Bold Line)
-                    if (data.levels.s1 != null) {
-                        activePriceLines.push(candleSeries.createPriceLine({
-                            price: data.levels.s1,
-                            color: 'rgba(22, 163, 74, 0.85)',
-                            lineWidth: 2,
-                            lineStyle: LightweightCharts.LineStyle.Dashed,
-                            axisLabelVisible: false,
-                            title: `S1 ₹${data.levels.s1}`
-                        }));
-                    }
-
-                    // Prominent Central Pivot / CPR (Left Pill Label + Bold Line)
-                    if (data.levels.pivot != null) {
-                        activePriceLines.push(candleSeries.createPriceLine({
-                            price: data.levels.pivot,
-                            color: 'rgba(37, 99, 235, 0.80)',
-                            lineWidth: 2,
-                            lineStyle: LightweightCharts.LineStyle.Dotted,
-                            axisLabelVisible: false,
-                            title: `CPR ₹${data.levels.pivot}`
-                        }));
-                    }
+                    const srSpecs = [
+                        { val: data.levels.r4, col: 'rgba(225, 29, 72, 0.35)', w: 1, style: LightweightCharts.LineStyle.Dotted, title: 'R4' },
+                        { val: data.levels.r3, col: 'rgba(225, 29, 72, 0.48)', w: 1, style: LightweightCharts.LineStyle.Dashed, title: 'R3' },
+                        { val: data.levels.r2, col: 'rgba(225, 29, 72, 0.65)', w: 1.5, style: LightweightCharts.LineStyle.Dashed, title: 'R2' },
+                        { val: data.levels.r1, col: 'rgba(225, 29, 72, 0.85)', w: 2, style: LightweightCharts.LineStyle.Dashed, title: 'R1' },
+                        { val: data.levels.pivot, col: 'rgba(37, 99, 235, 0.80)', w: 2, style: LightweightCharts.LineStyle.Dotted, title: 'CPR' },
+                        { val: data.levels.s1, col: 'rgba(22, 163, 74, 0.85)', w: 2, style: LightweightCharts.LineStyle.Dashed, title: 'S1' },
+                        { val: data.levels.s2, col: 'rgba(22, 163, 74, 0.65)', w: 1.5, style: LightweightCharts.LineStyle.Dashed, title: 'S2' },
+                        { val: data.levels.s3, col: 'rgba(22, 163, 74, 0.48)', w: 1, style: LightweightCharts.LineStyle.Dashed, title: 'S3' },
+                        { val: data.levels.s4, col: 'rgba(22, 163, 74, 0.35)', w: 1, style: LightweightCharts.LineStyle.Dotted, title: 'S4' }
+                    ];
+                    srSpecs.forEach(lvl => {
+                        if (lvl.val != null) {
+                            activePriceLines.push(candleSeries.createPriceLine({
+                                price: lvl.val,
+                                color: lvl.col,
+                                lineWidth: lvl.w,
+                                lineStyle: lvl.style,
+                                axisLabelVisible: false,
+                                title: `${lvl.title} ₹${lvl.val}`
+                            }));
+                        }
+                    });
                 }
 
                 // Classical Chart Pattern Horizon Target & Stop Overlays (Clean Axis Focus)
@@ -4884,8 +4984,15 @@
                 }
             }
 
+            requestAnimationFrame(() => {
+                if (window._lastVolumeProfile || window._lastChartLevels) {
+                    renderVolumeProfileHistogram(window._lastVolumeProfile);
+                }
+            });
         } catch (e) {
             console.error('Candlestick data error:', e);
+        } finally {
+            if (fetchSeq === _chartFetchSeq) _isFetchingChartData = false;
         }
     }
 
@@ -5007,7 +5114,7 @@
                     const liveSpot = parseFloat(currentActiveOpp.spot);
                     const spotEl = document.getElementById('quote-spot');
                     if (spotEl) spotEl.innerText = `₹${liveSpot.toLocaleString('en-IN')}`;
-                    if (candleSeries && window._latestCandle) {
+                    if (candleSeries && window._latestCandle && !_isFetchingChartData && window._latestCandle._assetKey === activeAssetKey && window._latestCandle._tf === activeTimeframe) {
                         const liveCandle = {
                             time: window._latestCandle.time,
                             open: window._latestCandle.open,
