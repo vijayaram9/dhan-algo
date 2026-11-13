@@ -716,10 +716,24 @@ class NiftySmartEdgeEngine:
         # LAYER 1: Underlying-Based Structural Stop (with sanity guard against corrupted spot quotes)
         spot_is_sane = (current_spot > 0 and abs(current_spot - pos.underlying_entry_spot) / max(1.0, pos.underlying_entry_spot) < 0.50)
         if spot_is_sane:
+            asset_k = str(getattr(pos, 'asset_key', 'NIFTY') or 'NIFTY').upper()
+            if "SENSEX" in asset_k:
+                min_buffer = 40.0
+            elif "BANKNIFTY" in asset_k:
+                min_buffer = 30.0
+            elif "FINNIFTY" in asset_k:
+                min_buffer = 18.0
+            elif "NIFTY" in asset_k:
+                min_buffer = 15.0
+            else:
+                min_buffer = max(1.5, pos.underlying_entry_spot * 0.0020)
+
+            structural_buffer = max(getattr(pos, 'atr_at_entry', 0.0) * 0.5, min_buffer)
+
             if pos.option_type == "CE":
-                # Structural Invalidation (CE: underlying breaks swing low with confirmed penetration & minimum 20s breathing room)
-                if pos.underlying_structural_sl > 0 and current_spot <= (pos.underlying_structural_sl - 1.0) and pos.current_premium <= pos.entry_premium and elapsed_seconds >= 20.0:
-                    return True, f"Layer 1 Structural Invalidation: {getattr(pos, 'asset_key', 'Spot')} {current_spot:.1f} broke swing low {pos.underlying_structural_sl:.1f}"
+                # Structural Invalidation (CE: underlying breaks swing low by at least the volatility buffer, premium confirms loss, and at least 60s breathing room)
+                if pos.underlying_structural_sl > 0 and current_spot <= (pos.underlying_structural_sl - structural_buffer) and pos.current_premium <= pos.entry_premium and elapsed_seconds >= 60.0:
+                    return True, f"Layer 1 Structural Invalidation: {asset_k} {current_spot:.1f} broke swing low {pos.underlying_structural_sl:.1f} (buffer: {structural_buffer:.1f}pts)"
 
                 # Target 1 (1.5R) reached (CE: underlying rises to or above target; requires minimum 15s)
                 if pos.target_1_spot > pos.underlying_entry_spot and current_spot >= pos.target_1_spot and elapsed_seconds >= 15.0:
@@ -734,9 +748,9 @@ class NiftySmartEdgeEngine:
                         pos.underlying_structural_sl = new_sl
 
             elif pos.option_type == "PE":
-                # Structural Invalidation (PE: underlying breaks swing high with confirmed penetration & minimum 20s breathing room)
-                if pos.underlying_structural_sl > 0 and current_spot >= (pos.underlying_structural_sl + 1.0) and pos.current_premium <= pos.entry_premium and elapsed_seconds >= 20.0:
-                    return True, f"Layer 1 Structural Invalidation: {getattr(pos, 'asset_key', 'Spot')} {current_spot:.1f} broke swing high {pos.underlying_structural_sl:.1f}"
+                # Structural Invalidation (PE: underlying breaks swing high by at least the volatility buffer, premium confirms loss, and at least 60s breathing room)
+                if pos.underlying_structural_sl > 0 and current_spot >= (pos.underlying_structural_sl + structural_buffer) and pos.current_premium <= pos.entry_premium and elapsed_seconds >= 60.0:
+                    return True, f"Layer 1 Structural Invalidation: {asset_k} {current_spot:.1f} broke swing high {pos.underlying_structural_sl:.1f} (buffer: {structural_buffer:.1f}pts)"
 
                 # Target 1 (1.5R) reached (PE: underlying falls to or below target; requires minimum 15s)
                 if 0 < pos.target_1_spot < pos.underlying_entry_spot and current_spot <= pos.target_1_spot and elapsed_seconds >= 15.0:
