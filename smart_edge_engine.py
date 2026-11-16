@@ -1312,8 +1312,12 @@ class NiftySmartEdgeEngine:
                     target_premium = round(contract.estimated_premium + (sl_distance * 1.8), 2)
             max_holding_seconds = 1800  # 30 minutes institutional trade window
         elif trade_style == "SWING":
+            # Tight 10% premium stop + ₹1,500 per-trade max rupee risk cap so one loser never wipes out 3 winners
+            swing_pct_sl = round(contract.estimated_premium * 0.90, 2)
+            rupee_cap_sl = round(max(1.0, contract.estimated_premium - (1500.0 / max(1, contract.lot_size))), 2)
+            hard_sl = max(hard_sl, swing_pct_sl, rupee_cap_sl)
             if target_premium <= 0:
-                target_premium = round(contract.estimated_premium * 1.35, 2)
+                target_premium = round(contract.estimated_premium * 1.25, 2)
             max_holding_seconds = 3600 # 60 minutes wave ride
         else:
             if target_premium <= 0:
