@@ -1719,11 +1719,13 @@ class NiftySmartEdgeEngine:
                         opp_action = "BUY_CE"
 
                     if opp_action == "BUY_CE":
-                        # Anti-chasing guard: never buy CALLs overbought inside R1-R2 Supply Zone
-                        if r1_lvl > 0 and opp_spot >= r1_lvl and rsi_5m >= 72.0:
+                        # Anti-chasing guard: never buy CALLs overbought near/inside R1-R2 Supply Zone or over-extended >0.12% above EMA9
+                        if r1_lvl > 0 and opp_spot >= (r1_lvl * 0.999) and rsi_5m >= 68.0:
                             continue
                         if not is_demand_bounce_ce:
                             if opp_spot < real_vwap:
+                                continue
+                            if ema9_val > 0 and ((opp_spot - ema9_val) / ema9_val) > 0.0012:
                                 continue
                             if not (ema9_val > ema21_val and b_close > ema21_val):
                                 continue
@@ -1732,11 +1734,13 @@ class NiftySmartEdgeEngine:
                             if b_close < (prev_low - (opp_spot * 0.0005)):
                                 continue
                     elif opp_action == "BUY_PE":
-                        # Anti-chasing guard: never buy PUTs oversold inside S1-S2 Demand Zone
-                        if s1_lvl > 0 and opp_spot <= s1_lvl and rsi_5m <= 28.0:
+                        # Anti-chasing guard: never buy PUTs oversold near/inside S1-S2 Demand Zone or over-extended >0.12% below EMA9
+                        if s1_lvl > 0 and opp_spot <= (s1_lvl * 1.001) and rsi_5m <= 32.0:
                             continue
                         if not is_supply_rejection_pe:
                             if opp_spot > real_vwap:
+                                continue
+                            if ema9_val > 0 and ((ema9_val - opp_spot) / ema9_val) > 0.0012:
                                 continue
                             if not (ema9_val < ema21_val and b_close < ema21_val):
                                 continue
