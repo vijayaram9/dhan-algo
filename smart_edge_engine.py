@@ -450,8 +450,8 @@ class NiftySmartEdgeEngine:
                 return False, "23:00 PM: MCX intraday cut-off. Managing existing positions only."
             return True, "MCX Commodity trading schedule active (until 11:00 PM IST)."
 
-        if "09:15" <= now_time < "09:30":
-            return False, "09:15-09:30 AM: Observing Opening Range. No entries allowed per rulebook."
+        if "09:15" <= now_time < "09:20":
+            return False, "09:15-09:20 AM: Observing initial 5m opening discovery."
         cutoff_time = getattr(config, "no_new_trades_time", "15:10")
         sq_off_time = getattr(config, "square_off_time", "15:20")
         if now_time >= sq_off_time:

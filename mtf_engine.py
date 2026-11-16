@@ -113,21 +113,29 @@ class MultiTimeframeEngine:
 
         sec_id, seg, itype = dhan_meta[asset_key]
         try:
-            from dhan_client import get_dhan_client
+            from datetime import timedelta
+            from dhan_client import get_dhan_client, DhanTraderClient
             client = get_dhan_client()
-            today_str = date.today().strftime("%Y-%m-%d")
-            res = client.dhan.intraday_minute_data(sec_id, seg, itype, today_str, today_str, interval=5)
+            DhanTraderClient.throttle_request(0.15)
+            today_dt = date.today()
+            today_str = today_dt.strftime("%Y-%m-%d")
+            from_str = (today_dt - timedelta(days=5)).strftime("%Y-%m-%d")
+            res = client.dhan.intraday_minute_data(sec_id, seg, itype, from_str, today_str, interval=5)
             if res and res.get("status") == "success":
                 d = res.get("data", {})
                 closes = d.get("close", [])
                 if len(closes) >= 3:
-                    df = pd.DataFrame({
+                    df_dict = {
                         "open": d.get("open", []),
                         "high": d.get("high", []),
                         "low": d.get("low", []),
                         "close": closes,
                         "volume": d.get("volume", [1000] * len(closes))
-                    })
+                    }
+                    ts_list = d.get("timestamp", [])
+                    if ts_list and len(ts_list) == len(closes):
+                        df_dict["timestamp"] = ts_list
+                    df = pd.DataFrame(df_dict)
                     self._candles_cache[asset_key] = df
                     self._candles_time[asset_key] = now_ts
                     return df
@@ -149,10 +157,20 @@ class MultiTimeframeEngine:
         # Pull real candles to compute real VWAP and Daily Pivots
         df5 = self.get_real_candles(asset_key)
         if df5 is not None and not df5.empty:
-            vwap = round(IndicatorEngine.calculate_vwap(df5), 2)
-            day_high = float(df5["high"].max())
-            day_low = float(df5["low"].min())
-            day_close = float(df5["close"].iloc[-1])
+            df_intraday = df5
+            if "timestamp" in df5.columns:
+                from datetime import datetime, timezone, timedelta
+                ist_now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
+                today_midnight_ts = ist_now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+                df_t = df5[df5["timestamp"] >= today_midnight_ts]
+                if not df_t.empty:
+                    df_intraday = df_t
+                elif len(df5) > 25:
+                    df_intraday = df5.tail(25)
+            vwap = round(IndicatorEngine.calculate_vwap(df_intraday), 2)
+            day_high = float(df_intraday["high"].max())
+            day_low = float(df_intraday["low"].min())
+            day_close = float(df_intraday["close"].iloc[-1])
             pp = round((day_high + day_low + day_close) / 3.0, 1)
             r1 = round((2 * pp) - day_low, 1)
             s1 = round((2 * pp) - day_high, 1)
