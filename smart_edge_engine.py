@@ -766,14 +766,18 @@ class NiftySmartEdgeEngine:
                 if pos.underlying_structural_sl > 0 and current_spot <= (pos.underlying_structural_sl - structural_buffer) and pos.current_premium <= pos.entry_premium and elapsed_seconds >= 60.0:
                     return True, f"Layer 1 Structural Invalidation: {asset_k} {current_spot:.1f} broke swing low {pos.underlying_structural_sl:.1f} (buffer: {structural_buffer:.1f}pts)"
 
-                # Target 1 (1.5R) reached (CE: underlying rises to or above target; require >= ₹220 gross to clear brokerage+taxes)
+                # Target 1 (1.5R) reached (CE): Lock 75% of open gain as trailing floor and ride runner to Target 2 (2.5R)
                 if pos.target_1_spot > pos.underlying_entry_spot and current_spot >= pos.target_1_spot and elapsed_seconds >= 15.0:
-                    if pos.pnl >= 220.0:
-                        return True, f"Target 1 (1.5R) Reached @ Spot {current_spot:.1f} (Target: {pos.target_1_spot:.1f})"
-                    else:
-                        fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
-                        pos.hard_stop_premium = max(pos.hard_stop_premium, round(pos.entry_premium + fee_buf, 2))
+                    fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
+                    gain_now = max(0.0, pos.current_premium - pos.entry_premium)
+                    t1_lock = round(pos.entry_premium + max(fee_buf, gain_now * 0.75), 2)
+                    t1_lock = min(t1_lock, round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
+                    if t1_lock > pos.hard_stop_premium:
+                        pos.hard_stop_premium = t1_lock
                         pos.is_trailing_active = True
+                        pos.locked_profit_inr = round((t1_lock - pos.entry_premium) * pos.quantity, 2)
+                if pos.target_2_spot > pos.underlying_entry_spot and current_spot >= pos.target_2_spot and pos.pnl >= 300.0 and elapsed_seconds >= 15.0:
+                    return True, f"Target 2 (2.5R) Reached @ Spot {current_spot:.1f} (Target: {pos.target_2_spot:.1f})"
 
                 # Trailing Stop: 1 ATR movement after 1R
                 risk_pts = pos.underlying_entry_spot - pos.underlying_structural_sl
@@ -788,14 +792,18 @@ class NiftySmartEdgeEngine:
                 if pos.underlying_structural_sl > 0 and current_spot >= (pos.underlying_structural_sl + structural_buffer) and pos.current_premium <= pos.entry_premium and elapsed_seconds >= 60.0:
                     return True, f"Layer 1 Structural Invalidation: {asset_k} {current_spot:.1f} broke swing high {pos.underlying_structural_sl:.1f} (buffer: {structural_buffer:.1f}pts)"
 
-                # Target 1 (1.5R) reached (PE: underlying falls to or below target; require >= ₹220 gross to clear brokerage+taxes)
+                # Target 1 (1.5R) reached (PE): Lock 75% of open gain as trailing floor and ride runner to Target 2 (2.5R)
                 if 0 < pos.target_1_spot < pos.underlying_entry_spot and current_spot <= pos.target_1_spot and elapsed_seconds >= 15.0:
-                    if pos.pnl >= 220.0:
-                        return True, f"Target 1 (1.5R) Reached @ Spot {current_spot:.1f} (Target: {pos.target_1_spot:.1f})"
-                    else:
-                        fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
-                        pos.hard_stop_premium = max(pos.hard_stop_premium, round(pos.entry_premium + fee_buf, 2))
+                    fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
+                    gain_now = max(0.0, pos.current_premium - pos.entry_premium)
+                    t1_lock = round(pos.entry_premium + max(fee_buf, gain_now * 0.75), 2)
+                    t1_lock = min(t1_lock, round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
+                    if t1_lock > pos.hard_stop_premium:
+                        pos.hard_stop_premium = t1_lock
                         pos.is_trailing_active = True
+                        pos.locked_profit_inr = round((t1_lock - pos.entry_premium) * pos.quantity, 2)
+                if 0 < pos.target_2_spot < pos.underlying_entry_spot and current_spot <= pos.target_2_spot and pos.pnl >= 300.0 and elapsed_seconds >= 15.0:
+                    return True, f"Target 2 (2.5R) Reached @ Spot {current_spot:.1f} (Target: {pos.target_2_spot:.1f})"
 
                 risk_pts = pos.underlying_structural_sl - pos.underlying_entry_spot
                 if risk_pts > 0 and (pos.underlying_entry_spot - current_spot) >= risk_pts:
@@ -1655,16 +1663,14 @@ class NiftySmartEdgeEngine:
                     if not opp_action:
                         continue
                     
-                    # Institutional Trend Direction & Candlestick Confirmation Filter:
+                    # Institutional Trend Direction, Supply/Demand Zone & Candlestick Confirmation Filter:
                     opp_spot = top_opp["spot"]
                     from mtf_engine import mtf_engine
+                    from indicators import IndicatorEngine
                     mtf_lvls = mtf_engine.calculate_institutional_levels(opp_spot, asset_key)
                     real_vwap = mtf_lvls.get("vwap", opp_spot)
-                    # Strict VWAP Directional Alignment:
-                    if opp_action == "BUY_CE" and opp_spot < real_vwap:
-                        continue
-                    if opp_action == "BUY_PE" and opp_spot > real_vwap:
-                        continue
+                    r1_lvl = float(mtf_lvls.get("r1", 0.0) or 0.0)
+                    s1_lvl = float(mtf_lvls.get("s1", 0.0) or 0.0)
 
                     # Fail-Closed Candle & EMA 9/21 Alignment Check:
                     df_bars = mtf_engine.get_real_candles(asset_key)
@@ -1676,23 +1682,44 @@ class NiftySmartEdgeEngine:
                     prev_high = float(df_bars["high"].iloc[-2])
                     ema9_val = float(df_bars["close"].ewm(span=9, adjust=False).mean().iloc[-1])
                     ema21_val = float(df_bars["close"].ewm(span=21, adjust=False).mean().iloc[-1])
+                    rsi_5m = IndicatorEngine.calculate_rsi(df_bars["close"])
+
+                    is_supply_rejection_pe = (r1_lvl > 0 and opp_spot >= r1_lvl and b_close < b_open and rsi_5m >= 62.0)
+                    is_demand_bounce_ce = (s1_lvl > 0 and opp_spot <= s1_lvl and b_close > b_open and rsi_5m <= 38.0)
+
+                    if is_supply_rejection_pe and opp_action == "BUY_CE":
+                        # At R1-R2 Supply Zone with bearish rejection candle: flip to PUT instead of chasing CALL into resistance
+                        opp_action = "BUY_PE"
+                    elif is_demand_bounce_ce and opp_action == "BUY_PE":
+                        # At S1-S2 Demand Zone with bullish bounce candle: flip to CALL instead of shorting into support
+                        opp_action = "BUY_CE"
 
                     if opp_action == "BUY_CE":
-                        # Must have bullish EMA cascade (EMA 9 > EMA 21) and price holding above EMA 21 without breaking prior bar low
-                        if not (ema9_val > ema21_val and b_close > ema21_val):
+                        # Anti-chasing guard: never buy CALLs overbought inside R1-R2 Supply Zone
+                        if r1_lvl > 0 and opp_spot >= r1_lvl and rsi_5m >= 72.0:
                             continue
-                        if b_close < b_open and b_close < ema9_val:
-                            continue
-                        if b_close < (prev_low - (opp_spot * 0.0005)):
-                            continue
+                        if not is_demand_bounce_ce:
+                            if opp_spot < real_vwap:
+                                continue
+                            if not (ema9_val > ema21_val and b_close > ema21_val):
+                                continue
+                            if b_close < b_open and b_close < ema9_val:
+                                continue
+                            if b_close < (prev_low - (opp_spot * 0.0005)):
+                                continue
                     elif opp_action == "BUY_PE":
-                        # Must have bearish EMA cascade (EMA 9 < EMA 21) and price holding below EMA 21 without breaking prior bar high
-                        if not (ema9_val < ema21_val and b_close < ema21_val):
+                        # Anti-chasing guard: never buy PUTs oversold inside S1-S2 Demand Zone
+                        if s1_lvl > 0 and opp_spot <= s1_lvl and rsi_5m <= 28.0:
                             continue
-                        if b_close > b_open and b_close > ema9_val:
-                            continue
-                        if b_close > (prev_high + (opp_spot * 0.0005)):
-                            continue
+                        if not is_supply_rejection_pe:
+                            if opp_spot > real_vwap:
+                                continue
+                            if not (ema9_val < ema21_val and b_close < ema21_val):
+                                continue
+                            if b_close > b_open and b_close > ema9_val:
+                                continue
+                            if b_close > (prev_high + (opp_spot * 0.0005)):
+                                continue
                     opp_spot = top_opp["spot"]
                     opp_contract = contract_selector.select_contract(
                         spot_price=opp_spot,
