@@ -76,18 +76,35 @@ class MultiTimeframeEngine:
     _candles_cache = {}
     _candles_time = {}
     _candles_fail_time = {}
+    _candles_lock = None
 
     def get_real_candles(self, asset_key: str) -> Optional[pd.DataFrame]:
-        """Fetches authentic 5-minute candles directly from DhanHQ API with a 75s cache and 20s rate-limit backoff."""
+        """Fetches authentic 5-minute candles directly from DhanHQ API with a 120s cache, thread lock, and 20s rate-limit backoff."""
         import time
+        import threading
         from datetime import date
+        if self._candles_lock is None:
+            self._candles_lock = threading.Lock()
         now_ts = time.time()
-        if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 75.0:
+        if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 120.0:
             return self._candles_cache[asset_key]
         if (now_ts - self._candles_fail_time.get(asset_key, 0)) < 20.0:
             if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 300.0:
                 return self._candles_cache[asset_key]
             return None
+
+        with self._candles_lock:
+            now_ts = time.time()
+            if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 120.0:
+                return self._candles_cache[asset_key]
+            if (now_ts - self._candles_fail_time.get(asset_key, 0)) < 20.0:
+                if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 300.0:
+                    return self._candles_cache[asset_key]
+                return None
+            return self._fetch_real_candles_locked(asset_key, now_ts)
+
+    def _fetch_real_candles_locked(self, asset_key: str, now_ts: float) -> Optional[pd.DataFrame]:
+        from datetime import date
 
         dhan_meta = {
             "NIFTY": ("13", "IDX_I", "INDEX"),

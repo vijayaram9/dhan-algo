@@ -1460,8 +1460,24 @@ class MarketIntelligenceEngine:
         3. High-beta movers: NIFTY IT, SENSEX, RELIANCE, HDFC BANK.
         """
         now_ts = time.time()
-        if hasattr(self, "_opps_cache") and (now_ts - getattr(self, "_opps_time", 0)) < 5.0 and self._opps_cache:
+        if hasattr(self, "_opps_cache") and (now_ts - getattr(self, "_opps_time", 0)) < 8.0 and self._opps_cache:
             return self._opps_cache
+
+        import threading
+        if not hasattr(self, "_opps_lock"):
+            self._opps_lock = threading.Lock()
+        acquired = self._opps_lock.acquire(blocking=not bool(getattr(self, "_opps_cache", None)))
+        if not acquired:
+            return self._opps_cache
+        try:
+            now_ts = time.time()
+            if hasattr(self, "_opps_cache") and (now_ts - getattr(self, "_opps_time", 0)) < 8.0 and self._opps_cache:
+                return self._opps_cache
+            return self._scan_all_opportunities_locked(capital)
+        finally:
+            self._opps_lock.release()
+
+    def _scan_all_opportunities_locked(self, capital: float = 15000.0) -> List[dict]:
 
         results = []
         weekday_idx = datetime.datetime.now().weekday()
