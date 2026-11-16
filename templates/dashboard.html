@@ -4913,15 +4913,10 @@
                     const bandHalf = (lvls.r1 && lvls.s1) ? Math.max(Math.abs(lvls.r1 - lvls.s1) * 0.14, Math.abs(vah - val) * 0.08) : 0;
                     const inConsolidation = bandHalf > 0 && Math.abs(lastC.close - piv) <= bandHalf;
                     const curRsi = (typeof window._latestRsi === 'number') ? window._latestRsi : 50;
-
-                    const isBullishSetup = !inConsolidation && (
-                        (lvls.s1 && lastC.close <= lvls.s1 && (lastC.close >= lastC.open || curRsi <= 38)) ||
-                        (lastC.close > vwapVal && e9 > e21 && curRsi >= 52 && lastC.close >= lastC.open)
-                    );
-                    const isBearishSetup = !inConsolidation && (
-                        (lvls.r1 && lastC.close >= lvls.r1 && (lastC.close < lastC.open || curRsi >= 68)) ||
-                        (lastC.close < vwapVal && e9 < e21 && curRsi <= 45 && lastC.close < lastC.open)
-                    );
+                    const atResistanceZone = (lvls.r1 && lastC.close >= lvls.r1);
+                    const atSupportZone = (lvls.s1 && lastC.close <= lvls.s1);
+                    const bullTrend = (lastC.close > vwapVal && e9 > e21 && lastC.close >= lastC.open);
+                    const bearTrend = (lastC.close < vwapVal && e9 < e21 && lastC.close < lastC.open);
 
                     if (inConsolidation) {
                         markers.push({
@@ -4931,21 +4926,54 @@
                             shape: 'circle',
                             text: 'NO-TRADE (CONSOLIDATION)'
                         });
-                    } else if (isBullishSetup) {
+                    } else if (atResistanceZone && bullTrend) {
+                        // Price is in R1-R2 Supply Zone while momentum is bullish: warn if overbought, else label clearly as R1 Breakout (never "Demand Zone")
                         markers.push({
                             time: lastC.time,
-                            position: 'belowBar',
-                            color: '#16a34a',
-                            shape: 'arrowUp',
-                            text: 'BUY ZONE (DEMAND)'
+                            position: 'aboveBar',
+                            color: curRsi >= 75 ? '#d97706' : '#059669',
+                            shape: curRsi >= 75 ? 'circle' : 'arrowUp',
+                            text: curRsi >= 75 ? 'OVERBOUGHT @ R1-R2 (CAUTION)' : 'R1 BREAKOUT (BULLISH)'
                         });
-                    } else if (isBearishSetup) {
+                    } else if (atResistanceZone && (lastC.close < lastC.open || curRsi >= 68)) {
                         markers.push({
                             time: lastC.time,
                             position: 'aboveBar',
                             color: '#e11d48',
                             shape: 'arrowDown',
-                            text: 'SELL ZONE (SUPPLY)'
+                            text: 'SELL ZONE (R1-R2 SUPPLY)'
+                        });
+                    } else if (atSupportZone && bearTrend) {
+                        markers.push({
+                            time: lastC.time,
+                            position: 'belowBar',
+                            color: curRsi <= 25 ? '#d97706' : '#e11d48',
+                            shape: curRsi <= 25 ? 'circle' : 'arrowDown',
+                            text: curRsi <= 25 ? 'OVERSOLD @ S1-S2 (CAUTION)' : 'S1 BREAKDOWN (BEARISH)'
+                        });
+                    } else if (atSupportZone && (lastC.close >= lastC.open || curRsi <= 38)) {
+                        markers.push({
+                            time: lastC.time,
+                            position: 'belowBar',
+                            color: '#16a34a',
+                            shape: 'arrowUp',
+                            text: 'BUY ZONE (S1-S2 DEMAND)'
+                        });
+                    } else if (bullTrend && curRsi >= 52) {
+                        markers.push({
+                            time: lastC.time,
+                            position: 'belowBar',
+                            color: '#16a34a',
+                            shape: 'arrowUp',
+                            text: 'BULLISH TREND (ABOVE VWAP)'
+                        });
+                    } else if (bearTrend && curRsi <= 45) {
+                        markers.push({
+                            time: lastC.time,
+                            position: 'aboveBar',
+                            color: '#e11d48',
+                            shape: 'arrowDown',
+                            text: 'BEARISH TREND (BELOW VWAP)'
                         });
                     } else {
                         markers.push({
