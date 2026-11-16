@@ -662,31 +662,31 @@ class NiftySmartEdgeEngine:
                     msg = f"🌊 Swing Target Hit: Floor Locked @ ₹{locked_floor:.2f}. Trailing runner active to ride wave continuation!"
                     self.log_sniper_event(msg, "PROFIT")
 
-            # 3. Multi-Tiered Dynamic Trailing Stop & Profit Lock for Swing (strictly % based, never above current_premium):
-            # Tier 1 (+6% premium gain): Lock in +2.5% (or minimum fee buffer) only when current_premium is safely above lock level
-            if prem_gain_pct >= 6.0 and pos.trailing_step_level < 1:
+            # 3. Multi-Tiered Dynamic Trailing Stop & Profit Lock for Swing (let runners breathe past 3-4% pullbacks):
+            # Tier 1 (+10% premium gain): Lock in +4% (or minimum fee buffer) so winners clear charges + bank meaningful profit
+            if prem_gain_pct >= 10.0 and pos.trailing_step_level < 1:
                 fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
-                locked_prem = max(round(pos.entry_premium * 1.025, 2), round(pos.entry_premium + fee_buf, 2))
+                locked_prem = max(round(pos.entry_premium * 1.04, 2), round(pos.entry_premium + fee_buf, 2))
                 locked_prem = min(locked_prem, round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
                 if locked_prem > pos.hard_stop_premium:
                     pos.hard_stop_premium = locked_prem
                     pos.is_trailing_active = True
                     pos.trailing_step_level = 1
                     pos.locked_profit_inr = round((pos.hard_stop_premium - pos.entry_premium) * pos.quantity, 2)
-                    print(f"[SWING TIER 1] 🌊 +2.5% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
+                    print(f"[SWING TIER 1] 🌊 +4% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
 
-            # Tier 2 (+10% premium gain): Lock in at least +6% profit!
-            if prem_gain_pct >= 10.0 and pos.trailing_step_level < 2:
-                locked_prem = min(round(pos.entry_premium * 1.06, 2), round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
+            # Tier 2 (+15% premium gain): Lock in at least +9% profit!
+            if prem_gain_pct >= 15.0 and pos.trailing_step_level < 2:
+                locked_prem = min(round(pos.entry_premium * 1.09, 2), round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
                 if locked_prem > pos.hard_stop_premium:
                     pos.hard_stop_premium = locked_prem
                     pos.trailing_step_level = 2
                     pos.locked_profit_inr = round((pos.hard_stop_premium - pos.entry_premium) * pos.quantity, 2)
-                    print(f"[SWING TIER 2] 🌊 +6% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
+                    print(f"[SWING TIER 2] 🌊 +9% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
 
-            # Tier 3 (+16% or higher runner): Lock at least +11% and trail tightly at 90% of highest watermark!
-            if prem_gain_pct >= 16.0:
-                trail_sl = max(round(pos.entry_premium * 1.11, 2), round(pos.highest_premium * 0.90, 2))
+            # Tier 3 (+22% or higher runner): Lock at least +15% and trail tightly at 90% of highest watermark!
+            if prem_gain_pct >= 22.0:
+                trail_sl = max(round(pos.entry_premium * 1.15, 2), round(pos.highest_premium * 0.90, 2))
                 trail_sl = min(trail_sl, round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
                 if trail_sl > pos.hard_stop_premium:
                     pos.hard_stop_premium = trail_sl
@@ -1655,8 +1655,12 @@ class NiftySmartEdgeEngine:
                     if is_asset_cd or (asset_cd_until is not None and datetime.datetime.now() < asset_cd_until):
                         continue
 
-                    # Require high-conviction institutional confluence
-                    if not top_opp.get("is_actionable") or top_opp.get("confluence_score", 0) < min_conf:
+                    # Require high-conviction institutional confluence (60+ for confirmed Index trends, 70+ for Stock options)
+                    opp_regime = top_opp.get("mtf_analysis", {}).get("market_regime", "")
+                    if opp_regime == "UNCONFIRMED_DATA":
+                        continue
+                    eff_min_conf = min(min_conf, 60) if (top_opp["key"] in index_keys and opp_regime in ("INSTITUTIONAL_ACCUMULATION", "INSTITUTIONAL_DISTRIBUTION")) else min_conf
+                    if not top_opp.get("is_actionable") or top_opp.get("confluence_score", 0) < eff_min_conf:
                         continue
                     asset_key = top_opp["key"]
                     opp_action = "BUY_CE" if any(x in top_opp["action"].upper() for x in ["CE", "CALL", "BULLISH"]) else ("BUY_PE" if any(x in top_opp["action"].upper() for x in ["PE", "PUT", "BEARISH"]) else None)

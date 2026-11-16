@@ -1575,6 +1575,12 @@ class MarketIntelligenceEngine:
                 opt_type = "CE" if is_bull else ("PE" if is_bear else "CE")
                 action_str = verdict["action"] if is_actionable else "STAND DOWN"
             
+            # Never mark UNCONFIRMED_DATA or raw option contracts as Auto-Pilot actionable
+            if mtf.market_regime == "UNCONFIRMED_DATA" or key.endswith("_CE") or key.endswith("_PE"):
+                is_actionable = False
+                if not is_bull and not is_bear:
+                    action_str = "STAND DOWN"
+
             # Momentum flash tag
             if is_actionable and score >= 80:
                 momentum_tag = "⚡ SURGING MOMENTUM"
