@@ -5302,7 +5302,7 @@
                     const liveSpot = parseFloat(currentActiveOpp.spot);
                     const spotEl = document.getElementById('quote-spot');
                     if (spotEl) spotEl.innerText = `₹${liveSpot.toLocaleString('en-IN')}`;
-                    if (candleSeries && window._latestCandle && !_isFetchingChartData && window._latestCandle._assetKey === activeAssetKey && window._latestCandle._tf === activeTimeframe) {
+                    if (candleSeries && window._latestCandle && !_isFetchingChartData && activeChartTarget === 'underlying' && window._latestCandle._assetKey === activeAssetKey && window._latestCandle._tf === activeTimeframe) {
                         const liveCandle = {
                             time: window._latestCandle.time,
                             open: window._latestCandle.open,
@@ -5321,13 +5321,7 @@
                         opps = opps.filter(o => o.category === 'INDEX' || o.category === 'COMMODITY' || o.category === 'STOCK' || o.category === 'CALL' || o.category === 'PUT' || o.category === 'FUTURES');
                     }
 
-                    // Adaptive Radar Autopilot: If user hasn't locked an explicit asset, auto-flash and analyze the #1 top recommendation
-                    if (!window.userManuallySelectedAsset && opps && opps.length > 0) {
-                        const topCandidate = opps[0];
-                        if (topCandidate && topCandidate.key && topCandidate.key !== activeAssetKey) {
-                            selectAsset(topCandidate.key, false);
-                        }
-                    }
+                    // Strict User Chart Lock: Never auto-switch the user's active chart script unless they explicitly select another instrument.
 
                     tbody.innerHTML = opps.map(opp => {
                         const isTop = opp.is_top_pick;
