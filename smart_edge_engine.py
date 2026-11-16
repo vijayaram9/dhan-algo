@@ -662,7 +662,18 @@ class NiftySmartEdgeEngine:
                     msg = f"🌊 Swing Target Hit: Floor Locked @ ₹{locked_floor:.2f}. Trailing runner active to ride wave continuation!"
                     self.log_sniper_event(msg, "PROFIT")
 
-            # 3. Multi-Tiered Dynamic Trailing Stop & Profit Lock for Swing (let runners breathe past 3-4% pullbacks):
+            # 3. Multi-Tiered Dynamic Trailing Stop & Profit Lock for Swing:
+            # Tier 0 (+6% open gain): Lock Fee-Protected Breakeven so a winning trade NEVER turns into a -10% loss, while giving 5% room to breathe!
+            if prem_gain_pct >= 6.0 and not pos.is_trailing_active:
+                fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
+                be_prem = round(pos.entry_premium + fee_buf, 2)
+                be_prem = min(be_prem, round(pos.current_premium - max(0.5, pos.current_premium * 0.01), 2))
+                if be_prem > pos.hard_stop_premium:
+                    pos.hard_stop_premium = be_prem
+                    pos.is_trailing_active = True
+                    pos.locked_profit_inr = round((be_prem - pos.entry_premium) * pos.quantity, 2)
+                    print(f"[SWING BE SHIELD] 🛡️ +6% Reached -> Fee-Protected Breakeven Locked @ ₹{pos.hard_stop_premium:.2f}")
+
             # Tier 1 (+10% premium gain): Lock in +4% (or minimum fee buffer) so winners clear charges + bank meaningful profit
             if prem_gain_pct >= 10.0 and pos.trailing_step_level < 1:
                 fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
@@ -928,16 +939,17 @@ class NiftySmartEdgeEngine:
         else:
             self.active_positions = [p for p in self.active_positions if getattr(p, "position_id", "") != getattr(pos, "position_id", "")]
 
-        # Release Global Trade Lock & engage 10-minute per-asset cooldown (so other instruments stay active!)
+        # Release Global Trade Lock & engage directional 15m cooldown on the SAME side only (allowing immediate ChoCH opposite-side flips!)
         try:
             from global_trade_lock import global_trade_lock
             closed_asset = getattr(pos, "asset_key", "")
+            closed_side = "BUY_CE" if getattr(pos, "option_type", "CE") == "CE" else "BUY_PE"
             if closed_asset:
                 if not hasattr(self, "_asset_cooldowns"):
                     self._asset_cooldowns = {}
-                self._asset_cooldowns[closed_asset] = datetime.datetime.now() + datetime.timedelta(seconds=1800)
+                self._asset_cooldowns[f"{closed_asset}:{closed_side}"] = datetime.datetime.now() + datetime.timedelta(seconds=900)
             global_trade_lock.release_lock(position_id=getattr(pos, "position_id", ""), cooldown_seconds=0)
-            print(Fore.CYAN + f"[GlobalTradeLock] Lock released. 10m per-asset cooldown set for {closed_asset}; other assets remain active.")
+            print(Fore.CYAN + f"[GlobalTradeLock] Lock released. 15m same-direction cooldown set for {closed_asset}:{closed_side}; opposite ChoCH flips remain open.")
         except Exception as e:
             print(f"[GlobalTradeLock Exit Error] {e}")
 
@@ -1649,10 +1661,9 @@ class NiftySmartEdgeEngine:
                 # High-Confluence Institutional Selection (Dynamic 70-80% + Trend & Candle Confirmation):
                 min_conf = getattr(self, "dynamic_min_confluence", 70)
                 for top_opp in valid_opps:
-                    # Check per-instrument 10-minute cooldown
+                    # Check global lock; directional same-side cooldown is checked after opp_action is determined (allowing immediate ChoCH opposite flips!)
                     is_asset_cd, _ = global_trade_lock.is_cooldown_active(top_opp["key"])
-                    asset_cd_until = getattr(self, "_asset_cooldowns", {}).get(top_opp["key"])
-                    if is_asset_cd or (asset_cd_until is not None and datetime.datetime.now() < asset_cd_until):
+                    if is_asset_cd:
                         continue
 
                     # Require high-conviction institutional confluence (60+ for confirmed Index trends, 70+ MCX, 85+ for Stock options to prevent fee churn)
@@ -1671,6 +1682,9 @@ class NiftySmartEdgeEngine:
                     asset_key = top_opp["key"]
                     opp_action = "BUY_CE" if any(x in top_opp["action"].upper() for x in ["CE", "CALL", "BULLISH"]) else ("BUY_PE" if any(x in top_opp["action"].upper() for x in ["PE", "PUT", "BEARISH"]) else None)
                     if not opp_action:
+                        continue
+                    dir_cd_until = getattr(self, "_asset_cooldowns", {}).get(f"{asset_key}:{opp_action}")
+                    if dir_cd_until is not None and datetime.datetime.now() < dir_cd_until:
                         continue
                     
                     # Institutional Trend Direction, Supply/Demand Zone & Candlestick Confirmation Filter:
