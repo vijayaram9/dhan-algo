@@ -480,14 +480,24 @@ class NiftySmartEdgeEngine:
         refreshed_ltp = self.client.get_option_ltp(
             pos.security_id, current_spot, strike_val, pos.option_type, pos.expiry_date, segment=p_seg, require_live=True
         )
-        if refreshed_ltp > 0.05:
+        has_live_quote = refreshed_ltp > 0.05
+        if has_live_quote:
             pos.current_premium = refreshed_ltp
         else:
-            # Strict live-price-only exit guardrail: never trigger SL/Target on stale cached premiums
-            now_hm_chk = datetime.datetime.now().strftime("%H:%M")
+            # Allow mandatory time-based cutoffs (60m Swing / 50m Standard / 15:15 Equity / 23:15 MCX) even if live tick is quiet,
+            # but strictly block SL/Target exits on stale prices when no live quote is available.
+            now_ist = get_ist_now()
+            now_hm_chk = now_ist.strftime("%H:%M")
             is_comm_chk = p_seg == "MCX_COMM"
-            is_mandatory_eod = (not is_comm_chk and "15:15" <= now_hm_chk < "15:30") or (is_comm_chk and "23:20" <= now_hm_chk <= "23:55")
-            if not is_mandatory_eod:
+            is_mandatory_eod = (not is_comm_chk and "15:15" <= now_hm_chk < "15:30") or (is_comm_chk and "23:15" <= now_hm_chk <= "23:55")
+            elapsed_min_chk = 0.0
+            try:
+                entry_dt_chk = datetime.datetime.strptime(pos.entry_time_iso[:19], "%Y-%m-%d %H:%M:%S")
+                elapsed_min_chk = (now_ist.replace(tzinfo=None) - entry_dt_chk).total_seconds() / 60.0
+            except Exception:
+                pass
+            is_time_cutoff = (pos.trade_style == "SWING" and elapsed_min_chk >= 60.0) or (pos.trade_style not in ("SNIPER", "SWING") and elapsed_min_chk >= 50.0)
+            if not (is_mandatory_eod or is_time_cutoff):
                 return False, ""
             if pos.current_premium <= 0.05:
                 pos.current_premium = pos.entry_premium
@@ -652,28 +662,32 @@ class NiftySmartEdgeEngine:
                     msg = f"🌊 Swing Target Hit: Floor Locked @ ₹{locked_floor:.2f}. Trailing runner active to ride wave continuation!"
                     self.log_sniper_event(msg, "PROFIT")
 
-            # 3. Multi-Tiered Dynamic Trailing Stop & Profit Lock for Swing:
-            # Tier 1 (+6% premium gain or +12 pts): Lock in +2.5% (or min fee buffer) so winners bank real profit!
-            if (prem_gain_pct >= 6.0 or prem_gain >= 12.0) and pos.trailing_step_level < 1:
+            # 3. Multi-Tiered Dynamic Trailing Stop & Profit Lock for Swing (strictly % based, never above current_premium):
+            # Tier 1 (+6% premium gain): Lock in +2.5% (or minimum fee buffer) only when current_premium is safely above lock level
+            if prem_gain_pct >= 6.0 and pos.trailing_step_level < 1:
                 fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
                 locked_prem = max(round(pos.entry_premium * 1.025, 2), round(pos.entry_premium + fee_buf, 2))
-                pos.hard_stop_premium = max(pos.hard_stop_premium, locked_prem)
-                pos.is_trailing_active = True
-                pos.trailing_step_level = 1
-                pos.locked_profit_inr = round((pos.hard_stop_premium - pos.entry_premium) * pos.quantity, 2)
-                print(f"[SWING TIER 1] 🌊 +2.5% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
+                locked_prem = min(locked_prem, round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
+                if locked_prem > pos.hard_stop_premium:
+                    pos.hard_stop_premium = locked_prem
+                    pos.is_trailing_active = True
+                    pos.trailing_step_level = 1
+                    pos.locked_profit_inr = round((pos.hard_stop_premium - pos.entry_premium) * pos.quantity, 2)
+                    print(f"[SWING TIER 1] 🌊 +2.5% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
 
-            # Tier 2 (+10% premium gain or +22 pts): Lock in at least +6% profit!
-            if (prem_gain_pct >= 10.0 or prem_gain >= 22.0) and pos.trailing_step_level < 2:
-                locked_prem = round(pos.entry_premium * 1.06, 2)
-                pos.hard_stop_premium = max(pos.hard_stop_premium, locked_prem)
-                pos.trailing_step_level = 2
-                pos.locked_profit_inr = round((pos.hard_stop_premium - pos.entry_premium) * pos.quantity, 2)
-                print(f"[SWING TIER 2] 🌊 +6% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
+            # Tier 2 (+10% premium gain): Lock in at least +6% profit!
+            if prem_gain_pct >= 10.0 and pos.trailing_step_level < 2:
+                locked_prem = min(round(pos.entry_premium * 1.06, 2), round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
+                if locked_prem > pos.hard_stop_premium:
+                    pos.hard_stop_premium = locked_prem
+                    pos.trailing_step_level = 2
+                    pos.locked_profit_inr = round((pos.hard_stop_premium - pos.entry_premium) * pos.quantity, 2)
+                    print(f"[SWING TIER 2] 🌊 +6% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
 
             # Tier 3 (+16% or higher runner): Lock at least +11% and trail tightly at 90% of highest watermark!
             if prem_gain_pct >= 16.0:
                 trail_sl = max(round(pos.entry_premium * 1.11, 2), round(pos.highest_premium * 0.90, 2))
+                trail_sl = min(trail_sl, round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
                 if trail_sl > pos.hard_stop_premium:
                     pos.hard_stop_premium = trail_sl
                     pos.trailing_step_level = 3
@@ -1660,14 +1674,18 @@ class NiftySmartEdgeEngine:
                     ema21_val = float(df_bars["close"].ewm(span=21, adjust=False).mean().iloc[-1])
 
                     if opp_action == "BUY_CE":
-                        # Must have bullish EMA cascade, green/rising candle, and not breaking prev low
-                        if not (ema9_val > ema21_val and b_close >= b_open and b_close > ema9_val):
+                        # Must have bullish EMA cascade (EMA 9 > EMA 21) and price holding above EMA 21 without breaking prior bar low
+                        if not (ema9_val > ema21_val and b_close > ema21_val):
+                            continue
+                        if b_close < b_open and b_close < ema9_val:
                             continue
                         if b_close < (prev_low - (opp_spot * 0.0005)):
                             continue
                     elif opp_action == "BUY_PE":
-                        # Must have bearish EMA cascade, red/falling candle, and not breaking prev high
-                        if not (ema9_val < ema21_val and b_close <= b_open and b_close < ema9_val):
+                        # Must have bearish EMA cascade (EMA 9 < EMA 21) and price holding below EMA 21 without breaking prior bar high
+                        if not (ema9_val < ema21_val and b_close < ema21_val):
+                            continue
+                        if b_close > b_open and b_close > ema9_val:
                             continue
                         if b_close > (prev_high + (opp_spot * 0.0005)):
                             continue
