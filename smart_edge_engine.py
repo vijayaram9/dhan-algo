@@ -935,7 +935,7 @@ class NiftySmartEdgeEngine:
             if closed_asset:
                 if not hasattr(self, "_asset_cooldowns"):
                     self._asset_cooldowns = {}
-                self._asset_cooldowns[closed_asset] = datetime.datetime.now() + datetime.timedelta(seconds=600)
+                self._asset_cooldowns[closed_asset] = datetime.datetime.now() + datetime.timedelta(seconds=1800)
             global_trade_lock.release_lock(position_id=getattr(pos, "position_id", ""), cooldown_seconds=0)
             print(Fore.CYAN + f"[GlobalTradeLock] Lock released. 10m per-asset cooldown set for {closed_asset}; other assets remain active.")
         except Exception as e:
@@ -1655,11 +1655,17 @@ class NiftySmartEdgeEngine:
                     if is_asset_cd or (asset_cd_until is not None and datetime.datetime.now() < asset_cd_until):
                         continue
 
-                    # Require high-conviction institutional confluence (60+ for confirmed Index trends, 70+ for Stock options)
+                    # Require high-conviction institutional confluence (60+ for confirmed Index trends, 70+ MCX, 85+ for Stock options to prevent fee churn)
                     opp_regime = top_opp.get("mtf_analysis", {}).get("market_regime", "")
                     if opp_regime == "UNCONFIRMED_DATA":
                         continue
-                    eff_min_conf = min(min_conf, 60) if (top_opp["key"] in index_keys and opp_regime in ("INSTITUTIONAL_ACCUMULATION", "INSTITUTIONAL_DISTRIBUTION")) else min_conf
+                    is_idx_or_mcx = (top_opp["key"] in index_keys) or (top_opp["key"] in mcx_keys)
+                    if top_opp["key"] in index_keys and opp_regime in ("INSTITUTIONAL_ACCUMULATION", "INSTITUTIONAL_DISTRIBUTION"):
+                        eff_min_conf = min(min_conf, 60)
+                    elif is_idx_or_mcx:
+                        eff_min_conf = min_conf
+                    else:
+                        eff_min_conf = max(min_conf, 85)
                     if not top_opp.get("is_actionable") or top_opp.get("confluence_score", 0) < eff_min_conf:
                         continue
                     asset_key = top_opp["key"]
