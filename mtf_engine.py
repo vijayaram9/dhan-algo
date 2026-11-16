@@ -76,6 +76,7 @@ class MultiTimeframeEngine:
     _candles_cache = {}
     _candles_time = {}
     _candles_fail_time = {}
+    _last_candle_err = {}
     _candles_lock = None
 
     def get_real_candles(self, asset_key: str) -> Optional[pd.DataFrame]:
@@ -164,9 +165,12 @@ class MultiTimeframeEngine:
                     self._candles_cache[asset_key] = df
                     self._candles_time[asset_key] = now_ts
                     self._candles_fail_time.pop(asset_key, None)
+                    self._last_candle_err.pop(asset_key, None)
                     return df
+            self._last_candle_err[asset_key] = str(res)[:180]
             self._candles_fail_time[asset_key] = now_ts
         except Exception as e:
+            self._last_candle_err[asset_key] = f"EXC: {e}"
             self._candles_fail_time[asset_key] = now_ts
             print(f"[MTF] Candle fetch error for {asset_key}: {e}")
         if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 300.0:
@@ -403,8 +407,9 @@ class MultiTimeframeEngine:
                 f"🛡️ FAIL-CLOSED DEFENSE: Awaiting authentic 5m candles for {display_name} directly from DhanHQ. "
                 f"Indicators (VWAP, EMA 9/21, RSI) require genuine multi-timeframe candles. Standing down in safe cash."
             )
+            err_detail = self._last_candle_err.get(asset_key, "no_err")
             key_reasons = [
-                f"Dhan 5m candle feed not yet available (minimum 5 candles required)",
+                f"Dhan 5m candle feed not yet available (minimum 5 candles required) [{err_detail}]",
                 f"Fail-Closed Discipline: Strictly refusing to execute trades on unconfirmed or synthetic data",
                 f"Safe Cash Defense active until verified candles are fetched"
             ]
