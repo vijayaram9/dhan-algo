@@ -75,14 +75,19 @@ class MultiTimeframeEngine:
 
     _candles_cache = {}
     _candles_time = {}
+    _candles_fail_time = {}
 
     def get_real_candles(self, asset_key: str) -> Optional[pd.DataFrame]:
-        """Fetches authentic 5-minute candles directly from DhanHQ API with a 75s cache to prevent DH-904 rate limits."""
+        """Fetches authentic 5-minute candles directly from DhanHQ API with a 75s cache and 20s rate-limit backoff."""
         import time
         from datetime import date
         now_ts = time.time()
         if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 75.0:
             return self._candles_cache[asset_key]
+        if (now_ts - self._candles_fail_time.get(asset_key, 0)) < 20.0:
+            if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 300.0:
+                return self._candles_cache[asset_key]
+            return None
 
         dhan_meta = {
             "NIFTY": ("13", "IDX_I", "INDEX"),
@@ -116,12 +121,15 @@ class MultiTimeframeEngine:
             from datetime import timedelta
             from dhan_client import get_dhan_client, DhanTraderClient
             client = get_dhan_client()
-            DhanTraderClient.throttle_request(0.15)
+            DhanTraderClient.throttle_request(0.35)
             today_dt = date.today()
             today_str = today_dt.strftime("%Y-%m-%d")
             from_str = (today_dt - timedelta(days=5)).strftime("%Y-%m-%d")
             res = client.dhan.intraday_minute_data(sec_id, seg, itype, from_str, today_str, interval=5)
-            if res and res.get("status") == "success":
+            if not (isinstance(res, dict) and res.get("status") == "success" and res.get("data", {}).get("close")):
+                DhanTraderClient.throttle_request(0.35)
+                res = client.dhan.intraday_minute_data(sec_id, seg, itype, today_str, today_str, interval=5)
+            if isinstance(res, dict) and res.get("status") == "success":
                 d = res.get("data", {})
                 closes = d.get("close", [])
                 if len(closes) >= 3:
@@ -138,9 +146,12 @@ class MultiTimeframeEngine:
                     df = pd.DataFrame(df_dict)
                     self._candles_cache[asset_key] = df
                     self._candles_time[asset_key] = now_ts
+                    self._candles_fail_time.pop(asset_key, None)
                     return df
+            self._candles_fail_time[asset_key] = now_ts
         except Exception as e:
-            pass
+            self._candles_fail_time[asset_key] = now_ts
+            print(f"[MTF] Candle fetch error for {asset_key}: {e}")
         if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 300.0:
             return self._candles_cache[asset_key]
         return None
