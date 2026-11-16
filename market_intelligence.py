@@ -1576,7 +1576,8 @@ class MarketIntelligenceEngine:
                 action_str = verdict["action"] if is_actionable else "STAND DOWN"
             
             # Never mark UNCONFIRMED_DATA or raw option contracts as Auto-Pilot actionable
-            if mtf.market_regime == "UNCONFIRMED_DATA" or key.endswith("_CE") or key.endswith("_PE"):
+            mtf_regime_chk = verdict.get("mtf_analysis", {}).get("market_regime", "")
+            if mtf_regime_chk == "UNCONFIRMED_DATA" or key.endswith("_CE") or key.endswith("_PE"):
                 is_actionable = False
                 if not is_bull and not is_bear:
                     action_str = "STAND DOWN"
