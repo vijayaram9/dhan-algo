@@ -186,7 +186,13 @@ class MultiTimeframeEngine:
             500.0 if asset_key == "SILVERM" else (5.0 if asset_key == "NATGASMINI" else 50.0)
         )
         
-        # Pull real candles to compute real VWAP and Daily Pivots
+        pdh = 0.0
+        pdl = 0.0
+        poc = round(spot, 2)
+        vah = round(spot, 2)
+        val = round(spot, 2)
+
+        # Pull real candles to compute real VWAP, Daily Pivots, PDH/PDL, and Volume Profile (POC/VAH/VAL)
         df5 = self.get_real_candles(asset_key)
         if df5 is not None and not df5.empty:
             df_intraday = df5
@@ -195,6 +201,16 @@ class MultiTimeframeEngine:
                 ist_now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
                 today_midnight_ts = ist_now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
                 df_t = df5[df5["timestamp"] >= today_midnight_ts]
+                df_prev = df5[df5["timestamp"] < today_midnight_ts]
+                if not df_prev.empty:
+                    # Isolate most recent prior trading day for authentic PDH / PDL
+                    last_prev_ts = float(df_prev["timestamp"].max())
+                    prev_day_start = last_prev_ts - (last_prev_ts % 86400) - 19800
+                    df_last_day = df_prev[df_prev["timestamp"] >= prev_day_start]
+                    if df_last_day.empty:
+                        df_last_day = df_prev.tail(75)
+                    pdh = round(float(df_last_day["high"].max()), 2)
+                    pdl = round(float(df_last_day["low"].min()), 2)
                 if not df_t.empty:
                     df_intraday = df_t
                 elif len(df5) > 25:
@@ -208,6 +224,38 @@ class MultiTimeframeEngine:
             s1 = round((2 * pp) - day_high, 1)
             r2 = round(pp + (day_high - day_low), 1)
             s2 = round(pp - (day_high - day_low), 1)
+            # Volume Profile (POC / VAH / VAL across 20 price bins on recent real candles)
+            try:
+                vp_df = df5.tail(75)
+                lo_p = float(vp_df["low"].min())
+                hi_p = float(vp_df["high"].max())
+                if hi_p > lo_p:
+                    bins = 20
+                    b_size = (hi_p - lo_p) / bins
+                    vol_bins = [0.0] * bins
+                    for _, row in vp_df.iterrows():
+                        idx = min(bins - 1, max(0, int((float(row["close"]) - lo_p) / b_size)))
+                        vol_bins[idx] += max(1.0, float(row.get("volume", 1.0) or 1.0))
+                    poc_idx = max(range(bins), key=lambda i: vol_bins[i])
+                    poc = round(lo_p + (poc_idx + 0.5) * b_size, 2)
+                    tot_v = sum(vol_bins)
+                    va_v = vol_bins[poc_idx]
+                    l_i, r_i = poc_idx, poc_idx
+                    while va_v < tot_v * 0.70 and (l_i > 0 or r_i < bins - 1):
+                        lv = vol_bins[l_i - 1] if l_i > 0 else -1.0
+                        rv = vol_bins[r_i + 1] if r_i < bins - 1 else -1.0
+                        if rv >= lv and r_i < bins - 1:
+                            r_i += 1
+                            va_v += vol_bins[r_i]
+                        elif l_i > 0:
+                            l_i -= 1
+                            va_v += vol_bins[l_i]
+                        else:
+                            break
+                    val = round(lo_p + l_i * b_size, 2)
+                    vah = round(lo_p + (r_i + 1) * b_size, 2)
+            except Exception:
+                pass
         else:
             pp = round(spot / step) * step
             r1 = round(pp + (step * 0.75), 1)
@@ -223,7 +271,12 @@ class MultiTimeframeEngine:
             "r2": r2,
             "s1": s1,
             "s2": s2,
-            "vwap": vwap
+            "vwap": vwap,
+            "pdh": pdh,
+            "pdl": pdl,
+            "poc": poc,
+            "vah": vah,
+            "val": val
         }
 
     def analyze(self, asset_key: str, display_name: str, spot: float) -> MultiTimeframeAnalysis:

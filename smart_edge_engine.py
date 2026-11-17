@@ -1779,8 +1779,11 @@ class NiftySmartEdgeEngine:
                         opp_action = "BUY_CE"
 
                     if opp_action == "BUY_CE":
-                        # Anti-chasing guard: never buy CALLs overbought near/inside R1-R2 Supply Zone or over-extended >0.12% above EMA9
+                        # Anti-chasing guard: never buy CALLs overbought near/inside R1-R2 Supply Zone, just under PDH resistance, or >0.12% above EMA9
                         if r1_lvl > 0 and opp_spot >= (r1_lvl * 0.999) and rsi_5m >= 68.0:
+                            continue
+                        pdh_lvl = float(mtf_lvls.get("pdh", 0.0) or 0.0)
+                        if pdh_lvl > 0 and 0.0 < ((pdh_lvl - opp_spot) / pdh_lvl) <= 0.0012 and comp_close <= pdh_lvl:
                             continue
                         if not is_demand_bounce_ce:
                             if opp_spot < real_vwap:
@@ -1794,8 +1797,11 @@ class NiftySmartEdgeEngine:
                             if b_close < (prev_low - (opp_spot * 0.0005)):
                                 continue
                     elif opp_action == "BUY_PE":
-                        # Anti-chasing guard: never buy PUTs oversold near/inside S1-S2 Demand Zone or over-extended >0.12% below EMA9
+                        # Anti-chasing guard: never buy PUTs oversold near/inside S1-S2 Demand Zone, just above PDL support, or >0.12% below EMA9
                         if s1_lvl > 0 and opp_spot <= (s1_lvl * 1.001) and rsi_5m <= 32.0:
+                            continue
+                        pdl_lvl = float(mtf_lvls.get("pdl", 0.0) or 0.0)
+                        if pdl_lvl > 0 and 0.0 < ((opp_spot - pdl_lvl) / pdl_lvl) <= 0.0012 and comp_close >= pdl_lvl:
                             continue
                         if not is_supply_rejection_pe:
                             if opp_spot > real_vwap:
@@ -1808,6 +1814,49 @@ class NiftySmartEdgeEngine:
                                 continue
                             if b_close > (prev_high + (opp_spot * 0.0005)):
                                 continue
+
+                    # Institutional Zone Confluence Boost (PDH/PDL, POC/VAH/VAL, Active FVG, Swing HH/HL or LH/LL)
+                    poc_lvl = float(mtf_lvls.get("poc", 0.0) or 0.0)
+                    vah_lvl = float(mtf_lvls.get("vah", 0.0) or 0.0)
+                    val_lvl = float(mtf_lvls.get("val", 0.0) or 0.0)
+                    pdh_lvl = float(mtf_lvls.get("pdh", 0.0) or 0.0)
+                    pdl_lvl = float(mtf_lvls.get("pdl", 0.0) or 0.0)
+                    fvg_info = IndicatorEngine.detect_fair_value_gap(df_bars)
+                    fvg_type = str(fvg_info.get("type", "NONE")).upper()
+                    swing_hl = len(df_bars) >= 10 and float(df_bars["low"].iloc[-2]) > float(df_bars["low"].iloc[-10:-3].min())
+                    swing_lh = len(df_bars) >= 10 and float(df_bars["high"].iloc[-2]) < float(df_bars["high"].iloc[-10:-3].max())
+
+                    zone_tags = []
+                    eff_score = int(top_opp.get("confluence_score", 75))
+                    if opp_action == "BUY_CE":
+                        if pdh_lvl > 0 and comp_close > pdh_lvl:
+                            zone_tags.append("PDH_BREAKOUT")
+                            eff_score += 8
+                        if poc_lvl > 0 and opp_spot > poc_lvl:
+                            zone_tags.append("ABOVE_POC")
+                        if vah_lvl > 0 and comp_close > vah_lvl:
+                            zone_tags.append("VAH_BREAK")
+                            eff_score += 5
+                        if "BULL" in fvg_type:
+                            zone_tags.append("BULL_FVG")
+                            eff_score += 6
+                        if swing_hl:
+                            zone_tags.append("HL_TREND")
+                    else:
+                        if pdl_lvl > 0 and comp_close < pdl_lvl:
+                            zone_tags.append("PDL_BREAKDOWN")
+                            eff_score += 8
+                        if poc_lvl > 0 and opp_spot < poc_lvl:
+                            zone_tags.append("BELOW_POC")
+                        if val_lvl > 0 and comp_close < val_lvl:
+                            zone_tags.append("VAL_BREAK")
+                            eff_score += 5
+                        if "BEAR" in fvg_type:
+                            zone_tags.append("BEAR_FVG")
+                            eff_score += 6
+                        if swing_lh:
+                            zone_tags.append("LH_TREND")
+                    eff_score = min(98, eff_score)
                     opp_spot = top_opp["spot"]
                     opp_contract = contract_selector.select_contract(
                         spot_price=opp_spot,
@@ -1816,7 +1865,7 @@ class NiftySmartEdgeEngine:
                         strike_preference="ATM",
                         asset_key=asset_key,
                         available_capital=active_cap,
-                        confluence_score=int(top_opp.get("confluence_score", 75))
+                        confluence_score=eff_score
                     )
                     if opp_contract.risk_budget_approved:
                         calc_levels = market_intelligence.calculate_levels_and_stops(
@@ -1829,9 +1878,10 @@ class NiftySmartEdgeEngine:
                         # Minimum 0.05% spread-survival stop distance guard
                         if opp_spot > 0 and (abs(opp_spot - struct_sl) / opp_spot) < 0.0005:
                             struct_sl = round(opp_spot * (0.9985 if opp_action == "BUY_CE" else 1.0015), 2)
+                        zone_suffix = f" [{' + '.join(zone_tags)}]" if zone_tags else ""
                         auto_sig = SmartEdgeSignal(
                             action=opp_action,
-                            strategy_name=top_opp.get("recommended_strategy", "RADAR_AUTO_PILOT"),
+                            strategy_name=f"{top_opp.get('recommended_strategy', 'RADAR_AUTO_PILOT')}{zone_suffix}",
                             regime=top_opp.get("market_regime", "MOMENTUM_TREND"),
                             spot_price=opp_spot,
                             structural_sl_spot=struct_sl,
