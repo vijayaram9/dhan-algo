@@ -755,6 +755,29 @@ class NiftySmartEdgeEngine:
         except Exception:
             elapsed_seconds = 60.0
 
+        # LIVE MID-TRADE ChoCH (Change of Character) EARLY CUT:
+        # After 3 minutes, if losing >= 2.5% (> ₹150) AND completed 5m bar + VWAP + EMA 9/21 flipped against our direction,
+        # cut immediately at ~-3% instead of bleeding to -10% (and allow immediate opposite-side ChoCH flip on next tick).
+        if has_live_quote and elapsed_seconds >= 180.0 and pos.pnl < -150.0 and pos.entry_premium > 0:
+            cur_loss_pct = (pos.current_premium - pos.entry_premium) / pos.entry_premium
+            if cur_loss_pct <= -0.025:
+                try:
+                    from mtf_engine import mtf_engine
+                    df_chk = mtf_engine.get_real_candles(pos_asset)
+                    lvls_chk = mtf_engine.calculate_institutional_levels(current_spot, pos_asset)
+                    vwap_chk = float(lvls_chk.get("vwap", 0.0) or 0.0)
+                    if df_chk is not None and len(df_chk) >= 21 and vwap_chk > 0:
+                        e9_chk = float(df_chk["close"].ewm(span=9, adjust=False).mean().iloc[-1])
+                        e21_chk = float(df_chk["close"].ewm(span=21, adjust=False).mean().iloc[-1])
+                        comp_c = float(df_chk["close"].iloc[-2])
+                        comp_o = float(df_chk["open"].iloc[-2])
+                        if pos.option_type == "CE" and current_spot < vwap_chk and e9_chk < e21_chk and comp_c < comp_o:
+                            return True, f"⚡ Live ChoCH Reversal Cut: {pos_asset} flipped below VWAP (₹{vwap_chk:,.1f}) & EMA 9 < 21"
+                        if pos.option_type == "PE" and current_spot > vwap_chk and e9_chk > e21_chk and comp_c > comp_o:
+                            return True, f"⚡ Live ChoCH Reversal Cut: {pos_asset} flipped above VWAP (₹{vwap_chk:,.1f}) & EMA 9 > 21"
+                except Exception:
+                    pass
+
         # LAYER 1: Underlying-Based Structural Stop (with sanity guard against corrupted spot quotes)
         spot_is_sane = (current_spot > 0 and abs(current_spot - pos.underlying_entry_spot) / max(1.0, pos.underlying_entry_spot) < 0.50)
         if spot_is_sane:
@@ -1336,6 +1359,8 @@ class NiftySmartEdgeEngine:
             swing_pct_sl = round(contract.estimated_premium * 0.90, 2)
             rupee_cap_sl = round(max(1.0, contract.estimated_premium - (1500.0 / max(1, contract.lot_size))), 2)
             hard_sl = max(hard_sl, swing_pct_sl, rupee_cap_sl)
+            # Spread-survival guard: ensure hard_sl is at least 1% below fresh live quote
+            hard_sl = min(hard_sl, round(contract.estimated_premium * 0.99, 2))
             if target_premium <= 0:
                 target_premium = round(contract.estimated_premium * 1.25, 2)
             max_holding_seconds = 3600 # 60 minutes wave ride
@@ -1666,14 +1691,14 @@ class NiftySmartEdgeEngine:
                     if is_asset_cd:
                         continue
 
-                    # Require high-conviction institutional confluence (60+ for confirmed Index trends, 70+ MCX, 85+ for Stock options to prevent fee churn)
+                    # Require high-conviction institutional confluence (60+ confirmed Index, 70+ Crude/NatGas, 85+ wide-spread Gold/Silver/Stocks)
                     opp_regime = top_opp.get("mtf_analysis", {}).get("market_regime", "")
                     if opp_regime == "UNCONFIRMED_DATA":
                         continue
-                    is_idx_or_mcx = (top_opp["key"] in index_keys) or (top_opp["key"] in mcx_keys)
+                    liquid_mcx = {"CRUDEOILM", "NATGASMINI"}
                     if top_opp["key"] in index_keys and opp_regime in ("INSTITUTIONAL_ACCUMULATION", "INSTITUTIONAL_DISTRIBUTION"):
                         eff_min_conf = min(min_conf, 60)
-                    elif is_idx_or_mcx:
+                    elif (top_opp["key"] in index_keys) or (top_opp["key"] in liquid_mcx):
                         eff_min_conf = min_conf
                     else:
                         eff_min_conf = max(min_conf, 85)
@@ -1696,17 +1721,37 @@ class NiftySmartEdgeEngine:
                     r1_lvl = float(mtf_lvls.get("r1", 0.0) or 0.0)
                     s1_lvl = float(mtf_lvls.get("s1", 0.0) or 0.0)
 
-                    # Fail-Closed Candle & EMA 9/21 Alignment Check:
+                    # Fail-Closed Candle & EMA 9/21 Alignment Check (Completed Bar + Volume + 15m ORB):
                     df_bars = mtf_engine.get_real_candles(asset_key)
                     if df_bars is None or len(df_bars) < 21:
                         continue
                     b_close = float(df_bars["close"].iloc[-1])
                     b_open = float(df_bars["open"].iloc[-1])
+                    comp_close = float(df_bars["close"].iloc[-2])
+                    comp_open = float(df_bars["open"].iloc[-2])
                     prev_low = float(df_bars["low"].iloc[-2])
                     prev_high = float(df_bars["high"].iloc[-2])
                     ema9_val = float(df_bars["close"].ewm(span=9, adjust=False).mean().iloc[-1])
                     ema21_val = float(df_bars["close"].ewm(span=21, adjust=False).mean().iloc[-1])
                     rsi_5m = IndicatorEngine.calculate_rsi(df_bars["close"])
+
+                    # Volume check on completed bar (skip ultra-thin < 0.75x volume bars when real volume is reported)
+                    if "volume" in df_bars.columns and float(df_bars["volume"].iloc[-2]) > 0:
+                        avg_vol20 = float(df_bars["volume"].tail(20).mean() or 0.0)
+                        if avg_vol20 > 0 and float(df_bars["volume"].iloc[-2]) < (avg_vol20 * 0.75):
+                            continue
+
+                    # 15m Opening Range (09:15-09:30 IST) for ORB + OR-Midpoint stop
+                    or_mid_sl = 0.0
+                    if asset_key not in mcx_keys and "timestamp" in df_bars.columns and now_hm_curr >= "09:30":
+                        ist_today = get_ist_now().replace(hour=9, minute=15, second=0, microsecond=0).timestamp()
+                        ist_or_end = get_ist_now().replace(hour=9, minute=30, second=0, microsecond=0).timestamp()
+                        df_or = df_bars[(df_bars["timestamp"] >= ist_today) & (df_bars["timestamp"] < ist_or_end)]
+                        if not df_or.empty:
+                            or_hi = float(df_or["high"].max())
+                            or_lo = float(df_or["low"].min())
+                            if (opp_action == "BUY_CE" and comp_close > or_hi) or (opp_action == "BUY_PE" and comp_close < or_lo):
+                                or_mid_sl = round((or_hi + or_lo) / 2.0, 2)
 
                     is_supply_rejection_pe = (r1_lvl > 0 and opp_spot >= r1_lvl and b_close < b_open and rsi_5m >= 62.0)
                     is_demand_bounce_ce = (s1_lvl > 0 and opp_spot <= s1_lvl and b_close > b_open and rsi_5m <= 38.0)
@@ -1761,12 +1806,19 @@ class NiftySmartEdgeEngine:
                         calc_levels = market_intelligence.calculate_levels_and_stops(
                             opp_spot, asset_key, is_bear=(opp_action == "BUY_PE")
                         )
+                        struct_sl = calc_levels.get("structural_sl_spot", calc_levels.get("sl", opp_spot - 25.0))
+                        if or_mid_sl > 0:
+                            if (opp_action == "BUY_CE" and or_mid_sl < opp_spot) or (opp_action == "BUY_PE" and or_mid_sl > opp_spot):
+                                struct_sl = or_mid_sl
+                        # Minimum 0.05% spread-survival stop distance guard
+                        if opp_spot > 0 and (abs(opp_spot - struct_sl) / opp_spot) < 0.0005:
+                            struct_sl = round(opp_spot * (0.9985 if opp_action == "BUY_CE" else 1.0015), 2)
                         auto_sig = SmartEdgeSignal(
                             action=opp_action,
                             strategy_name=top_opp.get("recommended_strategy", "RADAR_AUTO_PILOT"),
                             regime=top_opp.get("market_regime", "MOMENTUM_TREND"),
                             spot_price=opp_spot,
-                            structural_sl_spot=calc_levels.get("structural_sl_spot", calc_levels.get("sl", opp_spot - 25.0)),
+                            structural_sl_spot=struct_sl,
                             target_1_spot=calc_levels.get("target_1_spot", calc_levels.get("target_1", opp_spot + 35.0)),
                             target_2_spot=calc_levels.get("target_2_spot", calc_levels.get("target_2", opp_spot + 55.0))
                         )
