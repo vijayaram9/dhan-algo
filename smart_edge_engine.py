@@ -811,7 +811,14 @@ class NiftySmartEdgeEngine:
                         pos.is_trailing_active = True
                         pos.locked_profit_inr = round((t1_lock - pos.entry_premium) * pos.quantity, 2)
                 if pos.target_2_spot > pos.underlying_entry_spot and current_spot >= pos.target_2_spot and pos.pnl >= 300.0 and elapsed_seconds >= 15.0:
-                    return True, f"Target 2 (2.5R) Reached @ Spot {current_spot:.1f} (Target: {pos.target_2_spot:.1f})"
+                    gain_now = max(0.0, pos.current_premium - pos.entry_premium)
+                    t2_lock = max(round(pos.entry_premium + gain_now * 0.85, 2), round(pos.highest_premium * 0.92, 2))
+                    t2_lock = min(t2_lock, round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
+                    if t2_lock > pos.hard_stop_premium:
+                        pos.hard_stop_premium = t2_lock
+                        pos.is_trailing_active = True
+                        pos.trailing_step_level = max(pos.trailing_step_level, 4)
+                        pos.locked_profit_inr = round((t2_lock - pos.entry_premium) * pos.quantity, 2)
 
                 # Trailing Stop: 1 ATR movement after 1R
                 risk_pts = pos.underlying_entry_spot - pos.underlying_structural_sl
@@ -837,7 +844,14 @@ class NiftySmartEdgeEngine:
                         pos.is_trailing_active = True
                         pos.locked_profit_inr = round((t1_lock - pos.entry_premium) * pos.quantity, 2)
                 if 0 < pos.target_2_spot < pos.underlying_entry_spot and current_spot <= pos.target_2_spot and pos.pnl >= 300.0 and elapsed_seconds >= 15.0:
-                    return True, f"Target 2 (2.5R) Reached @ Spot {current_spot:.1f} (Target: {pos.target_2_spot:.1f})"
+                    gain_now = max(0.0, pos.current_premium - pos.entry_premium)
+                    t2_lock = max(round(pos.entry_premium + gain_now * 0.85, 2), round(pos.highest_premium * 0.92, 2))
+                    t2_lock = min(t2_lock, round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
+                    if t2_lock > pos.hard_stop_premium:
+                        pos.hard_stop_premium = t2_lock
+                        pos.is_trailing_active = True
+                        pos.trailing_step_level = max(pos.trailing_step_level, 4)
+                        pos.locked_profit_inr = round((t2_lock - pos.entry_premium) * pos.quantity, 2)
 
                 risk_pts = pos.underlying_structural_sl - pos.underlying_entry_spot
                 if risk_pts > 0 and (pos.underlying_entry_spot - current_spot) >= risk_pts:
@@ -1355,9 +1369,10 @@ class NiftySmartEdgeEngine:
                     target_premium = round(contract.estimated_premium + (sl_distance * 1.8), 2)
             max_holding_seconds = 1800  # 30 minutes institutional trade window
         elif trade_style == "SWING":
-            # Tight 10% premium stop + ₹1,500 per-trade max rupee risk cap so one loser never wipes out 3 winners
+            # Tight 10% premium stop + ₹1,500 max rupee risk cap (ratchets down to ₹900 once daily net P&L >= +₹3,000!)
+            max_risk_budget = 900.0 if float(getattr(self, "daily_net_pnl", 0.0) or 0.0) >= 3000.0 else 1500.0
             swing_pct_sl = round(contract.estimated_premium * 0.90, 2)
-            rupee_cap_sl = round(max(1.0, contract.estimated_premium - (1500.0 / max(1, contract.lot_size))), 2)
+            rupee_cap_sl = round(max(1.0, contract.estimated_premium - (max_risk_budget / max(1, contract.lot_size))), 2)
             hard_sl = max(hard_sl, swing_pct_sl, rupee_cap_sl)
             # Spread-survival guard: ensure hard_sl is at least 1% below fresh live quote
             hard_sl = min(hard_sl, round(contract.estimated_premium * 0.99, 2))
@@ -1659,22 +1674,15 @@ class NiftySmartEdgeEngine:
                 index_keys = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "NIFTYIT"}
                 active_index_count = sum(1 for p in self.active_positions if getattr(p, "asset_key", "") in index_keys)
 
+                # Option A: Equity/Index Focus (09:25 - 14:45 IST), MCX Auto-Pilot Off, up to 3 concurrent Index positions
                 if is_evening_session:
-                    if is_mcx_open:
-                        valid_opps = [
-                            o for o in all_opps
-                            if o["key"] in mcx_keys
-                            and o["key"] not in active_assets
-                            and self.check_trading_schedule(o["key"])[0]
-                        ]
-                    else:
-                        valid_opps = []
-                elif is_equity_open:
+                    valid_opps = []
+                elif is_equity_open and now_hm_curr < "14:45":
                     valid_opps = [
                         o for o in all_opps
                         if o["key"] not in active_assets
-                        and (o["key"] not in mcx_keys or is_mcx_open)
-                        and not (active_index_count >= 2 and o["key"] in index_keys)
+                        and o["key"] not in mcx_keys
+                        and not (active_index_count >= 3 and o["key"] in index_keys)
                         and self.check_trading_schedule(o["key"])[0]
                     ]
                 else:
