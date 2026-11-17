@@ -177,6 +177,31 @@ class MultiTimeframeEngine:
             return self._candles_cache[asset_key]
         return None
 
+    def get_resampled_trends(self, asset_key: str) -> dict:
+        """
+        Resamples cached 5m Dhan candles into true 15m and 1H bars (zero extra API calls)
+        and returns EMA 9 vs EMA 21 directional alignment for top-down MTF filtering.
+        """
+        out = {"tf_15m_bull": True, "tf_15m_bear": True, "tf_1h_bull": True, "tf_1h_bear": True}
+        df5 = self.get_real_candles(asset_key)
+        if df5 is None or len(df5) < 25 or "timestamp" not in df5.columns:
+            return out
+        try:
+            df_t = df5.copy()
+            df_t["dt"] = pd.to_datetime(df_t["timestamp"], unit="s")
+            df_t = df_t.set_index("dt")
+            for tf_rule, prefix in [("15min", "tf_15m"), ("1h", "tf_1h")]:
+                rs = df_t["close"].resample(tf_rule).last().dropna()
+                if len(rs) >= 21:
+                    e9 = float(rs.ewm(span=9, adjust=False).mean().iloc[-1])
+                    e21 = float(rs.ewm(span=21, adjust=False).mean().iloc[-1])
+                    last_c = float(rs.iloc[-1])
+                    out[f"{prefix}_bull"] = (e9 >= e21) and (last_c >= e21)
+                    out[f"{prefix}_bear"] = (e9 <= e21) and (last_c <= e21)
+        except Exception:
+            pass
+        return out
+
     def calculate_institutional_levels(self, spot: float, asset_key: str) -> dict:
         """
         Calculates REAL Floor Pivots and REAL Intraday VWAP from Dhan market feed.

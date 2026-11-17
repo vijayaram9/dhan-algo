@@ -762,28 +762,37 @@ class NiftySmartEdgeEngine:
         except Exception:
             elapsed_seconds = 60.0
 
-        # LIVE MID-TRADE ChoCH (Change of Character) EARLY CUT:
-        # After 3 minutes, if losing >= 2.5% (> ₹150) AND completed 5m bar + VWAP + EMA 9/21 flipped against our direction,
-        # cut immediately at ~-3% instead of bleeding to -10% (and allow immediate opposite-side ChoCH flip on next tick).
-        if has_live_quote and elapsed_seconds >= 180.0 and pos.pnl < -150.0 and pos.entry_premium > 0:
-            cur_loss_pct = (pos.current_premium - pos.entry_premium) / pos.entry_premium
-            if cur_loss_pct <= -0.025:
+        # LIVE MID-TRADE 5m REASSESSMENT (EMA-9 Thesis Break + VWAP ChoCH + 10m Dead-Money Cut):
+        if has_live_quote and pos.entry_premium > 0:
+            cur_ret_pct = (pos.current_premium - pos.entry_premium) / pos.entry_premium
+            if elapsed_seconds >= 180.0 and pos.pnl < -150.0 and cur_ret_pct <= -0.025:
                 try:
                     from mtf_engine import mtf_engine
                     df_chk = mtf_engine.get_real_candles(pos_asset)
                     lvls_chk = mtf_engine.calculate_institutional_levels(current_spot, pos_asset)
                     vwap_chk = float(lvls_chk.get("vwap", 0.0) or 0.0)
-                    if df_chk is not None and len(df_chk) >= 21 and vwap_chk > 0:
-                        e9_chk = float(df_chk["close"].ewm(span=9, adjust=False).mean().iloc[-1])
+                    if df_chk is not None and len(df_chk) >= 21:
+                        e9_series = df_chk["close"].ewm(span=9, adjust=False).mean()
+                        e9_chk = float(e9_series.iloc[-1])
+                        e9_prev = float(e9_series.iloc[-2])
                         e21_chk = float(df_chk["close"].ewm(span=21, adjust=False).mean().iloc[-1])
                         comp_c = float(df_chk["close"].iloc[-2])
                         comp_o = float(df_chk["open"].iloc[-2])
-                        if pos.option_type == "CE" and current_spot < vwap_chk and e9_chk < e21_chk and comp_c < comp_o:
-                            return True, f"⚡ Live ChoCH Reversal Cut: {pos_asset} flipped below VWAP (₹{vwap_chk:,.1f}) & EMA 9 < 21"
-                        if pos.option_type == "PE" and current_spot > vwap_chk and e9_chk > e21_chk and comp_c > comp_o:
-                            return True, f"⚡ Live ChoCH Reversal Cut: {pos_asset} flipped above VWAP (₹{vwap_chk:,.1f}) & EMA 9 > 21"
+                        if pos.option_type == "CE":
+                            if vwap_chk > 0 and current_spot < vwap_chk and e9_chk < e21_chk and comp_c < comp_o:
+                                return True, f"⚡ Live ChoCH Reversal Cut: {pos_asset} flipped below VWAP (₹{vwap_chk:,.1f}) & EMA 9 < 21"
+                            if comp_c < comp_o and comp_c < e9_prev and current_spot < e9_chk:
+                                return True, f"⚡ Live 5m Reassessment: {pos_asset} completed 5m bar closed below EMA 9 (₹{e9_chk:,.1f})"
+                        elif pos.option_type == "PE":
+                            if vwap_chk > 0 and current_spot > vwap_chk and e9_chk > e21_chk and comp_c > comp_o:
+                                return True, f"⚡ Live ChoCH Reversal Cut: {pos_asset} flipped above VWAP (₹{vwap_chk:,.1f}) & EMA 9 > 21"
+                            if comp_c > comp_o and comp_c > e9_prev and current_spot > e9_chk:
+                                return True, f"⚡ Live 5m Reassessment: {pos_asset} completed 5m bar closed above EMA 9 (₹{e9_chk:,.1f})"
                 except Exception:
                     pass
+            # 10-minute Dead-Money Theta Cut: exit flat options after 10m of zero momentum (-1.5% to +1.5%)
+            if elapsed_seconds >= 600.0 and -0.015 <= cur_ret_pct <= 0.015 and not pos.is_trailing_active:
+                return True, f"⏱️ 10m Dead-Money Cut: {pos.symbol} flat ({cur_ret_pct*100:+.1f}%) after 10m — preserving theta & capital"
 
         # LAYER 1: Underlying-Based Structural Stop (with sanity guard against corrupted spot quotes)
         spot_is_sane = (current_spot > 0 and abs(current_spot - pos.underlying_entry_spot) / max(1.0, pos.underlying_entry_spot) < 0.50)
@@ -1681,7 +1690,7 @@ class NiftySmartEdgeEngine:
                 index_keys = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "NIFTYIT"}
                 active_index_count = sum(1 for p in self.active_positions if getattr(p, "asset_key", "") in index_keys)
 
-                # Option A + Idea A: Equity/Index Focus (09:25 - 14:45 IST, or up to 15:00 IST on Expiry Gamma days), MCX Auto-Pilot Off, up to 3 concurrent Index positions
+                # Option A + Pullback Value-Zone: Equity/Index (09:25 - 14:45, or 15:00 on Expiry), MCX Off, 1 Index at a time (no 3x correlated losses!)
                 if is_evening_session:
                     valid_opps = []
                 elif is_equity_open and now_hm_curr < "15:00":
@@ -1690,7 +1699,7 @@ class NiftySmartEdgeEngine:
                         if o["key"] not in active_assets
                         and o["key"] not in mcx_keys
                         and (now_hm_curr < "14:45" or o.get("is_expiry_today", False))
-                        and not (active_index_count >= 3 and o["key"] in index_keys)
+                        and not (active_index_count >= 1 and o["key"] in index_keys)
                         and self.check_trading_schedule(o["key"])[0]
                     ]
                 else:
@@ -1786,8 +1795,13 @@ class NiftySmartEdgeEngine:
                     upper_wick = max(0.0, b_high - max(b_close, b_open))
                     lower_wick = max(0.0, min(b_close, b_open) - b_low)
 
+                    # Top-Down 15m + 1H Resampled MTF Alignment + Pullback Value-Zone Filter (<= 0.18% from EMA 9)
+                    rs_trends = mtf_engine.get_resampled_trends(asset_key)
+
                     if opp_action == "BUY_CE":
-                        # Anti-chasing guard: block CALLs at R1 only when overbought AND showing a red bar or upper rejection wick (allow clean green breakouts!)
+                        if not rs_trends.get("tf_15m_bull", True):
+                            continue
+                        # Anti-chasing guard: block CALLs at R1 only when overbought AND showing a red bar or upper rejection wick
                         if r1_lvl > 0 and opp_spot >= (r1_lvl * 0.999) and rsi_5m >= 72.0 and (b_close < b_open or upper_wick > b_body):
                             continue
                         pdh_lvl = float(mtf_lvls.get("pdh", 0.0) or 0.0)
@@ -1796,7 +1810,7 @@ class NiftySmartEdgeEngine:
                         if not is_demand_bounce_ce:
                             if opp_spot < real_vwap:
                                 continue
-                            if ema9_val > 0 and ((opp_spot - ema9_val) / ema9_val) > 0.0035:
+                            if ema9_val > 0 and ((opp_spot - ema9_val) / ema9_val) > 0.0018:
                                 continue
                             if not (ema9_val > ema21_val and b_close > ema21_val):
                                 continue
@@ -1805,6 +1819,8 @@ class NiftySmartEdgeEngine:
                             if b_close < (prev_low - (opp_spot * 0.0005)):
                                 continue
                     elif opp_action == "BUY_PE":
+                        if not rs_trends.get("tf_15m_bear", True):
+                            continue
                         # Anti-chasing guard: block PUTs at S1 only when oversold AND showing a green bar or lower bounce wick
                         if s1_lvl > 0 and opp_spot <= (s1_lvl * 1.001) and rsi_5m <= 28.0 and (b_close > b_open or lower_wick > b_body):
                             continue
@@ -1814,7 +1830,7 @@ class NiftySmartEdgeEngine:
                         if not is_supply_rejection_pe:
                             if opp_spot > real_vwap:
                                 continue
-                            if ema9_val > 0 and ((ema9_val - opp_spot) / ema9_val) > 0.0035:
+                            if ema9_val > 0 and ((ema9_val - opp_spot) / ema9_val) > 0.0018:
                                 continue
                             if not (ema9_val < ema21_val and b_close < ema21_val):
                                 continue
@@ -1865,12 +1881,18 @@ class NiftySmartEdgeEngine:
                         if swing_lh:
                             zone_tags.append("LH_TREND")
                     eff_score = min(98, eff_score)
+                    # 1H Macro Size Multiplier: if 1H aligns, keep full A+ sizing; if counter to 1H (early reversal), cap at 1 lot (score 68)
+                    hr_aligned = (opp_action == "BUY_CE" and rs_trends.get("tf_1h_bull", True)) or (opp_action == "BUY_PE" and rs_trends.get("tf_1h_bear", True))
+                    if not hr_aligned:
+                        eff_score = min(eff_score, 68)
+                    else:
+                        zone_tags.append("1H_ALIGNED")
                     # Idea B enforcement: Stock options with base score 80-84 MUST carry PDH/PDL or FVG structural confirmation
                     if asset_key not in index_keys and asset_key not in mcx_keys and int(top_opp.get("confluence_score", 0)) < 85:
                         if not any(t in zone_tags for t in ("PDH_BREAKOUT", "PDL_BREAKDOWN", "BULL_FVG", "BEAR_FVG")):
                             continue
-                    # Idea A: Use fast SNIPER execution during European Open (12:30-13:45) or Expiry Gamma days
-                    exec_style = "SNIPER" if (("12:30" <= now_hm_curr <= "13:45") or top_opp.get("is_expiry_today", False)) else top_opp.get("optimal_style", "SNIPER")
+                    # Always use SWING staged runner management (retire SNIPER's +1.8% micro-choke on Index/Stock trades!)
+                    exec_style = "SWING"
                     opp_spot = top_opp["spot"]
                     opp_contract = contract_selector.select_contract(
                         spot_price=opp_spot,
