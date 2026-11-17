@@ -52,7 +52,8 @@ class ContractSelector:
         available_capital: float = 150000.0,
         requested_lots: Optional[int] = None,
         candle_timestamp: Optional[str] = None,
-        strategy_name: str = "SMART_EDGE"
+        strategy_name: str = "SMART_EDGE",
+        confluence_score: int = 75
     ) -> SelectedContract:
         option_type = "CE" if action == "BUY_CE" else "PE"
 
@@ -344,18 +345,26 @@ class ContractSelector:
                 chosen_lots = req_lots
                 advisory_msg = f"⚠️ Lot Sizing Advisory: Position scaled to {chosen_lots} lot{'s' if chosen_lots > 1 else ''} (₹{req_margin:,.2f} margin, {util_pct}% of capital). Safe within 50% ceiling."
         else:
-            # Capital-Scaled Optimal Lot Sizing:
-            # Scales up lots on affordable contracts (up to 12% capital allocation & 2.5% max stop risk, max 5 lots)
-            # and automatically drops to 1 lot on expensive contracts or lower capital.
-            target_alloc = available_capital * 0.12
+            # Conviction-Tiered Capital-Scaled Optimal Lot Sizing:
+            # 60-69: 1 lot max (8% cap) | 70-84: 12% cap (up to 4 lots) | 85+: A+ 18% cap (up to 5 lots)
+            if confluence_score < 70:
+                alloc_pct = 0.08
+                max_lots_cap = 1
+            elif confluence_score < 85:
+                alloc_pct = 0.12
+                max_lots_cap = 4
+            else:
+                alloc_pct = 0.18
+                max_lots_cap = 5
+            target_alloc = available_capital * alloc_pct
             max_risk_budget = available_capital * 0.025
             risk_per_lot = max(1.0, cost_per_lot * 0.20)
             lots_by_alloc = int(target_alloc // cost_per_lot) if cost_per_lot > 0 else 1
             lots_by_risk = int(max_risk_budget // risk_per_lot) if risk_per_lot > 0 else 1
-            chosen_lots = max(1, min(5, lots_by_alloc, lots_by_risk))
+            chosen_lots = max(1, min(max_lots_cap, lots_by_alloc, lots_by_risk))
             chosen_margin = round(chosen_lots * cost_per_lot, 2)
             util_pct = round((chosen_margin / available_capital) * 100.0, 1) if available_capital > 0 else 100.0
-            advisory_msg = f"Optimal dynamic sizing: {chosen_lots} lot{'s' if chosen_lots > 1 else ''} (₹{chosen_margin:,.2f} margin, {util_pct}% of ₹{available_capital:,.0f} capital)."
+            advisory_msg = f"Conviction-tiered sizing ({confluence_score}%): {chosen_lots} lot{'s' if chosen_lots > 1 else ''} (₹{chosen_margin:,.2f} margin, {util_pct}% of ₹{available_capital:,.0f} capital)."
 
         final_quantity = chosen_lots * base_lot_size
         total_margin = round(final_quantity * estimated_premium, 2)

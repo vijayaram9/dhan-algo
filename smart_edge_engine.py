@@ -663,6 +663,13 @@ class NiftySmartEdgeEngine:
                     self.log_sniper_event(msg, "PROFIT")
 
             # 3. Multi-Tiered Dynamic Trailing Stop & Profit Lock for Swing:
+            # Step 0A (+4% open gain): Halve worst-case risk from -10% to -4% without choking normal 1m wicks!
+            if prem_gain_pct >= 4.0 and not pos.is_trailing_active:
+                half_risk_sl = round(pos.entry_premium * 0.96, 2)
+                if half_risk_sl > pos.hard_stop_premium:
+                    pos.hard_stop_premium = half_risk_sl
+                    print(f"[SWING RISK-HALF] 🛡️ +4% Reached -> Hard Stop tightened to -4% @ ₹{pos.hard_stop_premium:.2f}")
+
             # Tier 0 (+6% open gain): Lock Fee-Protected Breakeven so a winning trade NEVER turns into a -10% loss, while giving 5% room to breathe!
             if prem_gain_pct >= 6.0 and not pos.is_trailing_active:
                 fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
@@ -1808,7 +1815,8 @@ class NiftySmartEdgeEngine:
                         estimated_premium=0.0,
                         strike_preference="ATM",
                         asset_key=asset_key,
-                        available_capital=active_cap
+                        available_capital=active_cap,
+                        confluence_score=int(top_opp.get("confluence_score", 75))
                     )
                     if opp_contract.risk_budget_approved:
                         calc_levels = market_intelligence.calculate_levels_and_stops(
