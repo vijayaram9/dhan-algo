@@ -1750,8 +1750,8 @@ class NiftySmartEdgeEngine:
                     ema21_val = float(df_bars["close"].ewm(span=21, adjust=False).mean().iloc[-1])
                     rsi_5m = IndicatorEngine.calculate_rsi(df_bars["close"])
 
-                    # Volume check on completed bar (skip ultra-thin < 0.75x volume bars when real volume is reported)
-                    if "volume" in df_bars.columns and float(df_bars["volume"].iloc[-2]) > 0:
+                    # Volume check on completed bar for Equities/Futures (IDX_I index feed does not carry order-book volume)
+                    if asset_key not in index_keys and "volume" in df_bars.columns and float(df_bars["volume"].iloc[-2]) > 0:
                         avg_vol20 = float(df_bars["volume"].tail(20).mean() or 0.0)
                         if avg_vol20 > 0 and float(df_bars["volume"].iloc[-2]) < (avg_vol20 * 0.75):
                             continue
@@ -1778,9 +1778,15 @@ class NiftySmartEdgeEngine:
                         # At S1-S2 Demand Zone with bullish bounce candle: flip to CALL instead of shorting into support
                         opp_action = "BUY_CE"
 
+                    b_high = float(df_bars["high"].iloc[-1])
+                    b_low = float(df_bars["low"].iloc[-1])
+                    b_body = abs(b_close - b_open)
+                    upper_wick = max(0.0, b_high - max(b_close, b_open))
+                    lower_wick = max(0.0, min(b_close, b_open) - b_low)
+
                     if opp_action == "BUY_CE":
-                        # Anti-chasing guard: never buy CALLs overbought near/inside R1-R2 Supply Zone, just under PDH resistance, or >0.12% above EMA9
-                        if r1_lvl > 0 and opp_spot >= (r1_lvl * 0.999) and rsi_5m >= 68.0:
+                        # Anti-chasing guard: block CALLs at R1 only when overbought AND showing a red bar or upper rejection wick (allow clean green breakouts!)
+                        if r1_lvl > 0 and opp_spot >= (r1_lvl * 0.999) and rsi_5m >= 72.0 and (b_close < b_open or upper_wick > b_body):
                             continue
                         pdh_lvl = float(mtf_lvls.get("pdh", 0.0) or 0.0)
                         if pdh_lvl > 0 and 0.0 < ((pdh_lvl - opp_spot) / pdh_lvl) <= 0.0012 and comp_close <= pdh_lvl:
@@ -1788,7 +1794,7 @@ class NiftySmartEdgeEngine:
                         if not is_demand_bounce_ce:
                             if opp_spot < real_vwap:
                                 continue
-                            if ema9_val > 0 and ((opp_spot - ema9_val) / ema9_val) > 0.0012:
+                            if ema9_val > 0 and ((opp_spot - ema9_val) / ema9_val) > 0.0035:
                                 continue
                             if not (ema9_val > ema21_val and b_close > ema21_val):
                                 continue
@@ -1797,8 +1803,8 @@ class NiftySmartEdgeEngine:
                             if b_close < (prev_low - (opp_spot * 0.0005)):
                                 continue
                     elif opp_action == "BUY_PE":
-                        # Anti-chasing guard: never buy PUTs oversold near/inside S1-S2 Demand Zone, just above PDL support, or >0.12% below EMA9
-                        if s1_lvl > 0 and opp_spot <= (s1_lvl * 1.001) and rsi_5m <= 32.0:
+                        # Anti-chasing guard: block PUTs at S1 only when oversold AND showing a green bar or lower bounce wick
+                        if s1_lvl > 0 and opp_spot <= (s1_lvl * 1.001) and rsi_5m <= 28.0 and (b_close > b_open or lower_wick > b_body):
                             continue
                         pdl_lvl = float(mtf_lvls.get("pdl", 0.0) or 0.0)
                         if pdl_lvl > 0 and 0.0 < ((opp_spot - pdl_lvl) / pdl_lvl) <= 0.0012 and comp_close >= pdl_lvl:
@@ -1806,7 +1812,7 @@ class NiftySmartEdgeEngine:
                         if not is_supply_rejection_pe:
                             if opp_spot > real_vwap:
                                 continue
-                            if ema9_val > 0 and ((ema9_val - opp_spot) / ema9_val) > 0.0012:
+                            if ema9_val > 0 and ((ema9_val - opp_spot) / ema9_val) > 0.0035:
                                 continue
                             if not (ema9_val < ema21_val and b_close < ema21_val):
                                 continue
