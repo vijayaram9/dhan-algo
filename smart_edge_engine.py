@@ -663,15 +663,15 @@ class NiftySmartEdgeEngine:
                     self.log_sniper_event(msg, "PROFIT")
 
             # 3. Multi-Tiered Dynamic Trailing Stop & Profit Lock for Swing:
-            # Step 0A (+4% open gain): Halve worst-case risk from -10% to -4% without choking normal 1m wicks!
+            # Step 0A (+4% open gain): Tighten Hard Stop from -10% to -1% so a +4% winner never turns into a -₹900+ loss!
             if prem_gain_pct >= 4.0 and not pos.is_trailing_active:
-                half_risk_sl = round(pos.entry_premium * 0.96, 2)
-                if half_risk_sl > pos.hard_stop_premium:
-                    pos.hard_stop_premium = half_risk_sl
-                    print(f"[SWING RISK-HALF] 🛡️ +4% Reached -> Hard Stop tightened to -4% @ ₹{pos.hard_stop_premium:.2f}")
+                tight_sl = round(pos.entry_premium * 0.99, 2)
+                if tight_sl > pos.hard_stop_premium:
+                    pos.hard_stop_premium = tight_sl
+                    print(f"[SWING TIGHT-SHIELD] 🛡️ +4% Reached -> Hard Stop tightened to -1% @ ₹{pos.hard_stop_premium:.2f}")
 
-            # Tier 0 (+6% open gain): Lock Fee-Protected Breakeven so a winning trade NEVER turns into a -10% loss, while giving 5% room to breathe!
-            if prem_gain_pct >= 6.0 and not pos.is_trailing_active:
+            # Tier 0 (+5.5% open gain): Lock Fee-Protected Breakeven so a winning trade NEVER turns red, while giving 4.5% room to breathe!
+            if prem_gain_pct >= 5.5 and not pos.is_trailing_active:
                 fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
                 be_prem = round(pos.entry_premium + fee_buf, 2)
                 be_prem = min(be_prem, round(pos.current_premium - max(0.5, pos.current_premium * 0.01), 2))
@@ -1681,14 +1681,15 @@ class NiftySmartEdgeEngine:
                 index_keys = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "NIFTYIT"}
                 active_index_count = sum(1 for p in self.active_positions if getattr(p, "asset_key", "") in index_keys)
 
-                # Option A: Equity/Index Focus (09:25 - 14:45 IST), MCX Auto-Pilot Off, up to 3 concurrent Index positions
+                # Option A + Idea A: Equity/Index Focus (09:25 - 14:45 IST, or up to 15:00 IST on Expiry Gamma days), MCX Auto-Pilot Off, up to 3 concurrent Index positions
                 if is_evening_session:
                     valid_opps = []
-                elif is_equity_open and now_hm_curr < "14:45":
+                elif is_equity_open and now_hm_curr < "15:00":
                     valid_opps = [
                         o for o in all_opps
                         if o["key"] not in active_assets
                         and o["key"] not in mcx_keys
+                        and (now_hm_curr < "14:45" or o.get("is_expiry_today", False))
                         and not (active_index_count >= 3 and o["key"] in index_keys)
                         and self.check_trading_schedule(o["key"])[0]
                     ]
@@ -1716,7 +1717,8 @@ class NiftySmartEdgeEngine:
                     elif (top_opp["key"] in index_keys) or (top_opp["key"] in liquid_mcx):
                         eff_min_conf = min_conf
                     else:
-                        eff_min_conf = max(min_conf, 85)
+                        # Idea B: Allow liquid stock options at 80+ (verified for PDH/PDL/FVG tags below; 85+ otherwise)
+                        eff_min_conf = max(min_conf, 80)
                     if not top_opp.get("is_actionable") or top_opp.get("confluence_score", 0) < eff_min_conf:
                         continue
                     asset_key = top_opp["key"]
@@ -1863,6 +1865,12 @@ class NiftySmartEdgeEngine:
                         if swing_lh:
                             zone_tags.append("LH_TREND")
                     eff_score = min(98, eff_score)
+                    # Idea B enforcement: Stock options with base score 80-84 MUST carry PDH/PDL or FVG structural confirmation
+                    if asset_key not in index_keys and asset_key not in mcx_keys and int(top_opp.get("confluence_score", 0)) < 85:
+                        if not any(t in zone_tags for t in ("PDH_BREAKOUT", "PDL_BREAKDOWN", "BULL_FVG", "BEAR_FVG")):
+                            continue
+                    # Idea A: Use fast SNIPER execution during European Open (12:30-13:45) or Expiry Gamma days
+                    exec_style = "SNIPER" if (("12:30" <= now_hm_curr <= "13:45") or top_opp.get("is_expiry_today", False)) else top_opp.get("optimal_style", "SNIPER")
                     opp_spot = top_opp["spot"]
                     opp_contract = contract_selector.select_contract(
                         spot_price=opp_spot,
@@ -1894,8 +1902,8 @@ class NiftySmartEdgeEngine:
                             target_1_spot=calc_levels.get("target_1_spot", calc_levels.get("target_1", opp_spot + 35.0)),
                             target_2_spot=calc_levels.get("target_2_spot", calc_levels.get("target_2", opp_spot + 55.0))
                         )
-                        print(Fore.GREEN + f"\n[AUTOPILOT RADAR] 🚀 Auto-triggering top setup: {opp_contract.custom_symbol} ({top_opp['display_name']} Confluence: {top_opp['confluence_score']}%)")
-                        self.execute_entry(auto_sig, opp_contract, opp_spot, trade_style=top_opp.get("optimal_style", "SNIPER"))
+                        print(Fore.GREEN + f"\n[AUTOPILOT RADAR] 🚀 Auto-triggering top setup: {opp_contract.custom_symbol} ({top_opp['display_name']} Confluence: {eff_score}% | {exec_style})")
+                        self.execute_entry(auto_sig, opp_contract, opp_spot, trade_style=exec_style)
                         return
             except Exception as e:
                 print(f"[AutoPilot Radar Warning] {e}")
