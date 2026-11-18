@@ -1386,8 +1386,12 @@ class NiftySmartEdgeEngine:
                     target_premium = round(contract.estimated_premium + (sl_distance * 1.8), 2)
             max_holding_seconds = 1800  # 30 minutes institutional trade window
         elif trade_style == "SWING":
-            # Tight 10% premium stop + ₹1,500 max rupee risk cap (ratchets down to ₹900 once daily net P&L >= +₹3,000!)
-            max_risk_budget = 900.0 if float(getattr(self, "daily_net_pnl", 0.0) or 0.0) >= 3000.0 else 1500.0
+            # Percentage-of-Capital Risk Cap: 1.0% max risk/trade (ratchets to 0.6% once daily net P&L >= +2.0% of capital)
+            active_cap_sl = float(self.client.get_real_cash_balance() if self.mode == "LIVE" else getattr(self.client, "paper_capital", 150000.0) or 150000.0)
+            active_cap_sl = max(25000.0, active_cap_sl)
+            cur_day_net = float(getattr(self, "daily_net_pnl", 0.0) or 0.0)
+            risk_pct = 0.006 if cur_day_net >= (active_cap_sl * 0.02) else 0.010
+            max_risk_budget = round(active_cap_sl * risk_pct, 2)
             swing_pct_sl = round(contract.estimated_premium * 0.90, 2)
             rupee_cap_sl = round(max(1.0, contract.estimated_premium - (max_risk_budget / max(1, contract.lot_size))), 2)
             hard_sl = max(hard_sl, swing_pct_sl, rupee_cap_sl)
@@ -1659,6 +1663,13 @@ class NiftySmartEdgeEngine:
             try:
                 from market_intelligence import market_intelligence
                 active_cap = self.client.get_real_cash_balance() if self.mode == "LIVE" else float(self.client.paper_capital)
+                # Capital-Percentage Peak-Profit Lock: Once daily net P&L >= +2.0% of capital, protect 50% of peak profit
+                cur_net_d = float(getattr(self, "daily_net_pnl", 0.0) or 0.0)
+                peak_net_d = max(float(getattr(self, "_peak_daily_net_pnl", 0.0) or 0.0), cur_net_d)
+                self._peak_daily_net_pnl = peak_net_d
+                if active_cap > 0 and peak_net_d >= (active_cap * 0.02) and cur_net_d <= (peak_net_d * 0.50):
+                    self.waiting_reason = f"Green-Day Profit Lock: Protected ₹{cur_net_d:,.0f} (50% floor of ₹{peak_net_d:,.0f} peak)."
+                    return
                 all_opps = market_intelligence.scan_all_opportunities(capital=active_cap)
                 
                 # Seamless Multi-Session Multi-Asset Radar:
