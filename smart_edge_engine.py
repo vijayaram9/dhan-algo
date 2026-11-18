@@ -752,7 +752,8 @@ class NiftySmartEdgeEngine:
             if pos.hard_stop_premium > pos.entry_premium:
                 return True, f"🔒 Trailing Profit Locked: Exited @ ₹{pos.current_premium:.2f} (Secured +₹{pos.pnl:.2f})!"
             else:
-                return True, f"Layer 2 Hard Premium Stop Hit @ ₹{pos.current_premium:.2f} (-20% stop: ₹{pos.hard_stop_premium:.2f})"
+                stop_pct_lbl = round(((pos.hard_stop_premium - pos.entry_premium) / max(0.01, pos.entry_premium)) * 100.0, 1)
+                return True, f"Layer 2 Hard Premium Stop Hit @ ₹{pos.current_premium:.2f} ({stop_pct_lbl:+.1f}% stop: ₹{pos.hard_stop_premium:.2f})"
 
         # Minimum execution stabilization window: Allow at least 15 seconds for trade to breathe
         # before structural target or trailing can trigger (unless hard stop is breached)
@@ -1690,14 +1691,14 @@ class NiftySmartEdgeEngine:
                 index_keys = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "NIFTYIT"}
                 active_index_count = sum(1 for p in self.active_positions if getattr(p, "asset_key", "") in index_keys)
 
-                # Option A + Pullback Value-Zone: Equity/Index (09:25 - 14:45, or 15:00 on Expiry), MCX Off, 1 Index at a time (no 3x correlated losses!)
+                # Indices-Only Auto-Pilot (09:25 - 14:45, or 15:00 on Expiry): MCX & Stock Options paused (0W/4L yesterday), 1 Index at a time
                 if is_evening_session:
                     valid_opps = []
                 elif is_equity_open and now_hm_curr < "15:00":
                     valid_opps = [
                         o for o in all_opps
-                        if o["key"] not in active_assets
-                        and o["key"] not in mcx_keys
+                        if o["key"] in index_keys
+                        and o["key"] not in active_assets
                         and (now_hm_curr < "14:45" or o.get("is_expiry_today", False))
                         and not (active_index_count >= 1 and o["key"] in index_keys)
                         and self.check_trading_schedule(o["key"])[0]
@@ -1760,6 +1761,9 @@ class NiftySmartEdgeEngine:
                     ema9_val = float(df_bars["close"].ewm(span=9, adjust=False).mean().iloc[-1])
                     ema21_val = float(df_bars["close"].ewm(span=21, adjust=False).mean().iloc[-1])
                     rsi_5m = IndicatorEngine.calculate_rsi(df_bars["close"])
+                    adx_5m, _, _ = IndicatorEngine.calculate_adx(df_bars)
+                    if adx_5m < 20.0:
+                        continue
 
                     # Volume check on completed bar for Equities/Futures (IDX_I index feed does not carry order-book volume)
                     if asset_key not in index_keys and "volume" in df_bars.columns and float(df_bars["volume"].iloc[-2]) > 0:
@@ -1911,6 +1915,15 @@ class NiftySmartEdgeEngine:
                         if or_mid_sl > 0:
                             if (opp_action == "BUY_CE" and or_mid_sl < opp_spot) or (opp_action == "BUY_PE" and or_mid_sl > opp_spot):
                                 struct_sl = or_mid_sl
+                        # Clamp Layer 1 structural SL to recent 10-bar 5m swing low/high so morning ORB SL doesn't sit 500+ pts away
+                        if opp_action == "BUY_CE":
+                            recent_swing_lo = float(df_bars["low"].tail(10).min())
+                            if recent_swing_lo < opp_spot:
+                                struct_sl = max(struct_sl, recent_swing_lo)
+                        else:
+                            recent_swing_hi = float(df_bars["high"].tail(10).max())
+                            if recent_swing_hi > opp_spot:
+                                struct_sl = min(struct_sl, recent_swing_hi)
                         # Minimum 0.05% spread-survival stop distance guard
                         if opp_spot > 0 and (abs(opp_spot - struct_sl) / opp_spot) < 0.0005:
                             struct_sl = round(opp_spot * (0.9985 if opp_action == "BUY_CE" else 1.0015), 2)

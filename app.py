@@ -2650,8 +2650,16 @@ def api_admin_sync_code():
     import subprocess
     try:
         repo_dir = os.path.dirname(os.path.abspath(__file__))
+        env_path = os.path.join(repo_dir, ".env")
+        saved_env = None
+        if os.path.exists(env_path):
+            with open(env_path, "r", encoding="utf-8") as ef:
+                saved_env = ef.read()
         subprocess.check_output(["git", "fetch", "origin", "main"], cwd=repo_dir, stderr=subprocess.STDOUT, text=True)
         out = subprocess.check_output(["git", "reset", "--hard", "origin/main"], cwd=repo_dir, stderr=subprocess.STDOUT, text=True)
+        if saved_env is not None:
+            with open(env_path, "w", encoding="utf-8") as ef:
+                ef.write(saved_env)
         # Clear Jinja template cache
         if hasattr(app, "jinja_env") and hasattr(app.jinja_env, "cache") and app.jinja_env.cache is not None:
             app.jinja_env.cache.clear()
