@@ -663,44 +663,44 @@ class NiftySmartEdgeEngine:
                     self.log_sniper_event(msg, "PROFIT")
 
             # 3. Multi-Tiered Dynamic Trailing Stop & Profit Lock for Swing:
-            # Step 0A (+4% open gain): Tighten Hard Stop from -10% to -1% so a +4% winner never turns into a -₹900+ loss!
-            if prem_gain_pct >= 4.0 and not pos.is_trailing_active:
-                tight_sl = round(pos.entry_premium * 0.99, 2)
+            # Step 0A (+4.5% open gain): Tighten Hard Stop from -10% to -2.0% (halves risk without choking normal wicks)
+            if prem_gain_pct >= 4.5 and not pos.is_trailing_active:
+                tight_sl = round(pos.entry_premium * 0.98, 2)
                 if tight_sl > pos.hard_stop_premium:
                     pos.hard_stop_premium = tight_sl
-                    print(f"[SWING TIGHT-SHIELD] 🛡️ +4% Reached -> Hard Stop tightened to -1% @ ₹{pos.hard_stop_premium:.2f}")
+                    print(f"[SWING TIGHT-SHIELD] 🛡️ +4.5% Reached -> Hard Stop tightened to -2% @ ₹{pos.hard_stop_premium:.2f}")
 
-            # Tier 0 (+5.5% open gain): Lock Fee-Protected Breakeven so a winning trade NEVER turns red, while giving 4.5% room to breathe!
-            if prem_gain_pct >= 5.5 and not pos.is_trailing_active:
+            # Tier 0 (+7.0% open gain): Lock +3.0% real profit (never +₹8 micro-exits!) while giving 4%+ room to run
+            if prem_gain_pct >= 7.0 and not pos.is_trailing_active:
                 fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
-                be_prem = round(pos.entry_premium + fee_buf, 2)
+                be_prem = max(round(pos.entry_premium * 1.03, 2), round(pos.entry_premium + fee_buf, 2))
                 be_prem = min(be_prem, round(pos.current_premium - max(0.5, pos.current_premium * 0.01), 2))
                 if be_prem > pos.hard_stop_premium:
                     pos.hard_stop_premium = be_prem
                     pos.is_trailing_active = True
                     pos.locked_profit_inr = round((be_prem - pos.entry_premium) * pos.quantity, 2)
-                    print(f"[SWING BE SHIELD] 🛡️ +6% Reached -> Fee-Protected Breakeven Locked @ ₹{pos.hard_stop_premium:.2f}")
+                    print(f"[SWING PROFIT SHIELD] 🛡️ +7.0% Reached -> +3.0% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
 
-            # Tier 1 (+10% premium gain): Lock in +4% (or minimum fee buffer) so winners clear charges + bank meaningful profit
-            if prem_gain_pct >= 10.0 and pos.trailing_step_level < 1:
+            # Tier 1 (+11% premium gain): Lock in +6% profit!
+            if prem_gain_pct >= 11.0 and pos.trailing_step_level < 1:
                 fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
-                locked_prem = max(round(pos.entry_premium * 1.04, 2), round(pos.entry_premium + fee_buf, 2))
+                locked_prem = max(round(pos.entry_premium * 1.06, 2), round(pos.entry_premium + fee_buf, 2))
                 locked_prem = min(locked_prem, round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
                 if locked_prem > pos.hard_stop_premium:
                     pos.hard_stop_premium = locked_prem
                     pos.is_trailing_active = True
                     pos.trailing_step_level = 1
                     pos.locked_profit_inr = round((pos.hard_stop_premium - pos.entry_premium) * pos.quantity, 2)
-                    print(f"[SWING TIER 1] 🌊 +4% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
+                    print(f"[SWING TIER 1] 🌊 +6% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
 
-            # Tier 2 (+15% premium gain): Lock in at least +9% profit!
-            if prem_gain_pct >= 15.0 and pos.trailing_step_level < 2:
-                locked_prem = min(round(pos.entry_premium * 1.09, 2), round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
+            # Tier 2 (+16% premium gain): Lock in at least +10% profit!
+            if prem_gain_pct >= 16.0 and pos.trailing_step_level < 2:
+                locked_prem = min(round(pos.entry_premium * 1.10, 2), round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
                 if locked_prem > pos.hard_stop_premium:
                     pos.hard_stop_premium = locked_prem
                     pos.trailing_step_level = 2
                     pos.locked_profit_inr = round((pos.hard_stop_premium - pos.entry_premium) * pos.quantity, 2)
-                    print(f"[SWING TIER 2] 🌊 +9% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
+                    print(f"[SWING TIER 2] 🌊 +10% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
 
             # Tier 3 (+22% or higher runner): Lock at least +15% and trail tightly at 90% of highest watermark!
             if prem_gain_pct >= 22.0:
@@ -1386,11 +1386,12 @@ class NiftySmartEdgeEngine:
                     target_premium = round(contract.estimated_premium + (sl_distance * 1.8), 2)
             max_holding_seconds = 1800  # 30 minutes institutional trade window
         elif trade_style == "SWING":
-            # Percentage-of-Capital Risk Cap: 1.0% max risk/trade (ratchets to 0.6% once daily net P&L >= +2.0% of capital)
+            # Percentage-of-Capital Risk Cap: 1.5% for 2+ lot A+ setups, 1.0% for 1 lot (ratchets to 0.8% once daily net P&L >= +2.0%)
             active_cap_sl = float(self.client.get_real_cash_balance() if self.mode == "LIVE" else getattr(self.client, "paper_capital", 150000.0) or 150000.0)
             active_cap_sl = max(25000.0, active_cap_sl)
             cur_day_net = float(getattr(self, "daily_net_pnl", 0.0) or 0.0)
-            risk_pct = 0.006 if cur_day_net >= (active_cap_sl * 0.02) else 0.010
+            base_risk_pct = 0.015 if getattr(contract, "number_of_lots", 1) >= 2 else 0.010
+            risk_pct = 0.008 if cur_day_net >= (active_cap_sl * 0.02) else base_risk_pct
             max_risk_budget = round(active_cap_sl * risk_pct, 2)
             swing_pct_sl = round(contract.estimated_premium * 0.90, 2)
             rupee_cap_sl = round(max(1.0, contract.estimated_premium - (max_risk_budget / max(1, contract.lot_size))), 2)
@@ -1782,26 +1783,41 @@ class NiftySmartEdgeEngine:
                         if avg_vol20 > 0 and float(df_bars["volume"].iloc[-2]) < (avg_vol20 * 0.75):
                             continue
 
-                    # 15m Opening Range (09:15-09:30 IST) for ORB + OR-Midpoint stop
+                    # 15m Opening Range (09:15-09:30 IST) for ORB + OR-Midpoint stop + SMC Liquidity Sweep levels
                     or_mid_sl = 0.0
+                    or_hi_val = 0.0
+                    or_lo_val = 0.0
                     if asset_key not in mcx_keys and "timestamp" in df_bars.columns and now_hm_curr >= "09:30":
                         ist_today = get_ist_now().replace(hour=9, minute=15, second=0, microsecond=0).timestamp()
                         ist_or_end = get_ist_now().replace(hour=9, minute=30, second=0, microsecond=0).timestamp()
                         df_or = df_bars[(df_bars["timestamp"] >= ist_today) & (df_bars["timestamp"] < ist_or_end)]
                         if not df_or.empty:
-                            or_hi = float(df_or["high"].max())
-                            or_lo = float(df_or["low"].min())
-                            if (opp_action == "BUY_CE" and comp_close > or_hi) or (opp_action == "BUY_PE" and comp_close < or_lo):
-                                or_mid_sl = round((or_hi + or_lo) / 2.0, 2)
+                            or_hi_val = float(df_or["high"].max())
+                            or_lo_val = float(df_or["low"].min())
+                            if (opp_action == "BUY_CE" and comp_close > or_hi_val) or (opp_action == "BUY_PE" and comp_close < or_lo_val):
+                                or_mid_sl = round((or_hi_val + or_lo_val) / 2.0, 2)
 
-                    is_supply_rejection_pe = (r1_lvl > 0 and opp_spot >= r1_lvl and b_close < b_open and rsi_5m >= 62.0)
-                    is_demand_bounce_ce = (s1_lvl > 0 and opp_spot <= s1_lvl and b_close > b_open and rsi_5m <= 38.0)
+                    pdh_lvl = float(mtf_lvls.get("pdh", 0.0) or 0.0)
+                    pdl_lvl = float(mtf_lvls.get("pdl", 0.0) or 0.0)
+
+                    # Smart Money Liquidity Sweep (Stop-Hunt Trap Fade):
+                    is_sweep_pe = (comp_close < comp_open) and (
+                        (pdh_lvl > 0 and prev_high > pdh_lvl and comp_close < pdh_lvl) or
+                        (or_hi_val > 0 and prev_high > or_hi_val and comp_close < or_hi_val)
+                    )
+                    is_sweep_ce = (comp_close > comp_open) and (
+                        (pdl_lvl > 0 and prev_low < pdl_lvl and comp_close > pdl_lvl) or
+                        (or_lo_val > 0 and prev_low < or_lo_val and comp_close > or_lo_val)
+                    )
+
+                    is_supply_rejection_pe = is_sweep_pe or (r1_lvl > 0 and opp_spot >= r1_lvl and b_close < b_open and rsi_5m >= 62.0)
+                    is_demand_bounce_ce = is_sweep_ce or (s1_lvl > 0 and opp_spot <= s1_lvl and b_close > b_open and rsi_5m <= 38.0)
 
                     if is_supply_rejection_pe and opp_action == "BUY_CE":
-                        # At R1-R2 Supply Zone with bearish rejection candle: flip to PUT instead of chasing CALL into resistance
+                        # Bull-Trap Sweep or R1 Supply Rejection: fade the trap with PUT instead of buying CALL with retail sheep!
                         opp_action = "BUY_PE"
                     elif is_demand_bounce_ce and opp_action == "BUY_PE":
-                        # At S1-S2 Demand Zone with bullish bounce candle: flip to CALL instead of shorting into support
+                        # Bear-Trap Sweep or S1 Demand Bounce: fade the trap with CALL instead of shorting into support!
                         opp_action = "BUY_CE"
 
                     b_high = float(df_bars["high"].iloc[-1])
@@ -1814,7 +1830,7 @@ class NiftySmartEdgeEngine:
                     rs_trends = mtf_engine.get_resampled_trends(asset_key)
 
                     if opp_action == "BUY_CE":
-                        if not rs_trends.get("tf_15m_bull", True):
+                        if not is_sweep_ce and not rs_trends.get("tf_15m_bull", True):
                             continue
                         # Anti-chasing guard: block CALLs at R1 only when overbought AND showing a red bar or upper rejection wick
                         if r1_lvl > 0 and opp_spot >= (r1_lvl * 0.999) and rsi_5m >= 72.0 and (b_close < b_open or upper_wick > b_body):
@@ -1834,7 +1850,7 @@ class NiftySmartEdgeEngine:
                             if b_close < (prev_low - (opp_spot * 0.0005)):
                                 continue
                     elif opp_action == "BUY_PE":
-                        if not rs_trends.get("tf_15m_bear", True):
+                        if not is_sweep_pe and not rs_trends.get("tf_15m_bear", True):
                             continue
                         # Anti-chasing guard: block PUTs at S1 only when oversold AND showing a green bar or lower bounce wick
                         if s1_lvl > 0 and opp_spot <= (s1_lvl * 1.001) and rsi_5m <= 28.0 and (b_close > b_open or lower_wick > b_body):
@@ -1881,6 +1897,9 @@ class NiftySmartEdgeEngine:
                             eff_score += 6
                         if swing_hl:
                             zone_tags.append("HL_TREND")
+                        if is_sweep_ce:
+                            zone_tags.append("SMC_BEAR_TRAP_SWEEP")
+                            eff_score += 10
                     else:
                         if pdl_lvl > 0 and comp_close < pdl_lvl:
                             zone_tags.append("PDL_BREAKDOWN")
@@ -1895,6 +1914,9 @@ class NiftySmartEdgeEngine:
                             eff_score += 6
                         if swing_lh:
                             zone_tags.append("LH_TREND")
+                        if is_sweep_pe:
+                            zone_tags.append("SMC_BULL_TRAP_SWEEP")
+                            eff_score += 10
                     eff_score = min(98, eff_score)
                     # 1H Macro Size Multiplier: if 1H aligns, keep full A+ sizing; if counter to 1H (early reversal), cap at 1 lot (score 68)
                     hr_aligned = (opp_action == "BUY_CE" and rs_trends.get("tf_1h_bull", True)) or (opp_action == "BUY_PE" and rs_trends.get("tf_1h_bear", True))
@@ -1954,29 +1976,7 @@ class NiftySmartEdgeEngine:
             except Exception as e:
                 print(f"[AutoPilot Radar Warning] {e}")
 
-            # 2. Local Chart Strategy Signal (Strictly verified for NIFTY trading schedule)
-            nifty_open, _ = self.check_trading_schedule("NIFTY")
-            if nifty_open and signal.action in ["BUY_CE", "BUY_PE"]:
-                opt_type = "CE" if signal.action == "BUY_CE" else "PE"
-                atm_strike = round(current_spot / 50.0) * 50
-                contract_meta = self.scrip_master.get_nifty_option(current_spot, opt_type, 0, "NIFTY")
-                sec_id = contract_meta.get("security_id", "0")
-                exp_date = contract_meta.get("expiry", "")
-                est_premium = self.client.get_option_ltp(sec_id, current_spot, atm_strike, opt_type, expiry_date=exp_date)
-                struct_risk = abs(current_spot - signal.structural_sl_spot) if signal.structural_sl_spot > 0 else 12.0
-                contract = contract_selector.select_contract(
-                    current_spot, signal.action, est_premium, "ATM", struct_risk,
-                    asset_key="NIFTY",
-                    available_capital=(self.client.get_real_cash_balance() if self.mode == "LIVE" else float(self.client.paper_capital))
-                )
-                
-                # Check risk budget
-                if contract.risk_budget_approved:
-                    chosen_style = "SNIPER" if ("SNIPER" in signal.strategy_name.upper() or "SCALP" in signal.strategy_name.upper()) else "SMART_EDGE"
-                    self.execute_entry(signal, contract, current_spot, trade_style=chosen_style)
-                else:
-                    audit_record.decision = "REJECTED_BY_RISK"
-                    audit_record.reason = contract.rejection_reason
+            # Legacy Local Chart Strategy fallback disabled during Auto-Pilot to prevent self-canceling CALL+PUT conflicts and unfiltered entries.
 
     def run_loop(self, iterations: int = 6, interval_seconds: int = 3):
         self.is_running = True

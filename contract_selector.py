@@ -346,15 +346,15 @@ class ContractSelector:
                 advisory_msg = f"⚠️ Lot Sizing Advisory: Position scaled to {chosen_lots} lot{'s' if chosen_lots > 1 else ''} (₹{req_margin:,.2f} margin, {util_pct}% of capital). Safe within 50% ceiling."
         else:
             # Conviction-Tiered Capital-Scaled Optimal Lot Sizing:
-            # 60-69: 1 lot max (8% cap) | 70-84: 12% cap (up to 4 lots) | 85+: A+ 18% cap (up to 5 lots)
+            # 60-69: 1 lot max (10% cap) | 70-84: 20% cap (up to 3 lots) | 85+: A+ 30% cap (up to 5 lots)
             if confluence_score < 70:
-                alloc_pct = 0.08
+                alloc_pct = 0.10
                 max_lots_cap = 1
             elif confluence_score < 85:
-                alloc_pct = 0.12
-                max_lots_cap = 4
+                alloc_pct = 0.20
+                max_lots_cap = 3
             else:
-                alloc_pct = 0.18
+                alloc_pct = 0.30
                 max_lots_cap = 5
             target_alloc = available_capital * alloc_pct
             max_risk_budget = available_capital * 0.025
