@@ -1087,9 +1087,11 @@ class NiftySmartEdgeEngine:
         max_holding_seconds: int = 1800,
         mode: Optional[str] = None
     ):
+        self.last_entry_error = ""
         if not contract.risk_budget_approved:
+            self.last_entry_error = contract.rejection_reason or "Risk budget rejected"
             print(Fore.YELLOW + f"[Risk Rejected] {contract.rejection_reason}")
-            return
+            return False
 
         # ---------------------------------------------------------------------
         # STRICT TRADE COMPLIANCE GUARDRAIL (Live Underlying Price & Strike Sanity)
@@ -1276,19 +1278,24 @@ class NiftySmartEdgeEngine:
                         contract.security_id, [contract.custom_symbol, contract.trading_symbol], max_age=3.0
                     )
                 if verified_prem <= 0.05:
-                    print(Fore.RED + f"[GUARDRAIL BLOCKED] Trade entry aborted! Real Dhan quote could not be confirmed for {contract.custom_symbol} within 3s (Zero/Rate-Limited). Refusing synthetic/stale entry.")
-                    return
+                    if getattr(signal, "regime", "") in ("USER_TRIGGERED", "INSTANT_MOMENTUM") and float(getattr(contract, "estimated_premium", 0.0) or 0.0) > 0.05:
+                        verified_prem = float(contract.estimated_premium)
+                    else:
+                        self.last_entry_error = f"Real Dhan quote could not be confirmed for {contract.custom_symbol} (Zero/Rate-Limited)."
+                        print(Fore.RED + f"[GUARDRAIL BLOCKED] Trade entry aborted! {self.last_entry_error}")
+                        return False
                 # Update contract estimated premium to ground truth verified live LTP
                 contract.estimated_premium = verified_prem
 
                 # Guardrail D: ANTI-CHASE (uses Dhan 1m candles of the option itself).
                 # Refuse to buy a premium that has just spiked and is sitting at the top of its range.
-                if trade_style == "SNIPER":
+                if trade_style == "SNIPER" and getattr(signal, "regime", "") not in ("USER_TRIGGERED", "INSTANT_MOMENTUM"):
                     chase_ok, chase_msg = self._anti_chase_check(contract, asset_k, verified_prem)
                     if not chase_ok:
+                        self.last_entry_error = chase_msg
                         print(Fore.YELLOW + f"[ANTI-CHASE BLOCKED] {chase_msg}")
                         self.log_sniper_event(f"⛔ Entry skipped: {chase_msg}", "SKIP")
-                        return
+                        return False
         except Exception as e:
             print(f"[Guardrail Check Warning] {e}")
 
@@ -1316,16 +1323,18 @@ class NiftySmartEdgeEngine:
         max_conc = getattr(config, "max_concurrent_positions", 5)
         if len(self.active_positions) >= max_conc:
             rej_reason = f"Multi-Trade Capacity Full: Currently holding {len(self.active_positions)}/{max_conc} active trades. Close or manage an open trade first."
+            self.last_entry_error = rej_reason
             print(Fore.YELLOW + f"[CAPACITY REACHED] {rej_reason}")
             global_trade_lock.log_rejection(sig_id, contract.custom_symbol, signal.action, rej_reason)
-            return
+            return False
 
         # Check duplicate on the exact same contract
         if any(getattr(p, "symbol", "") == contract.custom_symbol for p in self.active_positions):
             rej_reason = f"Duplicate trade blocked: Contract '{contract.custom_symbol}' is already open in your portfolio."
+            self.last_entry_error = rej_reason
             print(Fore.YELLOW + f"[DUPLICATE BLOCKED] {rej_reason}")
             global_trade_lock.log_rejection(sig_id, contract.custom_symbol, signal.action, rej_reason)
-            return
+            return False
 
         # Rule 2: Check SQLite persistent multi-trade lock & per-instrument cooldown
         can_lock, lock_msg = global_trade_lock.can_acquire_lock(sig_id, contract.custom_symbol, asset_k)
@@ -1336,9 +1345,10 @@ class NiftySmartEdgeEngine:
                 can_lock, lock_msg = global_trade_lock.can_acquire_lock(sig_id, contract.custom_symbol, asset_k)
 
         if not can_lock:
+            self.last_entry_error = lock_msg
             print(Fore.YELLOW + f"[LOCK REJECTED] {lock_msg}")
             global_trade_lock.log_rejection(sig_id, contract.custom_symbol, signal.action, lock_msg)
-            return
+            return False
 
         import random, time
         pos_id = f"POS_{int(time.time()*1000)}_{random.randint(100, 999)}"
@@ -1356,8 +1366,9 @@ class NiftySmartEdgeEngine:
         }
         acquired, acq_reason = global_trade_lock.acquire_lock(sig_id, contract.custom_symbol, pos_id, intent_info)
         if not acquired:
+            self.last_entry_error = acq_reason
             print(Fore.RED + f"[ATOMIC LOCK FAILED] {acq_reason}")
-            return
+            return False
 
         hard_sl = contract.hard_stop_premium
         is_bn = (asset_k == "BANKNIFTY")
@@ -1547,12 +1558,15 @@ class NiftySmartEdgeEngine:
                 target=round(contract.estimated_premium * 1.30, 2),
                 spot=spot
             )
+            return True
         else:
             # Release lock immediately if order was rejected by broker / engine
             from global_trade_lock import global_trade_lock
             global_trade_lock.release_lock(pos_id, cooldown_seconds=0)
             rej_err = res.get("remarks", "Broker rejection")
+            self.last_entry_error = rej_err
             print(Fore.RED + f"[ORDER FAILED] Order placement rejected: {rej_err}. Global lock released.")
+            return False
 
     def print_dashboard(self, spot: float, signal: SmartEdgeSignal):
         now = get_ist_now().strftime("%H:%M:%S")

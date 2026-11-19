@@ -1133,10 +1133,15 @@ def api_execute_manual_trade():
             engine.mode = target_mode
             engine.client.mode = target_mode
             try:
-                engine.execute_entry(sig, contract, current_spot, trade_style=trade_style)
+                ok = engine.execute_entry(sig, contract, current_spot, trade_style=trade_style)
             finally:
                 engine.mode = original_mode
                 engine.client.mode = original_mode
+            if not ok:
+                return jsonify({
+                    "success": False,
+                    "error": getattr(engine, "last_entry_error", "") or "Trade entry blocked by engine guardrails."
+                }), 400
 
             style_label = "🎯 Sniper Scalp (1-3m)" if trade_style == "SNIPER" else ("🌊 Swing Wave (15-60m)" if trade_style == "SWING" else "⚡ Standard Trade")
             prefix = f"🧪 Paper {style_label} Executed" if target_mode == "PAPER" else f"🔥 Live Dhan {style_label} Dispatched"
@@ -1426,14 +1431,20 @@ def api_trigger_best_sniper():
             engine.mode = target_mode
             engine.client.mode = target_mode
             try:
-                engine.execute_entry(sig, contract, spot, trade_style="SNIPER", mode=target_mode)
-                engine.log_sniper_event(
-                    f"⚡ SNIPER ARMED & DISPATCHED: {contract.custom_symbol} ({contract.lot_size} Qty @ ₹{contract.estimated_premium:.2f} | Margin: ₹{contract.margin_required:,.0f}) | Breakeven Lock & Dynamic Runner Trail Active!",
-                    "DISPATCH"
-                )
+                ok = engine.execute_entry(sig, contract, spot, trade_style="SNIPER", mode=target_mode)
+                if ok:
+                    engine.log_sniper_event(
+                        f"⚡ SNIPER ARMED & DISPATCHED: {contract.custom_symbol} ({contract.lot_size} Qty @ ₹{contract.estimated_premium:.2f} | Margin: ₹{contract.margin_required:,.0f}) | Breakeven Lock & Dynamic Runner Trail Active!",
+                        "DISPATCH"
+                    )
             finally:
                 engine.mode = orig_mode
                 engine.client.mode = orig_mode
+            if not ok:
+                return jsonify({
+                    "success": False,
+                    "error": getattr(engine, "last_entry_error", "") or "Sniper entry blocked by engine guardrails."
+                }), 400
 
             prefix = "🧪 Paper Sniper Trade Dispatched" if target_mode == "PAPER" else "🔥 Live Dhan Sniper Trade Dispatched"
             return jsonify({
