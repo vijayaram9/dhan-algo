@@ -526,7 +526,7 @@ class MultiTimeframeEngine:
             option_type = "CE"
             recommended_strike = f"{display_name} {atm_strike:,.0f} CALL"
             direction_label = "BULLISH (BUY CE)"
-            confluence_score = 92
+            confluence_score = 72 if (tf5_stage == "CONSOLIDATION" and tf1_score < 58) else 92
             stop_loss_pts = default_stop_pts
             target_pts = default_target_pts
             risk_reward_ratio = "1 : 2.5"
@@ -573,7 +573,7 @@ class MultiTimeframeEngine:
             option_type = "PE"
             recommended_strike = f"{display_name} {atm_strike:,.0f} PUT"
             direction_label = "BEARISH (BUY PE)"
-            confluence_score = 92
+            confluence_score = 72 if (tf5_stage == "CONSOLIDATION" and tf1_score < 58) else 92
             stop_loss_pts = default_stop_pts
             target_pts = default_target_pts
             risk_reward_ratio = "1 : 2.5"

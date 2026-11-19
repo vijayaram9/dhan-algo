@@ -989,11 +989,13 @@ class NiftySmartEdgeEngine:
                 if not hasattr(self, "_asset_cooldowns"):
                     self._asset_cooldowns = {}
                 self._asset_cooldowns[f"{closed_asset}:{closed_side}"] = datetime.datetime.now() + datetime.timedelta(seconds=cd_secs)
+                global_trade_lock.set_cooldown(f"{closed_asset}:{closed_side}", cd_secs, reason)
                 # Correlated index basket cooldown (5m) ONLY on Manual exit or Stop-Loss so we don't hop from BANKNIFTY -> FINNIFTY 16s later
                 if closed_asset in {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"} and any(w in reason.lower() for w in ("manual", "stop", "invalidation")):
                     if not hasattr(self, "_basket_cooldowns"):
                         self._basket_cooldowns = {}
                     self._basket_cooldowns[closed_side] = datetime.datetime.now() + datetime.timedelta(seconds=300)
+                    global_trade_lock.set_cooldown(f"BASKET:{closed_side}", 300, reason)
             global_trade_lock.release_lock(position_id=getattr(pos, "position_id", ""), cooldown_seconds=0)
             print(Fore.CYAN + f"[GlobalTradeLock] Lock released. {cd_secs//60}m same-direction cooldown set for {closed_asset}:{closed_side}; opposite ChoCH flips remain open.")
         except Exception as e:
@@ -1386,7 +1388,8 @@ class NiftySmartEdgeEngine:
             risk_pct = 0.008 if cur_day_net >= (active_cap_sl * 0.02) else base_risk_pct
             max_risk_budget = round(active_cap_sl * risk_pct, 2)
             swing_pct_sl = round(contract.estimated_premium * 0.90, 2)
-            rupee_cap_sl = round(max(1.0, contract.estimated_premium - (max_risk_budget / max(1, contract.lot_size))), 2)
+            total_qty = max(1, int(getattr(contract, "lot_size", 1) or 1) * int(getattr(contract, "number_of_lots", 1) or 1))
+            rupee_cap_sl = round(max(1.0, contract.estimated_premium - (max_risk_budget / total_qty)), 2)
             hard_sl = max(hard_sl, swing_pct_sl, rupee_cap_sl)
             # Spread-survival guard: ensure hard_sl is at least 1% below fresh live quote
             hard_sl = min(hard_sl, round(contract.estimated_premium * 0.99, 2))
@@ -1658,7 +1661,11 @@ class NiftySmartEdgeEngine:
                 active_cap = self.client.get_real_cash_balance() if self.mode == "LIVE" else float(self.client.paper_capital)
                 # Capital-Percentage Peak-Profit Lock: Once daily net P&L >= +2.0% of capital, protect 50% of peak profit
                 cur_net_d = float(getattr(self, "daily_net_pnl", 0.0) or 0.0)
-                peak_net_d = max(float(getattr(self, "_peak_daily_net_pnl", 0.0) or 0.0), cur_net_d)
+                running_peak, cum_net = 0.0, 0.0
+                for tr in getattr(self, "closed_trades_today", []):
+                    cum_net += float(tr.get("net_pnl", tr.get("pnl", 0.0)) or 0.0)
+                    running_peak = max(running_peak, cum_net)
+                peak_net_d = max(float(getattr(self, "_peak_daily_net_pnl", 0.0) or 0.0), running_peak, cur_net_d)
                 self._peak_daily_net_pnl = peak_net_d
                 if active_cap > 0 and peak_net_d >= (active_cap * 0.02) and cur_net_d <= (peak_net_d * 0.50):
                     self.waiting_reason = f"Green-Day Profit Lock: Protected ₹{cur_net_d:,.0f} (50% floor of ₹{peak_net_d:,.0f} peak)."
@@ -1742,9 +1749,15 @@ class NiftySmartEdgeEngine:
                     dir_cd_until = getattr(self, "_asset_cooldowns", {}).get(f"{asset_key}:{opp_action}")
                     if dir_cd_until is not None and datetime.datetime.now() < dir_cd_until:
                         continue
+                    is_dir_cd_db, _ = global_trade_lock.is_cooldown_active(f"{asset_key}:{opp_action}")
+                    if is_dir_cd_db:
+                        continue
                     if asset_key in index_keys:
                         basket_cd_until = getattr(self, "_basket_cooldowns", {}).get(opp_action)
                         if basket_cd_until is not None and datetime.datetime.now() < basket_cd_until:
+                            continue
+                        is_basket_cd_db, _ = global_trade_lock.is_cooldown_active(f"BASKET:{opp_action}")
+                        if is_basket_cd_db:
                             continue
                     
                     # Institutional Trend Direction, Supply/Demand Zone & Candlestick Confirmation Filter:

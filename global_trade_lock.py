@@ -405,6 +405,20 @@ class GlobalTradeLockEngine:
         finally:
             conn.close()
 
+    def set_cooldown(self, key: str, cooldown_seconds: int, reason: str = "") -> None:
+        """Persists an instrument, directional, or basket cooldown in SQLite so restarts never wipe it."""
+        if not key or cooldown_seconds <= 0:
+            return
+        conn = self._get_connection()
+        try:
+            cd_until = (datetime.now() + timedelta(seconds=int(cooldown_seconds))).strftime("%Y-%m-%d %H:%M:%S")
+            conn.execute("""
+                INSERT OR REPLACE INTO instrument_cooldowns (key, cooldown_until, reason)
+                VALUES (?, ?, ?);
+            """, (key, cd_until, reason[:200]))
+        finally:
+            conn.close()
+
     def is_cooldown_active(self, asset_or_symbol: str = "") -> Tuple[bool, float]:
         """Returns (is_active, remaining_seconds) for a specific instrument or global."""
         conn = self._get_connection()
