@@ -817,8 +817,9 @@ class NiftySmartEdgeEngine:
                 if pos.underlying_structural_sl > 0 and current_spot <= (pos.underlying_structural_sl - structural_buffer) and pos.current_premium <= pos.entry_premium and elapsed_seconds >= 60.0:
                     return True, f"Layer 1 Structural Invalidation: {asset_k} {current_spot:.1f} broke swing low {pos.underlying_structural_sl:.1f} (buffer: {structural_buffer:.1f}pts)"
 
-                # Target 1 (1.5R) reached (CE): Lock 30% of open gain (min fee-protected BE) so runners have room to reach Target 2 (2.5R)
-                if pos.target_1_spot > pos.underlying_entry_spot and current_spot >= pos.target_1_spot and elapsed_seconds >= 15.0:
+                # Target 1 (1.5R) reached (CE): Lock 30% of open gain (min fee-protected BE) only once option is >= +5.5% so normal spread noise doesn't choke runners
+                prem_gain_pct = (pos.current_premium - pos.entry_premium) / max(0.01, pos.entry_premium)
+                if pos.target_1_spot > pos.underlying_entry_spot and current_spot >= pos.target_1_spot and prem_gain_pct >= 0.055 and elapsed_seconds >= 15.0:
                     fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
                     gain_now = max(0.0, pos.current_premium - pos.entry_premium)
                     t1_lock = round(pos.entry_premium + max(fee_buf, gain_now * 0.30), 2)
@@ -850,8 +851,9 @@ class NiftySmartEdgeEngine:
                 if pos.underlying_structural_sl > 0 and current_spot >= (pos.underlying_structural_sl + structural_buffer) and pos.current_premium <= pos.entry_premium and elapsed_seconds >= 60.0:
                     return True, f"Layer 1 Structural Invalidation: {asset_k} {current_spot:.1f} broke swing high {pos.underlying_structural_sl:.1f} (buffer: {structural_buffer:.1f}pts)"
 
-                # Target 1 (1.5R) reached (PE): Lock 30% of open gain (min fee-protected BE) so runners have room to reach Target 2 (2.5R)
-                if 0 < pos.target_1_spot < pos.underlying_entry_spot and current_spot <= pos.target_1_spot and elapsed_seconds >= 15.0:
+                # Target 1 (1.5R) reached (PE): Lock 30% of open gain (min fee-protected BE) only once option is >= +5.5% so normal spread noise doesn't choke runners
+                prem_gain_pct = (pos.current_premium - pos.entry_premium) / max(0.01, pos.entry_premium)
+                if 0 < pos.target_1_spot < pos.underlying_entry_spot and current_spot <= pos.target_1_spot and prem_gain_pct >= 0.055 and elapsed_seconds >= 15.0:
                     fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
                     gain_now = max(0.0, pos.current_premium - pos.entry_premium)
                     t1_lock = round(pos.entry_premium + max(fee_buf, gain_now * 0.30), 2)

@@ -357,8 +357,9 @@ class ContractSelector:
                 alloc_pct = 0.30
                 max_lots_cap = 5
             target_alloc = available_capital * alloc_pct
-            max_risk_budget = available_capital * 0.025
-            risk_per_lot = max(1.0, cost_per_lot * 0.20)
+            # Match risk_per_lot to our actual 10% Swing SL so lots_by_risk doesn't choke 20-30% conviction sizing to 1 lot
+            max_risk_budget = available_capital * (0.030 if confluence_score >= 85 else 0.020)
+            risk_per_lot = max(1.0, cost_per_lot * 0.10)
             lots_by_alloc = int(target_alloc // cost_per_lot) if cost_per_lot > 0 else 1
             lots_by_risk = int(max_risk_budget // risk_per_lot) if risk_per_lot > 0 else 1
             chosen_lots = max(1, min(max_lots_cap, lots_by_alloc, lots_by_risk))
