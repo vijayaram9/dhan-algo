@@ -670,37 +670,20 @@ class NiftySmartEdgeEngine:
                     pos.hard_stop_premium = tight_sl
                     print(f"[SWING TIGHT-SHIELD] 🛡️ +4.5% Reached -> Hard Stop tightened to -2% @ ₹{pos.hard_stop_premium:.2f}")
 
-            # Tier 0 (+7.0% open gain): Lock +3.0% real profit (never +₹8 micro-exits!) while giving 4%+ room to run
-            if prem_gain_pct >= 7.0 and not pos.is_trailing_active:
+            # Continuous Peak-Gain Ratchet (+7%+): never let a +₹1,000 winner bleed back to +₹300!
+            peak_gain = max(0.0, pos.highest_premium - pos.entry_premium)
+            peak_gain_pct = (peak_gain / max(0.01, pos.entry_premium)) * 100.0
+            if peak_gain_pct >= 7.0:
                 fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
-                be_prem = max(round(pos.entry_premium * 1.03, 2), round(pos.entry_premium + fee_buf, 2))
-                be_prem = min(be_prem, round(pos.current_premium - max(0.5, pos.current_premium * 0.01), 2))
-                if be_prem > pos.hard_stop_premium:
-                    pos.hard_stop_premium = be_prem
+                lock_ratio = 0.55 if peak_gain_pct < 12.0 else (0.65 if peak_gain_pct < 18.0 else 0.75)
+                ratchet_sl = round(pos.entry_premium + max(fee_buf, peak_gain * lock_ratio), 2)
+                ratchet_sl = min(ratchet_sl, round(pos.current_premium - max(0.5, pos.current_premium * 0.01), 2))
+                if ratchet_sl > pos.hard_stop_premium:
+                    pos.hard_stop_premium = ratchet_sl
                     pos.is_trailing_active = True
-                    pos.locked_profit_inr = round((be_prem - pos.entry_premium) * pos.quantity, 2)
-                    print(f"[SWING PROFIT SHIELD] 🛡️ +7.0% Reached -> +3.0% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
-
-            # Tier 1 (+11% premium gain): Lock in +6% profit!
-            if prem_gain_pct >= 11.0 and pos.trailing_step_level < 1:
-                fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
-                locked_prem = max(round(pos.entry_premium * 1.06, 2), round(pos.entry_premium + fee_buf, 2))
-                locked_prem = min(locked_prem, round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
-                if locked_prem > pos.hard_stop_premium:
-                    pos.hard_stop_premium = locked_prem
-                    pos.is_trailing_active = True
-                    pos.trailing_step_level = 1
+                    pos.trailing_step_level = max(pos.trailing_step_level, 1 if peak_gain_pct < 12.0 else (2 if peak_gain_pct < 18.0 else 3))
                     pos.locked_profit_inr = round((pos.hard_stop_premium - pos.entry_premium) * pos.quantity, 2)
-                    print(f"[SWING TIER 1] 🌊 +6% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
-
-            # Tier 2 (+16% premium gain): Lock in at least +10% profit!
-            if prem_gain_pct >= 16.0 and pos.trailing_step_level < 2:
-                locked_prem = min(round(pos.entry_premium * 1.10, 2), round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
-                if locked_prem > pos.hard_stop_premium:
-                    pos.hard_stop_premium = locked_prem
-                    pos.trailing_step_level = 2
-                    pos.locked_profit_inr = round((pos.hard_stop_premium - pos.entry_premium) * pos.quantity, 2)
-                    print(f"[SWING TIER 2] 🌊 +10% Profit Locked @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
+                    print(f"[SWING RATCHET] 🛡️ Peak +{peak_gain_pct:.1f}% -> Locking {int(lock_ratio*100)}% of peak @ ₹{pos.hard_stop_premium:.2f} (+₹{pos.locked_profit_inr:,.0f})")
 
             # Tier 3 (+22% or higher runner): Lock at least +15% and trail tightly at 90% of highest watermark!
             if prem_gain_pct >= 22.0:
@@ -718,7 +701,8 @@ class NiftySmartEdgeEngine:
                 elif pos.hard_stop_premium > pos.entry_premium:
                     return True, f"🛡️ Swing Breakeven/Slippage Stop: Exited @ ₹{pos.current_premium:.2f} (Gross ₹{pos.pnl:+.2f})"
                 else:
-                    return True, f"Layer 2 Hard Premium Stop Hit @ ₹{pos.current_premium:.2f} (-20% stop: ₹{pos.hard_stop_premium:.2f})"
+                    sl_pct = round(((pos.hard_stop_premium - pos.entry_premium) / max(0.01, pos.entry_premium)) * 100.0, 1)
+                    return True, f"Layer 2 Hard Premium Stop Hit @ ₹{pos.current_premium:.2f} ({sl_pct:+.1f}% stop: ₹{pos.hard_stop_premium:.2f})"
 
         # ---------------------------------------------------------------------
         # 2. STANDARD / SMART EDGE DEFENSES & HOLDING LIMITS
@@ -1000,12 +984,13 @@ class NiftySmartEdgeEngine:
             from global_trade_lock import global_trade_lock
             closed_asset = getattr(pos, "asset_key", "")
             closed_side = "BUY_CE" if getattr(pos, "option_type", "CE") == "CE" else "BUY_PE"
+            cd_secs = 1200 if "manual" in reason.lower() else 900
             if closed_asset:
                 if not hasattr(self, "_asset_cooldowns"):
                     self._asset_cooldowns = {}
-                self._asset_cooldowns[f"{closed_asset}:{closed_side}"] = datetime.datetime.now() + datetime.timedelta(seconds=900)
+                self._asset_cooldowns[f"{closed_asset}:{closed_side}"] = datetime.datetime.now() + datetime.timedelta(seconds=cd_secs)
             global_trade_lock.release_lock(position_id=getattr(pos, "position_id", ""), cooldown_seconds=0)
-            print(Fore.CYAN + f"[GlobalTradeLock] Lock released. 15m same-direction cooldown set for {closed_asset}:{closed_side}; opposite ChoCH flips remain open.")
+            print(Fore.CYAN + f"[GlobalTradeLock] Lock released. {cd_secs//60}m same-direction cooldown set for {closed_asset}:{closed_side}; opposite ChoCH flips remain open.")
         except Exception as e:
             print(f"[GlobalTradeLock Exit Error] {e}")
 
