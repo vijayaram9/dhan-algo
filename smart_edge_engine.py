@@ -1159,7 +1159,6 @@ class NiftySmartEdgeEngine:
                 if not is_manual_override:
                     try:
                         from journal import journal
-                        import datetime
                         j_df = journal.get_all_trades_df()
                         if not j_df.empty:
                             today_s = datetime.date.today().strftime("%Y-%m-%d")
