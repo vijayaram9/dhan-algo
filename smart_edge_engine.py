@@ -989,6 +989,11 @@ class NiftySmartEdgeEngine:
                 if not hasattr(self, "_asset_cooldowns"):
                     self._asset_cooldowns = {}
                 self._asset_cooldowns[f"{closed_asset}:{closed_side}"] = datetime.datetime.now() + datetime.timedelta(seconds=cd_secs)
+                # Correlated index basket cooldown (5m) ONLY on Manual exit or Stop-Loss so we don't hop from BANKNIFTY -> FINNIFTY 16s later
+                if closed_asset in {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"} and any(w in reason.lower() for w in ("manual", "stop", "invalidation")):
+                    if not hasattr(self, "_basket_cooldowns"):
+                        self._basket_cooldowns = {}
+                    self._basket_cooldowns[closed_side] = datetime.datetime.now() + datetime.timedelta(seconds=300)
             global_trade_lock.release_lock(position_id=getattr(pos, "position_id", ""), cooldown_seconds=0)
             print(Fore.CYAN + f"[GlobalTradeLock] Lock released. {cd_secs//60}m same-direction cooldown set for {closed_asset}:{closed_side}; opposite ChoCH flips remain open.")
         except Exception as e:
@@ -1737,6 +1742,10 @@ class NiftySmartEdgeEngine:
                     dir_cd_until = getattr(self, "_asset_cooldowns", {}).get(f"{asset_key}:{opp_action}")
                     if dir_cd_until is not None and datetime.datetime.now() < dir_cd_until:
                         continue
+                    if asset_key in index_keys:
+                        basket_cd_until = getattr(self, "_basket_cooldowns", {}).get(opp_action)
+                        if basket_cd_until is not None and datetime.datetime.now() < basket_cd_until:
+                            continue
                     
                     # Institutional Trend Direction, Supply/Demand Zone & Candlestick Confirmation Filter:
                     opp_spot = top_opp["spot"]

@@ -492,7 +492,7 @@ class MultiTimeframeEngine:
                 f"Safe Cash Defense active until verified candles are fetched"
             ]
 
-        elif is_hero_zero_time:
+        elif is_hero_zero_time and (is_real_bull or is_real_bear or tf5_stage in ("BREAKOUT", "BREAKDOWN")) and tf1_score >= 58:
             # ⭐️ HERO-TO-ZERO EXPIRY SETUP (Explosive Gamma Expansion)
             setup_type = "HERO_TO_ZERO"
             market_regime = "EXPIRY_GAMMA_ACCELERATION"
