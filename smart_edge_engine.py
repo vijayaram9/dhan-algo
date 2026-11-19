@@ -1887,8 +1887,8 @@ class NiftySmartEdgeEngine:
                             skip_notes.append(f"{asset_key}(R1_OB)")
                             continue
                         pdh_lvl = float(mtf_lvls.get("pdh", 0.0) or 0.0)
-                        if pdh_lvl > 0 and 0.0 < ((pdh_lvl - opp_spot) / pdh_lvl) <= 0.0012 and comp_close <= pdh_lvl:
-                            skip_notes.append(f"{asset_key}(BELOW_PDH)")
+                        if pdh_lvl > 0 and 0.0 < ((pdh_lvl - opp_spot) / pdh_lvl) <= 0.0012 and comp_close <= pdh_lvl and (b_close < b_open or upper_wick > b_body):
+                            skip_notes.append(f"{asset_key}(BELOW_PDH_REJ)")
                             continue
                         if not is_demand_bounce_ce:
                             if opp_spot < real_vwap:
@@ -1913,7 +1913,8 @@ class NiftySmartEdgeEngine:
                         if s1_lvl > 0 and opp_spot <= (s1_lvl * 1.001) and rsi_5m <= 28.0 and (b_close > b_open or lower_wick > b_body):
                             continue
                         pdl_lvl = float(mtf_lvls.get("pdl", 0.0) or 0.0)
-                        if pdl_lvl > 0 and 0.0 < ((opp_spot - pdl_lvl) / pdl_lvl) <= 0.0012 and comp_close >= pdl_lvl:
+                        if pdl_lvl > 0 and 0.0 < ((opp_spot - pdl_lvl) / pdl_lvl) <= 0.0012 and comp_close >= pdl_lvl and (b_close > b_open or lower_wick > b_body):
+                            skip_notes.append(f"{asset_key}(ABOVE_PDL_REJ)")
                             continue
                         if not is_supply_rejection_pe:
                             if opp_spot > real_vwap:

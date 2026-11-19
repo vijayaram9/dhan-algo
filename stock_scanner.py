@@ -107,7 +107,7 @@ class StockMomentumScanner:
         news_map = self.get_news_catalysts()
         news_title = news_map.get(asset_key.upper(), "")
         news_hit = bool(news_title)
-        momentum_ok = (rvol >= 1.15) or (news_hit and rvol >= 0.70 and abs(pct_move) >= 0.30)
+        momentum_ok = (rvol >= 0.90) or (news_hit and rvol >= 0.55)
         return {
             "asset_key": asset_key,
             "sector": sector,
