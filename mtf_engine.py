@@ -213,6 +213,12 @@ class MultiTimeframeEngine:
         
         pdh = 0.0
         pdl = 0.0
+        pdc = 0.0
+        cpr_bc = 0.0
+        cpr_tc = 0.0
+        fib_382 = 0.0
+        fib_500 = 0.0
+        fib_618 = 0.0
         poc = round(spot, 2)
         vah = round(spot, 2)
         val = round(spot, 2)
@@ -236,6 +242,12 @@ class MultiTimeframeEngine:
                         df_last_day = df_prev.tail(75)
                     pdh = round(float(df_last_day["high"].max()), 2)
                     pdl = round(float(df_last_day["low"].min()), 2)
+                    pdc = round(float(df_last_day["close"].iloc[-1]), 2)
+                    cpr_pp = (pdh + pdl + pdc) / 3.0
+                    cpr_bc_raw = (pdh + pdl) / 2.0
+                    cpr_tc_raw = (cpr_pp - cpr_bc_raw) + cpr_pp
+                    cpr_bc = round(min(cpr_bc_raw, cpr_tc_raw), 2)
+                    cpr_tc = round(max(cpr_bc_raw, cpr_tc_raw), 2)
                 if not df_t.empty:
                     df_intraday = df_t
                 elif len(df5) > 25:
@@ -249,6 +261,11 @@ class MultiTimeframeEngine:
             s1 = round((2 * pp) - day_high, 1)
             r2 = round(pp + (day_high - day_low), 1)
             s2 = round(pp - (day_high - day_low), 1)
+            day_rng = max(0.0, day_high - day_low)
+            if day_rng > 0:
+                fib_382 = round(day_low + 0.382 * day_rng, 2)
+                fib_500 = round(day_low + 0.500 * day_rng, 2)
+                fib_618 = round(day_low + 0.618 * day_rng, 2)
             # Volume Profile (POC / VAH / VAL across 20 price bins on recent real candles)
             try:
                 vp_df = df5.tail(75)
@@ -299,6 +316,11 @@ class MultiTimeframeEngine:
             "vwap": vwap,
             "pdh": pdh,
             "pdl": pdl,
+            "cpr_bc": cpr_bc,
+            "cpr_tc": cpr_tc,
+            "fib_382": fib_382,
+            "fib_500": fib_500,
+            "fib_618": fib_618,
             "poc": poc,
             "vah": vah,
             "val": val

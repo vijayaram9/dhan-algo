@@ -670,6 +670,32 @@ class NiftySmartEdgeEngine:
                     pos.hard_stop_premium = tight_sl
                     print(f"[SWING TIGHT-SHIELD] 🛡️ +4.5% Reached -> Hard Stop tightened to -2% @ ₹{pos.hard_stop_premium:.2f}")
 
+            # Substantial Rupee Profit Lock + Fib/CPR/R1/S1 Level Tightening (never wait for 10% if cash profit is already substantial!)
+            if pos.pnl >= 600.0 and pos.current_premium > pos.entry_premium:
+                cash_ratio = 0.80 if pos.pnl >= 2500.0 else (0.70 if pos.pnl >= 1500.0 else (0.55 if pos.pnl >= 800.0 else 0.0))
+                try:
+                    from mtf_engine import mtf_engine as _mtf_lv
+                    _lvls = _mtf_lv.calculate_institutional_levels(current_spot, asset_k)
+                    if pos.option_type == "CE":
+                        _key_lvls = [v for k in ("r1", "pdh", "fib_618", "cpr_tc") if (v := float(_lvls.get(k, 0.0) or 0.0)) > 0]
+                        if any(abs(current_spot - lv) / max(1.0, current_spot) <= 0.0008 or current_spot >= lv for lv in _key_lvls if lv > pos.underlying_entry_spot):
+                            cash_ratio = max(cash_ratio, 0.75)
+                    else:
+                        _key_lvls = [v for k in ("s1", "pdl", "fib_382", "cpr_bc") if (v := float(_lvls.get(k, 0.0) or 0.0)) > 0]
+                        if any(abs(current_spot - lv) / max(1.0, current_spot) <= 0.0008 or current_spot <= lv for lv in _key_lvls if lv < pos.underlying_entry_spot):
+                            cash_ratio = max(cash_ratio, 0.75)
+                except Exception:
+                    pass
+                if cash_ratio > 0:
+                    fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
+                    cash_sl = round(pos.entry_premium + max(fee_buf, (pos.current_premium - pos.entry_premium) * cash_ratio), 2)
+                    cash_sl = min(cash_sl, round(pos.current_premium - max(0.5, pos.current_premium * 0.01), 2))
+                    if cash_sl > pos.hard_stop_premium:
+                        pos.hard_stop_premium = cash_sl
+                        pos.is_trailing_active = True
+                        pos.trailing_step_level = max(pos.trailing_step_level, 2 if cash_ratio >= 0.70 else 1)
+                        pos.locked_profit_inr = round((pos.hard_stop_premium - pos.entry_premium) * pos.quantity, 2)
+
             # Continuous Peak-Gain Ratchet (+7%+): never let a +₹1,000 winner bleed back to +₹300!
             peak_gain = max(0.0, pos.highest_premium - pos.entry_premium)
             peak_gain_pct = (peak_gain / max(0.01, pos.entry_premium)) * 100.0
@@ -1380,17 +1406,9 @@ class NiftySmartEdgeEngine:
                     target_premium = round(contract.estimated_premium + (sl_distance * 1.8), 2)
             max_holding_seconds = 1800  # 30 minutes institutional trade window
         elif trade_style == "SWING":
-            # Percentage-of-Capital Risk Cap: 1.5% for 2+ lot A+ setups, 1.0% for 1 lot (ratchets to 0.8% once daily net P&L >= +2.0%)
-            active_cap_sl = float(self.client.get_real_cash_balance() if self.mode == "LIVE" else getattr(self.client, "paper_capital", 150000.0) or 150000.0)
-            active_cap_sl = max(25000.0, active_cap_sl)
-            cur_day_net = float(getattr(self, "daily_net_pnl", 0.0) or 0.0)
-            base_risk_pct = 0.015 if getattr(contract, "number_of_lots", 1) >= 2 else 0.010
-            risk_pct = 0.008 if cur_day_net >= (active_cap_sl * 0.02) else base_risk_pct
-            max_risk_budget = round(active_cap_sl * risk_pct, 2)
+            # Keep structural -10% Swing SL intact (lot sizing in contract_selector fits risk budget; never squeeze SL to 3%!)
             swing_pct_sl = round(contract.estimated_premium * 0.90, 2)
-            total_qty = max(1, int(getattr(contract, "lot_size", 1) or 1) * int(getattr(contract, "number_of_lots", 1) or 1))
-            rupee_cap_sl = round(max(1.0, contract.estimated_premium - (max_risk_budget / total_qty)), 2)
-            hard_sl = max(hard_sl, swing_pct_sl, rupee_cap_sl)
+            hard_sl = max(hard_sl, swing_pct_sl)
             # Spread-survival guard: ensure hard_sl is at least 1% below fresh live quote
             hard_sl = min(hard_sl, round(contract.estimated_premium * 0.99, 2))
             if target_premium <= 0:
@@ -1702,16 +1720,21 @@ class NiftySmartEdgeEngine:
                 index_keys = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "NIFTYIT"}
                 active_index_count = sum(1 for p in self.active_positions if getattr(p, "asset_key", "") in index_keys)
 
-                # Indices-Only Auto-Pilot (09:25 - 14:45, or 15:00 on Expiry): MCX & Stock Options paused (0W/4L yesterday), 1 Index at a time
+                # Multi-Slot Uncorrelated Auto-Pilot (09:25 - 14:45, or 15:00 on Expiry):
+                # 1 Index slot + up to 2 uncorrelated High-RVOL/News F&O Stock slots (1 per sector max, <= 3 total)
+                from stock_scanner import stock_scanner
+                active_sectors = {stock_scanner.get_sector(getattr(p, "asset_key", "")) for p in self.active_positions if getattr(p, "asset_key", "") not in index_keys and getattr(p, "asset_key", "") not in mcx_keys}
+                active_stock_count = sum(1 for p in self.active_positions if getattr(p, "asset_key", "") not in index_keys and getattr(p, "asset_key", "") not in mcx_keys)
                 if is_evening_session:
                     valid_opps = []
                 elif is_equity_open and now_hm_curr < "15:00":
                     valid_opps = [
                         o for o in all_opps
-                        if o["key"] in index_keys
+                        if o["key"] not in mcx_keys
                         and o["key"] not in active_assets
                         and (now_hm_curr < "14:45" or o.get("is_expiry_today", False))
                         and not (active_index_count >= 1 and o["key"] in index_keys)
+                        and not (o["key"] not in index_keys and (active_stock_count >= 2 or stock_scanner.get_sector(o["key"]) in active_sectors))
                         and self.check_trading_schedule(o["key"])[0]
                     ]
                 else:
@@ -1738,8 +1761,8 @@ class NiftySmartEdgeEngine:
                     elif (top_opp["key"] in index_keys) or (top_opp["key"] in liquid_mcx):
                         eff_min_conf = min_conf
                     else:
-                        # Idea B: Allow liquid stock options at 80+ (verified for PDH/PDL/FVG tags below; 85+ otherwise)
-                        eff_min_conf = max(min_conf, 80)
+                        # High-RVOL (>= 1.35x) or News-Catalyst F&O Stock Options only (75+ confluence)
+                        eff_min_conf = max(min_conf, 75)
                     if not top_opp.get("is_actionable") or top_opp.get("confluence_score", 0) < eff_min_conf:
                         continue
                     asset_key = top_opp["key"]
@@ -1786,10 +1809,10 @@ class NiftySmartEdgeEngine:
                     if adx_5m < 20.0:
                         continue
 
-                    # Volume check on completed bar for Equities/Futures (IDX_I index feed does not carry order-book volume)
-                    if asset_key not in index_keys and "volume" in df_bars.columns and float(df_bars["volume"].iloc[-2]) > 0:
-                        avg_vol20 = float(df_bars["volume"].tail(20).mean() or 0.0)
-                        if avg_vol20 > 0 and float(df_bars["volume"].iloc[-2]) < (avg_vol20 * 0.75):
+                    # High-RVOL & News Catalyst Gate for F&O Stock Options (never trade sleepy/illiquid stocks)
+                    if asset_key not in index_keys and asset_key not in mcx_keys:
+                        stk_scan = stock_scanner.score_stock(asset_key, df_bars)
+                        if not stk_scan["momentum_ok"]:
                             continue
 
                     # 15m Opening Range (09:15-09:30 IST) for ORB + OR-Midpoint stop + SMC Liquidity Sweep levels
