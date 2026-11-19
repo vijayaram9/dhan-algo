@@ -1759,6 +1759,7 @@ class NiftySmartEdgeEngine:
 
                 # High-Confluence Institutional Selection (Dynamic 70-80% + Trend & Candle Confirmation):
                 min_conf = getattr(self, "dynamic_min_confluence", 70)
+                skip_notes = []
                 for top_opp in valid_opps:
                     # Check global lock; directional same-side cooldown is checked after opp_action is determined (allowing immediate ChoCH opposite flips!)
                     is_asset_cd, _ = global_trade_lock.is_cooldown_active(top_opp["key"])
@@ -1820,13 +1821,15 @@ class NiftySmartEdgeEngine:
                     ema21_val = float(df_bars["close"].ewm(span=21, adjust=False).mean().iloc[-1])
                     rsi_5m = IndicatorEngine.calculate_rsi(df_bars["close"])
                     adx_5m, _, _ = IndicatorEngine.calculate_adx(df_bars)
-                    if adx_5m < 20.0:
+                    if adx_5m < 18.0:
+                        skip_notes.append(f"{asset_key}(ADX {adx_5m:.1f}<18)")
                         continue
 
                     # High-RVOL & News Catalyst Gate for F&O Stock Options (never trade sleepy/illiquid stocks)
                     if asset_key not in index_keys and asset_key not in mcx_keys:
                         stk_scan = stock_scanner.score_stock(asset_key, df_bars)
                         if not stk_scan["momentum_ok"]:
+                            skip_notes.append(f"{asset_key}(RVOL {stk_scan['rvol']}x)")
                             continue
 
                     # 15m Opening Range (09:15-09:30 IST) for ORB + OR-Midpoint stop + SMC Liquidity Sweep levels
@@ -1877,23 +1880,31 @@ class NiftySmartEdgeEngine:
 
                     if opp_action == "BUY_CE":
                         if not is_sweep_ce and not rs_trends.get("tf_15m_bull", True):
+                            skip_notes.append(f"{asset_key}(15m!=BULL)")
                             continue
                         # Anti-chasing guard: block CALLs at R1 only when overbought AND showing a red bar or upper rejection wick
                         if r1_lvl > 0 and opp_spot >= (r1_lvl * 0.999) and rsi_5m >= 72.0 and (b_close < b_open or upper_wick > b_body):
+                            skip_notes.append(f"{asset_key}(R1_OB)")
                             continue
                         pdh_lvl = float(mtf_lvls.get("pdh", 0.0) or 0.0)
                         if pdh_lvl > 0 and 0.0 < ((pdh_lvl - opp_spot) / pdh_lvl) <= 0.0012 and comp_close <= pdh_lvl:
+                            skip_notes.append(f"{asset_key}(BELOW_PDH)")
                             continue
                         if not is_demand_bounce_ce:
                             if opp_spot < real_vwap:
+                                skip_notes.append(f"{asset_key}(<VWAP)")
                                 continue
                             if ema9_val > 0 and ((opp_spot - ema9_val) / ema9_val) > (0.0018 if asset_key in index_keys else 0.0065):
+                                skip_notes.append(f"{asset_key}(EMA9_EXT)")
                                 continue
                             if not (ema9_val > ema21_val and b_close > ema21_val):
+                                skip_notes.append(f"{asset_key}(EMA9<=21)")
                                 continue
                             if b_close < b_open and b_close < ema9_val:
+                                skip_notes.append(f"{asset_key}(RED<EMA9)")
                                 continue
                             if b_close < (prev_low - (opp_spot * 0.0005)):
+                                skip_notes.append(f"{asset_key}(<PREV_LOW)")
                                 continue
                     elif opp_action == "BUY_PE":
                         if not is_sweep_pe and not rs_trends.get("tf_15m_bear", True):
@@ -2017,8 +2028,11 @@ class NiftySmartEdgeEngine:
                             target_2_spot=calc_levels.get("target_2_spot", calc_levels.get("target_2", opp_spot + 55.0))
                         )
                         print(Fore.GREEN + f"\n[AUTOPILOT RADAR] 🚀 Auto-triggering top setup: {opp_contract.custom_symbol} ({top_opp['display_name']} Confluence: {eff_score}% | {exec_style})")
-                        self.execute_entry(auto_sig, opp_contract, opp_spot, trade_style=exec_style)
-                        return
+                        if self.execute_entry(auto_sig, opp_contract, opp_spot, trade_style=exec_style):
+                            return
+                        skip_notes.append(f"{asset_key}({getattr(self, 'last_entry_error', 'BLOCKED')[:24]})")
+                if skip_notes:
+                    self.waiting_reason = "Radar filtered: " + ", ".join(skip_notes[:6])
             except Exception as e:
                 print(f"[AutoPilot Radar Warning] {e}")
 
