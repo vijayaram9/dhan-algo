@@ -1873,7 +1873,7 @@ class NiftySmartEdgeEngine:
                         if not is_demand_bounce_ce:
                             if opp_spot < real_vwap:
                                 continue
-                            if ema9_val > 0 and ((opp_spot - ema9_val) / ema9_val) > 0.0018:
+                            if ema9_val > 0 and ((opp_spot - ema9_val) / ema9_val) > (0.0018 if asset_key in index_keys else 0.0065):
                                 continue
                             if not (ema9_val > ema21_val and b_close > ema21_val):
                                 continue
@@ -1893,7 +1893,7 @@ class NiftySmartEdgeEngine:
                         if not is_supply_rejection_pe:
                             if opp_spot > real_vwap:
                                 continue
-                            if ema9_val > 0 and ((ema9_val - opp_spot) / ema9_val) > 0.0018:
+                            if ema9_val > 0 and ((ema9_val - opp_spot) / ema9_val) > (0.0018 if asset_key in index_keys else 0.0065):
                                 continue
                             if not (ema9_val < ema21_val and b_close < ema21_val):
                                 continue
