@@ -1809,14 +1809,18 @@ class NiftySmartEdgeEngine:
                     if opp_regime == "UNCONFIRMED_DATA":
                         continue
                     liquid_mcx = {"CRUDEOILM", "NATGASMINI"}
-                    if top_opp["key"] in index_keys and opp_regime in ("INSTITUTIONAL_ACCUMULATION", "INSTITUTIONAL_DISTRIBUTION"):
+                    if (top_opp["key"] in index_keys or top_opp["key"] in liquid_mcx) and opp_regime in ("INSTITUTIONAL_ACCUMULATION", "INSTITUTIONAL_DISTRIBUTION"):
                         eff_min_conf = min(min_conf, 60)
                     elif (top_opp["key"] in index_keys) or (top_opp["key"] in liquid_mcx):
                         eff_min_conf = min_conf
                     else:
                         # High-RVOL (>= 1.35x) or News-Catalyst F&O Stock Options only (75+ confluence)
                         eff_min_conf = max(min_conf, 75)
-                    if not top_opp.get("is_actionable") or top_opp.get("confluence_score", 0) < eff_min_conf:
+                    if not top_opp.get("is_actionable"):
+                        skip_notes.append(f"{top_opp['key']}(Not Actionable)")
+                        continue
+                    if top_opp.get("confluence_score", 0) < eff_min_conf:
+                        skip_notes.append(f"{top_opp['key']}(Conf {top_opp.get('confluence_score', 0)}<{eff_min_conf})")
                         continue
                     asset_key = top_opp["key"]
                     opp_action = "BUY_CE" if any(x in top_opp["action"].upper() for x in ["CE", "CALL", "BULLISH"]) else ("BUY_PE" if any(x in top_opp["action"].upper() for x in ["PE", "PUT", "BEARISH"]) else None)
@@ -1848,6 +1852,8 @@ class NiftySmartEdgeEngine:
                     # Fail-Closed Candle & EMA 9/21 Alignment Check (Completed Bar + Volume + 15m ORB):
                     df_bars = mtf_engine.get_real_candles(asset_key)
                     if df_bars is None or len(df_bars) < 21:
+                        n_b = 0 if df_bars is None else len(df_bars)
+                        skip_notes.append(f"{asset_key}(Bars {n_b}<21)")
                         continue
                     b_close = float(df_bars["close"].iloc[-1])
                     b_open = float(df_bars["open"].iloc[-1])
