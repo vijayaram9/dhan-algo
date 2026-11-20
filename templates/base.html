@@ -89,6 +89,67 @@
             --chart-bg: #131a26;
             --chart-grid: rgba(255, 255, 255, 0.05);
             --chart-text: #cbd5e1;
+            color-scheme: dark;
+        }
+
+        /* Broadsheet Blush — Iconic Salmon-Pink Financial Newsprint */
+        [data-theme="broadsheet"] {
+            --apple-canvas: #f5dfd3;
+            --apple-surface: #fff1e5;
+            --apple-surface-secondary: #f2d7c9;
+            --apple-header: rgba(255, 241, 229, 0.94);
+            --apple-border: rgba(92, 45, 34, 0.14);
+            --apple-text: #241410;
+            --apple-text-secondary: #4a2e27;
+            --apple-muted: #704c43;
+            --apple-blue: #0d5c8c;
+            --apple-green: #117a42;
+            --apple-red: #b91c2e;
+            --apple-amber: #b45309;
+            --chart-bg: #fff1e5;
+            --chart-grid: rgba(92, 45, 34, 0.07);
+            --chart-text: #4a2e27;
+            color-scheme: light;
+        }
+
+        /* Imperial Burgundy — Deep Velvet Wine Titanium */
+        [data-theme="burgundy"] {
+            --apple-canvas: #16090e;
+            --apple-surface: #220e16;
+            --apple-surface-secondary: #301420;
+            --apple-header: rgba(28, 11, 18, 0.93);
+            --apple-border: rgba(255, 210, 222, 0.13);
+            --apple-text: #fdf4f6;
+            --apple-text-secondary: #e8cbd3;
+            --apple-muted: #bd93a0;
+            --apple-blue: #60a5fa;
+            --apple-green: #34d399;
+            --apple-red: #fb7185;
+            --apple-amber: #fbbf24;
+            --chart-bg: #220e16;
+            --chart-grid: rgba(255, 210, 222, 0.06);
+            --chart-text: #e8cbd3;
+            color-scheme: dark;
+        }
+
+        /* Titanium Ultramarine — Modern iPhone Metallic Deep Blue */
+        [data-theme="ultramarine"] {
+            --apple-canvas: #0a1220;
+            --apple-surface: #111d30;
+            --apple-surface-secondary: #1a2a44;
+            --apple-header: rgba(14, 24, 40, 0.93);
+            --apple-border: rgba(186, 214, 255, 0.14);
+            --apple-text: #f2f7ff;
+            --apple-text-secondary: #c9dbf5;
+            --apple-muted: #8faad2;
+            --apple-blue: #38bdf8;
+            --apple-green: #34d399;
+            --apple-red: #fb7185;
+            --apple-amber: #fbbf24;
+            --chart-bg: #111d30;
+            --chart-grid: rgba(186, 214, 255, 0.07);
+            --chart-text: #c9dbf5;
+            color-scheme: dark;
         }
 
         body {
@@ -119,36 +180,232 @@
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
         }
 
-        /* Global Contrast & Theme Adaptation for Soft Light & Midnight Modes */
-        .apple-box .bg-white, .bg-white\/95 {
+        /* Global Contrast & Theme Adaptation for All Light & Dark Modes */
+        .apple-box .bg-white, .bg-white\/95, .bg-white\/90 {
             background-color: var(--apple-surface) !important;
         }
         .apple-box .bg-slate-50, .apple-box .bg-slate-100 {
             background-color: var(--apple-surface-secondary) !important;
         }
-        .text-slate-900 {
+        .text-slate-900, .text-gray-900 {
             color: var(--apple-text) !important;
         }
-        .text-slate-800, .text-slate-700, .text-slate-600 {
+        .text-slate-800, .text-slate-700, .text-slate-600,
+        .text-gray-800, .text-gray-700, .text-gray-600 {
             color: var(--apple-text-secondary) !important;
         }
-        .text-slate-500, .text-slate-400 {
+        .text-slate-500, .text-slate-400,
+        .text-gray-500, .text-gray-400 {
             color: var(--apple-muted) !important;
         }
-        [data-theme="midnight"] .border-slate-200,
-        [data-theme="midnight"] .border-slate-200\/90,
-        [data-theme="midnight"] .border-slate-200\/80,
-        [data-theme="midnight"] .border-slate-100,
-        [data-theme="midnight"] .border-black\/\[0\.04\] {
-            border-color: rgba(255, 255, 255, 0.09) !important;
+
+        /* Seamless Warm Newsprint Blending for Broadsheet Blush & Warm Paper */
+        :is([data-theme="broadsheet"], [data-theme="paper"]) .bg-white {
+            background-color: var(--apple-surface) !important;
         }
-        [data-theme="midnight"] .bg-slate-100,
-        [data-theme="midnight"] .bg-slate-50,
-        [data-theme="midnight"] .bg-white {
+        :is([data-theme="broadsheet"], [data-theme="paper"]) .bg-slate-50,
+        :is([data-theme="broadsheet"], [data-theme="paper"]) .bg-slate-100,
+        :is([data-theme="broadsheet"], [data-theme="paper"]) .bg-gray-50,
+        :is([data-theme="broadsheet"], [data-theme="paper"]) .bg-gray-100 {
             background-color: var(--apple-surface-secondary) !important;
         }
+        :is([data-theme="broadsheet"], [data-theme="paper"]) .border-slate-200,
+        :is([data-theme="broadsheet"], [data-theme="paper"]) .border-slate-200\/90,
+        :is([data-theme="broadsheet"], [data-theme="paper"]) .border-slate-200\/80,
+        :is([data-theme="broadsheet"], [data-theme="paper"]) .border-slate-100,
+        :is([data-theme="broadsheet"], [data-theme="paper"]) .border-black\/\[0\.04\],
+        :is([data-theme="broadsheet"], [data-theme="paper"]) .border-black\/\[0\.05\],
+        :is([data-theme="broadsheet"], [data-theme="paper"]) .border-black\/\[0\.06\] {
+            border-color: var(--apple-border) !important;
+        }
+        [data-theme="broadsheet"] .bg-amber-50,
+        [data-theme="broadsheet"] .bg-orange-50 {
+            background-color: rgba(217, 119, 6, 0.11) !important;
+        }
+        [data-theme="broadsheet"] .bg-emerald-50 {
+            background-color: rgba(17, 122, 66, 0.10) !important;
+        }
+        [data-theme="broadsheet"] .bg-rose-50 {
+            background-color: rgba(185, 28, 46, 0.10) !important;
+        }
+        [data-theme="broadsheet"] .bg-blue-50 {
+            background-color: rgba(13, 92, 140, 0.10) !important;
+        }
+
+        /* Comprehensive Dark Theme Blending (Midnight Pro, Imperial Burgundy, Titanium Ultramarine) */
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .apple-box {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28), 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+        }
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-slate-200,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-slate-200\/90,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-slate-200\/80,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-slate-100,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-slate-300,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-gray-200,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-gray-100,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-black\/\[0\.04\],
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-black\/\[0\.05\],
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-black\/\[0\.06\],
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+            border-color: var(--apple-border) !important;
+        }
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-slate-100,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-slate-50,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-gray-100,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-gray-50,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-white,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-white\/95,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-white\/90,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-white\/80 {
+            background-color: var(--apple-surface-secondary) !important;
+        }
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .hover\:bg-slate-50:hover,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .hover\:bg-slate-100:hover,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .hover\:bg-slate-200:hover {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        /* Dark Mode Semantic Pastel Surfaces -> Translucent Glass Tints */
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-emerald-50,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-emerald-50\/80,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-emerald-100,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-green-50,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-green-100 {
+            background-color: rgba(16, 185, 129, 0.14) !important;
+        }
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-rose-50,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-rose-50\/80,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-rose-100,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-red-50,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-red-100 {
+            background-color: rgba(244, 63, 94, 0.15) !important;
+        }
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-blue-50,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-blue-100,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-sky-50,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-indigo-50,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-indigo-100 {
+            background-color: rgba(56, 189, 248, 0.15) !important;
+        }
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-amber-50,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-amber-100,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-amber-100\/90,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-yellow-50,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-orange-50 {
+            background-color: rgba(245, 158, 11, 0.15) !important;
+        }
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-purple-50,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-violet-50,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .bg-fuchsia-50 {
+            background-color: rgba(168, 85, 247, 0.16) !important;
+        }
+        /* Dark Mode Light Gradients -> Rich Subtle Glass Gradients */
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .from-amber-50,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .from-orange-50 {
+            background-image: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(217, 119, 6, 0.10)) !important;
+        }
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .from-slate-50,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .from-white {
+            background-image: linear-gradient(135deg, var(--apple-surface), var(--apple-surface-secondary)) !important;
+        }
+
+        /* Dark Mode Semantic Borders */
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-amber-200,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-amber-200\/90,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-amber-300,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-orange-200 {
+            border-color: rgba(251, 191, 36, 0.30) !important;
+        }
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-emerald-200,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-emerald-300,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-green-200 {
+            border-color: rgba(52, 211, 153, 0.30) !important;
+        }
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-rose-200,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-rose-300,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-red-200 {
+            border-color: rgba(251, 113, 133, 0.30) !important;
+        }
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-blue-200,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-blue-300,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .border-indigo-200 {
+            border-color: rgba(96, 165, 250, 0.30) !important;
+        }
+
+        /* Dark Mode High-Contrast Legible Foreground Text (Fixes dark-on-dark unreadable text) */
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-black {
+            color: var(--apple-text) !important;
+        }
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-amber-950,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-amber-900,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-amber-800,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-amber-700,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-orange-950,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-orange-900,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-orange-800 {
+            color: #fcd34d !important;
+        }
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-emerald-950,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-emerald-900,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-emerald-800,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-emerald-700,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-green-800,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-green-700 {
+            color: #6ee7b7 !important;
+        }
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-rose-950,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-rose-900,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-rose-800,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-rose-700,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-rose-600,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-red-800,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-red-700,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-red-600 {
+            color: #fda4af !important;
+        }
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-blue-950,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-blue-900,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-blue-800,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-blue-700,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-blue-600,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-indigo-900,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-indigo-800,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-indigo-700 {
+            color: #93c5fd !important;
+        }
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-purple-900,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-purple-800,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-purple-700,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-violet-800,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) .text-violet-700 {
+            color: #d8b4fe !important;
+        }
+
+        /* Native Dropdowns & Form Controls Match Active Theme */
+        select option {
+            background-color: var(--apple-surface);
+            color: var(--apple-text);
+        }
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) select,
+        :is([data-theme="midnight"], [data-theme="burgundy"], [data-theme="ultramarine"]) textarea {
+            background-color: var(--apple-surface-secondary) !important;
+            color: var(--apple-text) !important;
+            border-color: var(--apple-border) !important;
+        }
+
         [data-theme="midnight"] #pattern-horizon-banner {
             background: linear-gradient(135deg, #161f2e, #1a2438) !important;
+        }
+        [data-theme="burgundy"] #pattern-horizon-banner {
+            background: linear-gradient(135deg, #2a111c, #381726) !important;
+        }
+        [data-theme="ultramarine"] #pattern-horizon-banner {
+            background: linear-gradient(135deg, #142238, #1d3150) !important;
+        }
+        [data-theme="broadsheet"] #pattern-horizon-banner {
+            background: linear-gradient(135deg, #fbe8dc, #f5d8c8) !important;
         }
 
         /* Apple-style thin smooth scrollbars */
@@ -275,12 +532,15 @@
             <div class="flex items-center space-x-1.5 flex-shrink-0">
                 <!-- Curated Eye-Comfort Theme Switcher -->
                 <div class="relative flex items-center">
-                    <select id="ui-theme-selector" onchange="setAlgoTheme(this.value)" title="Switch Eye-Comfort Theme (Soft Daylight, Warm Paper, Slate Mist, Midnight Pro)"
+                    <select id="ui-theme-selector" onchange="setAlgoTheme(this.value)" title="Switch Eye-Comfort Theme"
                         class="px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-100 text-slate-800 border border-black/[0.06] cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
                         <option value="daylight">🌤️ Soft Daylight</option>
+                        <option value="broadsheet">🌸 Broadsheet Blush</option>
                         <option value="paper">📜 Warm Paper</option>
                         <option value="mist">🌫️ Slate Mist</option>
                         <option value="midnight">🌙 Midnight Pro</option>
+                        <option value="burgundy">🍷 Imperial Burgundy</option>
+                        <option value="ultramarine">💎 Titanium Blue</option>
                     </select>
                 </div>
 
