@@ -1682,13 +1682,12 @@ class NiftySmartEdgeEngine:
             return
 
         # Refresh REAL completed 5m candles from Dhan once per 5-minute boundary.
-        # (Previously a synthetic candle open=spot-2/close=spot was injected: every candle looked
-        #  green with a fixed 6-pt range, so the engine only ever bought CALLs and placed stops
-        #  ~3 pts away. That was the root cause of the instant stop-outs.)
+        # Only during daytime equity hours (Nifty is closed during MCX commodity session).
         bucket = (now_dt.hour * 60 + now_dt.minute) // 5
         if self.last_candle_minute != bucket:
-            if self.refresh_real_candles():
-                self.last_candle_minute = bucket
+            self.last_candle_minute = bucket
+            if is_equity_open:
+                self.refresh_real_candles()
 
         # Evaluate Multi-Strategy & Regime Detector
         signal = self.strategy.evaluate(now_dt.strftime("%H:%M"))
