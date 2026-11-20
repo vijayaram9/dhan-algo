@@ -766,7 +766,8 @@ class NiftySmartEdgeEngine:
 
         # Force Cutoff: 3:15 PM for Equity, 11:15 PM for MCX Commodities
         now_hm = get_ist_now().strftime("%H:%M")
-        is_comm = getattr(pos, "asset_key", "") in ["CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"]
+        mcx_all_exit = {"CRUDEOILM", "CRUDEOIL", "NATGASMINI", "NATURALGAS", "GOLDM", "GOLD", "SILVERM", "SILVER", "COPPER", "ZINC"}
+        is_comm = getattr(pos, "asset_key", "") in mcx_all_exit
         if not is_comm and "15:15" <= now_hm < "15:30":
             return True, "3:15 PM IST: Mandatory Equity Intraday Force Square-Off."
         elif is_comm and now_hm >= "23:15":
@@ -832,10 +833,15 @@ class NiftySmartEdgeEngine:
                 min_buffer = 18.0
             elif "NIFTY" in asset_k:
                 min_buffer = 15.0
+            elif is_comm:
+                # Video 2 (Groww ATR): Give MCX commodities proper volatility breathing room (0.45% min or 1.2x ATR)
+                min_buffer = max(5.0, pos.underlying_entry_spot * 0.0045)
             else:
                 min_buffer = max(1.5, pos.underlying_entry_spot * 0.0020)
 
-            structural_buffer = max(getattr(pos, 'atr_at_entry', 0.0) * 0.5, min_buffer)
+            structural_buffer = max(getattr(pos, 'atr_at_entry', 0.0) * (1.2 if is_comm else 0.5), min_buffer)
+            t2_min_pnl = 900.0 if is_comm else 300.0
+            t2_min_pct = 0.06 if is_comm else 0.0
 
             if pos.option_type == "CE":
                 # Structural Invalidation (CE: underlying breaks swing low by at least the volatility buffer, premium confirms loss, and at least 60s breathing room)
@@ -844,7 +850,7 @@ class NiftySmartEdgeEngine:
 
                 # Target 1 (1.5R) reached (CE): Lock 30% of open gain (min fee-protected BE) only once option is >= +5.5% so normal spread noise doesn't choke runners
                 prem_gain_pct = (pos.current_premium - pos.entry_premium) / max(0.01, pos.entry_premium)
-                if pos.target_1_spot > pos.underlying_entry_spot and current_spot >= pos.target_1_spot and prem_gain_pct >= 0.055 and elapsed_seconds >= 15.0:
+                if pos.target_1_spot > pos.underlying_entry_spot and current_spot >= pos.target_1_spot and prem_gain_pct >= (0.06 if is_comm else 0.055) and elapsed_seconds >= 15.0:
                     fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
                     gain_now = max(0.0, pos.current_premium - pos.entry_premium)
                     t1_lock = round(pos.entry_premium + max(fee_buf, gain_now * 0.30), 2)
@@ -853,7 +859,7 @@ class NiftySmartEdgeEngine:
                         pos.hard_stop_premium = t1_lock
                         pos.is_trailing_active = True
                         pos.locked_profit_inr = round((t1_lock - pos.entry_premium) * pos.quantity, 2)
-                if pos.target_2_spot > pos.underlying_entry_spot and current_spot >= pos.target_2_spot and pos.pnl >= 300.0 and elapsed_seconds >= 15.0:
+                if pos.target_2_spot > pos.underlying_entry_spot and current_spot >= pos.target_2_spot and pos.pnl >= t2_min_pnl and prem_gain_pct >= t2_min_pct and elapsed_seconds >= 15.0:
                     gain_now = max(0.0, pos.current_premium - pos.entry_premium)
                     t2_lock = max(round(pos.entry_premium + gain_now * 0.85, 2), round(pos.highest_premium * 0.92, 2))
                     t2_lock = min(t2_lock, round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
@@ -878,7 +884,7 @@ class NiftySmartEdgeEngine:
 
                 # Target 1 (1.5R) reached (PE): Lock 30% of open gain (min fee-protected BE) only once option is >= +5.5% so normal spread noise doesn't choke runners
                 prem_gain_pct = (pos.current_premium - pos.entry_premium) / max(0.01, pos.entry_premium)
-                if 0 < pos.target_1_spot < pos.underlying_entry_spot and current_spot <= pos.target_1_spot and prem_gain_pct >= 0.055 and elapsed_seconds >= 15.0:
+                if 0 < pos.target_1_spot < pos.underlying_entry_spot and current_spot <= pos.target_1_spot and prem_gain_pct >= (0.06 if is_comm else 0.055) and elapsed_seconds >= 15.0:
                     fee_buf = max(2.0, round(150.0 / max(1, pos.quantity), 2))
                     gain_now = max(0.0, pos.current_premium - pos.entry_premium)
                     t1_lock = round(pos.entry_premium + max(fee_buf, gain_now * 0.30), 2)
@@ -887,7 +893,7 @@ class NiftySmartEdgeEngine:
                         pos.hard_stop_premium = t1_lock
                         pos.is_trailing_active = True
                         pos.locked_profit_inr = round((t1_lock - pos.entry_premium) * pos.quantity, 2)
-                if 0 < pos.target_2_spot < pos.underlying_entry_spot and current_spot <= pos.target_2_spot and pos.pnl >= 300.0 and elapsed_seconds >= 15.0:
+                if 0 < pos.target_2_spot < pos.underlying_entry_spot and current_spot <= pos.target_2_spot and pos.pnl >= t2_min_pnl and prem_gain_pct >= t2_min_pct and elapsed_seconds >= 15.0:
                     gain_now = max(0.0, pos.current_premium - pos.entry_premium)
                     t2_lock = max(round(pos.entry_premium + gain_now * 0.85, 2), round(pos.highest_premium * 0.92, 2))
                     t2_lock = min(t2_lock, round(pos.current_premium - max(1.0, pos.current_premium * 0.01), 2))
@@ -923,6 +929,13 @@ class NiftySmartEdgeEngine:
         pos = target_pos
         pos_mode = getattr(pos, "execution_mode", self.mode)
         print(Fore.MAGENTA + f"\n[EXIT ({pos_mode})] Exiting {pos.symbol} | Reason: {reason}")
+        try:
+            from commodity_strategy import is_mcx_commodity, record_mcx_exit
+            _exit_ak = getattr(pos, "asset_key", "") or str(getattr(pos, "symbol", "")).split()[0]
+            if is_mcx_commodity(_exit_ak):
+                record_mcx_exit(_exit_ak, cooldown_minutes=15)
+        except Exception:
+            pass
         
         self.client.place_order(
             security_id=pos.security_id,
@@ -1720,9 +1733,8 @@ class NiftySmartEdgeEngine:
                 active_cap = self.client.get_real_cash_balance() if self.mode == "LIVE" else float(self.client.paper_capital)
                 now_hm_curr = now_dt.strftime("%H:%M")
                 is_equity_session = is_equity_open and ("09:25" <= now_hm_curr < "15:05")
-                # MCX auto-entries paused while analyzing the 5 MCX YouTube strategies (Indian equities 100% untouched)
-                is_commodity_session = False
-                is_evening_session = (now_hm_curr >= "15:05" or now_hm_curr < "09:15")
+                is_commodity_session = ("15:05" <= now_hm_curr < "23:00") or (not is_equity_open and "09:15" <= now_hm_curr < "23:00")
+                is_evening_session = is_commodity_session
 
                 # Track peak daily P&L for telemetry only (NEVER halt or cap winning sessions — keep capturing opportunities!)
                 cur_net_d = float(getattr(self, "daily_net_pnl", 0.0) or 0.0)
@@ -1878,6 +1890,7 @@ class NiftySmartEdgeEngine:
                             rs_trends=rs_trends_mcx,
                             now_hm_ist=now_hm_curr,
                             active_positions=self.active_positions,
+                            closed_trades_today=getattr(self, "closed_trades_today", []),
                         )
                         if not mcx_ok:
                             skip_notes.append(mcx_reason)
@@ -1901,14 +1914,13 @@ class NiftySmartEdgeEngine:
                         calc_levels = market_intelligence.calculate_levels_and_stops(
                             opp_spot, asset_key, is_bear=(opp_action == "BUY_PE")
                         )
-                        struct_sl = calc_levels.get("structural_sl_spot", calc_levels.get("sl", opp_spot - 25.0))
-                        pb_sl = float(mcx_meta.get("pullback_sl", 0.0) or 0.0)
-                        if pb_sl > 0 and ((opp_action == "BUY_CE" and pb_sl < opp_spot) or (opp_action == "BUY_PE" and pb_sl > opp_spot)):
-                            struct_sl = pb_sl
-                        mcx_tags = mcx_meta.get("tags", ["MCX_PRIME_ENGINE"])
+                        struct_sl = float(mcx_meta.get("atr_sl_spot", 0.0) or 0.0)
+                        if struct_sl <= 0:
+                            struct_sl = calc_levels.get("structural_sl_spot", calc_levels.get("sl", opp_spot - 25.0))
+                        mcx_tags = mcx_meta.get("tags", ["MCX_5VIDEO_ENGINE"])
                         auto_sig = SmartEdgeSignal(
                             action=opp_action,
-                            strategy_name=f"MCX Prime Strategy ({opp_action}) [{' + '.join(mcx_tags)}]",
+                            strategy_name=f"MCX 5-Video Strategy ({opp_action}) [{' + '.join(mcx_tags)}]",
                             regime=top_opp.get("market_regime", "MOMENTUM_TREND"),
                             spot_price=opp_spot,
                             structural_sl_spot=struct_sl,
