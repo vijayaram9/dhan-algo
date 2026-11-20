@@ -20,13 +20,15 @@ class TradingConfig:
     lot_size: int = int(os.getenv("LOT_SIZE", "65"))
     max_lots: int = int(os.getenv("MAX_LOTS", "1"))
     
-    # RMS - Risk Management System (Configured for ₹1,50,000 Capital)
+    # RMS - Risk Management System (100% Percentage-Based — Scales Infinitely to Any Capital)
     account_capital: float = float(os.getenv("ACCOUNT_CAPITAL", "150000.0"))
-    risk_per_trade_pct: float = float(os.getenv("RISK_PER_TRADE_PCT", "0.45"))  # 0.45% of Capital per trade (₹650 max stop ceiling)
-    max_daily_loss: float = float(os.getenv("MAX_DAILY_LOSS", "2500.0"))       # Disciplined daily loss ceiling
-    max_daily_profit: float = float(os.getenv("MAX_DAILY_PROFIT", "10000.0"))
-    max_trades_per_day: int = int(os.getenv("MAX_TRADES_PER_DAY", "20"))
-    max_consecutive_losses: int = 3
+    risk_per_trade_pct: float = float(os.getenv("RISK_PER_TRADE_PCT", "1.0"))  # 1.0% of Active Capital per trade (= 1R)
+    max_portfolio_heat_pct: float = float(os.getenv("MAX_PORTFOLIO_HEAT_PCT", "3.0"))  # Max 3.0% combined open risk across concurrent trades
+    max_daily_loss_pct: float = float(os.getenv("MAX_DAILY_LOSS_PCT", "4.0"))  # 4.0% of Active Capital daily stop
+    max_daily_loss: float = float(os.getenv("MAX_DAILY_LOSS", "6000.0"))
+    max_daily_profit: float = float(os.getenv("MAX_DAILY_PROFIT", "1000000.0"))  # Uncapped growth engine
+    max_trades_per_day: int = int(os.getenv("MAX_TRADES_PER_DAY", "50"))
+    max_consecutive_losses: int = 99
     
     # Multi-Instrument Execution & Concurrency Control
     max_concurrent_positions: int = int(os.getenv("MAX_CONCURRENT_POSITIONS", "5"))   # Allows up to 5 concurrent positions across instruments (like Zerodha/Dhan)

@@ -295,19 +295,17 @@ class NiftySmartEdgeEngine:
                     config.max_trades_per_day = self.max_daily_trades
                     print(f"[SmartEdgeEngine] 🏆 Profit Milestone Restored (+Rs.{self.realized_pnl:,.2f}). Cap auto-scaled to {self.max_daily_trades} trades.")
 
-        # Hard Account Emergency Stop: Only trips on true daily limit (Rs.3,000)
+        # Percentage-Based Daily Emergency Stop (4% of Active Capital — Zero Blind Recovery Naps!)
+        active_cap_init = self.client.get_real_cash_balance() if self.mode == "LIVE" else float(self.client.paper_capital)
+        pct_daily_limit = round(active_cap_init * (getattr(config, "max_daily_loss_pct", 4.0) / 100.0), 2)
+        self.daily_loss_limit = pct_daily_limit if pct_daily_limit > 0 else self.daily_loss_limit
         if self.realized_pnl <= -self.daily_loss_limit:
-            self.activate_kill_switch(f"Daily hard loss ceiling of Rs.{self.daily_loss_limit:.2f} reached. Preserving remaining capital.")
-        elif self.consecutive_losses >= 3 and self.realized_pnl <= -self.daily_loss_limit * 0.5:
-            # Dynamic Cooldown & Recovery Protocol: Only trips on true capital drawdown (> 50% of daily limit),
-            # NOT for minor friction scratch trades!
-            self.cooldown_until = datetime.datetime.now() + datetime.timedelta(minutes=5)
-            self.in_recovery_mode = True
+            self.activate_kill_switch(f"Daily loss ceiling ({getattr(config, 'max_daily_loss_pct', 4.0):.1f}% = Rs.{self.daily_loss_limit:,.2f}) reached.")
+        else:
+            self.cooldown_until = None
+            self.in_recovery_mode = False
             self.is_kill_switch_active = False
             self.kill_switch_reason = ""
-            print(f"[RECOVERY PROTOCOL] 2 consecutive scratch losses detected. 15m patience cooldown active until {self.cooldown_until.strftime('%H:%M:%S')}. Auto-pilot will resume in Defensive Recovery Mode (80%+ confluence only).")
-        elif self.trade_count >= self.max_daily_trades:
-            self.activate_kill_switch(f"Maximum daily trades ({self.max_daily_trades}) completed. Preserving capital and locking trading session.")
 
     def activate_kill_switch(self, reason: str):
         self.is_kill_switch_active = True
@@ -557,13 +555,15 @@ class NiftySmartEdgeEngine:
                 base_be = 10.0  # Nifty expansion to cover spread + fee
                 trail_buffer = 6.0
 
-            # 🛡️ DYNAMIC CAPITAL SHIELD (Loss Ceiling in Rupees):
-            # Institutional Risk Ceiling: Hard stop at max ₹650 loss per trade (never allow ₹1,500 bleeds!)
-            raw_risk = getattr(pos, "trade_risk_inr", 0.0)
-            planned_risk_budget = min(raw_risk if raw_risk > 0 else 650.0, 650.0)
+            # 🛡️ DYNAMIC CAPITAL SHIELD (100% Percentage-Based 1R Ceiling — Zero Hardcoded Rupees):
+            risk_pct = getattr(config, "risk_per_trade_pct", 1.0) / 100.0
+            active_cap_ref = self.client.get_real_cash_balance() if self.mode == "LIVE" else float(self.client.paper_capital)
+            one_r_cap = max(1.0, active_cap_ref * risk_pct)
+            raw_risk = getattr(pos, "trade_risk_inr", 0.0) or 0.0
+            planned_risk_budget = min(raw_risk, one_r_cap) if raw_risk > 0 else one_r_cap
 
             if pos.pnl <= -planned_risk_budget:
-                msg = f"🛡️ Dynamic Capital Shield Hit: Exited @ ₹{pos.current_premium:.2f} (Loss of ₹{abs(pos.pnl):.2f} capped at planned risk budget ₹{planned_risk_budget:,.2f})."
+                msg = f"🛡️ Dynamic Capital Shield Hit: Exited @ ₹{pos.current_premium:.2f} (Loss of ₹{abs(pos.pnl):.2f} capped at 1R risk budget ₹{planned_risk_budget:,.2f})."
                 self.log_sniper_event(msg, "STOP")
                 print(f"[CAPITAL SHIELD] {msg}")
                 return True, msg
@@ -643,11 +643,14 @@ class NiftySmartEdgeEngine:
         elif pos.trade_style == "SWING":
             # 🌊 SWING WAVE RIDER: Structural Trend Trail & Multi-Stage Profit Lock
             # -----------------------------------------------------------------
-            # 0. 🛡️ DYNAMIC CAPITAL SHIELD (Strict ₹650 Loss Ceiling in Rupees):
-            # Never allow a 10% premium stop on a high-premium or multi-lot contract to bleed > ₹650!
-            swing_risk_cap = min(getattr(pos, "trade_risk_inr", 650.0) or 650.0, 650.0)
+            # 0. 🛡️ DYNAMIC CAPITAL SHIELD (100% Percentage-Based 1R Ceiling — Scales to Any Capital):
+            risk_pct = getattr(config, "risk_per_trade_pct", 1.0) / 100.0
+            active_cap_ref = self.client.get_real_cash_balance() if self.mode == "LIVE" else float(self.client.paper_capital)
+            one_r_cap = max(1.0, active_cap_ref * risk_pct)
+            raw_risk = getattr(pos, "trade_risk_inr", 0.0) or 0.0
+            swing_risk_cap = min(raw_risk, one_r_cap) if raw_risk > 0 else one_r_cap
             if pos.pnl <= -swing_risk_cap:
-                msg = f"🛡️ Swing Capital Shield Hit: Exited @ ₹{pos.current_premium:.2f} (Loss of ₹{abs(pos.pnl):.2f} capped strictly at ₹{swing_risk_cap:,.0f})."
+                msg = f"🛡️ Swing 1R Capital Shield Hit: Exited @ ₹{pos.current_premium:.2f} (Loss of ₹{abs(pos.pnl):.2f} capped at 1R = ₹{swing_risk_cap:,.2f})."
                 self.log_sniper_event(msg, "STOP")
                 print(f"[SWING CAPITAL SHIELD] {msg}")
                 return True, msg
@@ -679,9 +682,9 @@ class NiftySmartEdgeEngine:
                     pos.hard_stop_premium = tight_sl
                     print(f"[SWING TIGHT-SHIELD] 🛡️ +4.5% Reached -> Hard Stop tightened to -2% @ ₹{pos.hard_stop_premium:.2f}")
 
-            # Substantial Rupee Profit Lock + Fib/CPR/R1/S1 Level Tightening (never wait for 10% if cash profit is already substantial!)
-            if pos.pnl >= 600.0 and pos.current_premium > pos.entry_premium:
-                cash_ratio = 0.80 if pos.pnl >= 2500.0 else (0.70 if pos.pnl >= 1500.0 else (0.55 if pos.pnl >= 800.0 else 0.0))
+            # Pure R-Multiple Profit Lock + Fib/CPR/R1/S1 Level Tightening (Zero Hardcoded Rupees!)
+            if pos.pnl >= (one_r_cap * 0.75) and pos.current_premium > pos.entry_premium:
+                cash_ratio = 0.80 if pos.pnl >= (one_r_cap * 2.5) else (0.70 if pos.pnl >= (one_r_cap * 1.5) else (0.55 if pos.pnl >= (one_r_cap * 0.9) else 0.0))
                 try:
                     from mtf_engine import mtf_engine as _mtf_lv
                     _lvls = _mtf_lv.calculate_institutional_levels(current_spot, asset_k)
@@ -991,48 +994,30 @@ class NiftySmartEdgeEngine:
                 self.log_sniper_event(msg, "PROFIT")
                 notifier.notify("🏆 Profit Milestone Auto-Scaled", msg, tags="trophy,chart_with_upwards_trend,moneybag")
 
-        # Check Account Protection Limits (Section 7)
+        # Check Account Protection Limits (Pure % of Active Capital — NO Blind Recovery Naps!)
+        active_cap_exit = self.client.get_real_cash_balance() if self.mode == "LIVE" else float(self.client.paper_capital)
+        self.daily_loss_limit = round(active_cap_exit * (getattr(config, "max_daily_loss_pct", 4.0) / 100.0), 2)
         if self.realized_pnl <= -self.daily_loss_limit:
-            self.activate_kill_switch(f"Daily loss limit of Rs.{self.daily_loss_limit} breached (Net: Rs.{self.realized_pnl:.2f})")
-        elif self.consecutive_losses >= 3 and self.realized_pnl <= 0:
-            self.cooldown_until = datetime.datetime.now() + datetime.timedelta(minutes=15)
-            self.in_recovery_mode = True
-            msg = f"🛡️ Risk Defense: 3 consecutive pullbacks in drawdown (Net: Rs.{self.realized_pnl:+.2f}). 15-minute patience cooldown active until {self.cooldown_until.strftime('%H:%M:%S')} to preserve capital."
-            self.log_sniper_event(msg, "WARNING")
-            notifier.notify("🛡️ 15m Cooldown Active", msg, tags="warning,shield")
-        elif self.consecutive_losses >= 3 and self.realized_pnl > 0:
-            self.log_sniper_event(
-                f"⚠️ Discipline Alert: 3 consecutive pullbacks in profit zone (Net: Rs.{self.realized_pnl:+,.2f}). Session protected with positive cushion; 5m cooldown engaged.",
-                "WARNING"
-            )
-            self.cooldown_until = datetime.datetime.now() + datetime.timedelta(minutes=5)
-        elif self.trade_count >= self.max_daily_trades:
-            self.activate_kill_switch(f"Maximum daily limit ({self.max_daily_trades} trades) completed. Preserving capital and locking trading session.")
+            self.activate_kill_switch(f"Daily loss limit ({getattr(config, 'max_daily_loss_pct', 4.0):.1f}% = Rs.{self.daily_loss_limit:,.2f}) breached (Net: Rs.{self.realized_pnl:.2f})")
 
         if pos in self.active_positions:
             self.active_positions.remove(pos)
         else:
             self.active_positions = [p for p in self.active_positions if getattr(p, "position_id", "") != getattr(pos, "position_id", "")]
 
-        # Release Global Trade Lock & engage directional 15m cooldown on the SAME side only (allowing immediate ChoCH opposite-side flips!)
+        # Release Global Trade Lock & engage ONLY a 60s same-candle duplicate guard (NO 15m sleep or basket nap!)
         try:
             from global_trade_lock import global_trade_lock
             closed_asset = getattr(pos, "asset_key", "")
             closed_side = "BUY_CE" if getattr(pos, "option_type", "CE") == "CE" else "BUY_PE"
-            cd_secs = 1200 if "manual" in reason.lower() else 900
+            cd_secs = 60  # 1-minute same-candle duplicate guard only; algo stays awake!
             if closed_asset:
                 if not hasattr(self, "_asset_cooldowns"):
                     self._asset_cooldowns = {}
                 self._asset_cooldowns[f"{closed_asset}:{closed_side}"] = datetime.datetime.now() + datetime.timedelta(seconds=cd_secs)
                 global_trade_lock.set_cooldown(f"{closed_asset}:{closed_side}", cd_secs, reason)
-                # Correlated index basket cooldown (5m) ONLY on Manual exit or Stop-Loss so we don't hop from BANKNIFTY -> FINNIFTY 16s later
-                if closed_asset in {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"} and any(w in reason.lower() for w in ("manual", "stop", "invalidation")):
-                    if not hasattr(self, "_basket_cooldowns"):
-                        self._basket_cooldowns = {}
-                    self._basket_cooldowns[closed_side] = datetime.datetime.now() + datetime.timedelta(seconds=300)
-                    global_trade_lock.set_cooldown(f"BASKET:{closed_side}", 300, reason)
             global_trade_lock.release_lock(position_id=getattr(pos, "position_id", ""), cooldown_seconds=0)
-            print(Fore.CYAN + f"[GlobalTradeLock] Lock released. {cd_secs//60}m same-direction cooldown set for {closed_asset}:{closed_side}; opposite ChoCH flips remain open.")
+            print(Fore.CYAN + f"[GlobalTradeLock] Lock released. 60s same-candle guard set for {closed_asset}:{closed_side}; engine stays 100% awake.")
         except Exception as e:
             print(f"[GlobalTradeLock Exit Error] {e}")
 
@@ -1729,20 +1714,16 @@ class NiftySmartEdgeEngine:
                 peak_net_d = max(float(getattr(self, "_peak_daily_net_pnl", 0.0) or 0.0), running_peak, cur_net_d)
                 self._peak_daily_net_pnl = peak_net_d
 
-                # Dynamic Profit Protection Floor:
-                # - Peak >= ₹1,000: Floor = ₹600 (protect 60%)
-                # - Peak >= ₹2,000: Floor = 70% of peak
-                # - Peak >= ₹4,000: Floor = 75% of peak
-                if peak_net_d >= 1000.0:
-                    if peak_net_d < 2000.0:
-                        protected_floor = 600.0
-                    elif peak_net_d < 4000.0:
-                        protected_floor = round(peak_net_d * 0.70, 2)
-                    else:
-                        protected_floor = round(peak_net_d * 0.75, 2)
-
+                # Pure R-Multiple House-Money Trailing Floor (Zero Hardcoded Rupees — Scales to Any Capital):
+                # 1R = active_cap * risk_per_trade_pct%
+                # - Peak >= 2.0R: Protect 60% of peak
+                # - Peak >= 4.0R: Protect 75% of peak
+                one_r_session = max(1.0, active_cap * (getattr(config, "risk_per_trade_pct", 1.0) / 100.0))
+                if peak_net_d >= (2.0 * one_r_session):
+                    lock_pct = 0.75 if peak_net_d >= (4.0 * one_r_session) else 0.60
+                    protected_floor = round(peak_net_d * lock_pct, 2)
                     if cur_net_d <= protected_floor:
-                        self.waiting_reason = f"Green-Day Floor Protected: Secured ₹{cur_net_d:,.0f} (Floor ₹{protected_floor:,.0f} of ₹{peak_net_d:,.0f} peak). Standing down."
+                        self.waiting_reason = f"Green-Day Floor Protected: Secured ₹{cur_net_d:,.0f} ({int(lock_pct*100)}% floor ₹{protected_floor:,.0f} of ₹{peak_net_d:,.0f} peak)."
                         return
                 all_opps = market_intelligence.scan_all_opportunities(capital=active_cap)
                 
@@ -1781,15 +1762,22 @@ class NiftySmartEdgeEngine:
                 from stock_scanner import stock_scanner
                 active_sectors = {stock_scanner.get_sector(getattr(p, "asset_key", "")) for p in self.active_positions if getattr(p, "asset_key", "") not in index_keys and getattr(p, "asset_key", "") not in mcx_keys}
                 active_stock_count = sum(1 for p in self.active_positions if getattr(p, "asset_key", "") not in index_keys and getattr(p, "asset_key", "") not in mcx_keys)
-                if is_evening_session:
+                # Multi-Slot Portfolio-Heat Execution (Up to 3 Concurrent Trades = Max 3.0% Portfolio Heat):
+                # 1 Index slot (until 14:15, or 14:45 on expiry) + up to 2 different-sector High-RVOL/VCP F&O Stock slots (until 13:30 IST)
+                max_heat_inr = active_cap * (getattr(config, "max_portfolio_heat_pct", 3.0) / 100.0)
+                current_open_heat = sum(getattr(p, "trade_risk_inr", 0.0) or (active_cap * (getattr(config, "risk_per_trade_pct", 1.0) / 100.0)) for p in self.active_positions)
+                if is_evening_session or len(self.active_positions) >= 3 or current_open_heat >= max_heat_inr:
                     valid_opps = []
                 elif is_equity_open and now_hm_curr < "14:45":
                     valid_opps = [
                         o for o in all_opps
-                        if o["key"] in index_keys # STRICT INTRADAY: High-liquidity Index options only (NIFTY, BANKNIFTY, SENSEX, FINNIFTY)
+                        if o["key"] not in mcx_keys
                         and o["key"] not in active_assets
-                        and (now_hm_curr < "14:15" or o.get("is_expiry_today", False))
-                        and not (active_index_count >= 2)
+                        and (
+                            (o["key"] in index_keys and (now_hm_curr < "14:15" or o.get("is_expiry_today", False)) and active_index_count < 1)
+                            or
+                            (o["key"] not in index_keys and now_hm_curr < "13:30" and active_stock_count < 2 and stock_scanner.get_sector(o["key"]) not in active_sectors)
+                        )
                         and self.check_trading_schedule(o["key"])[0]
                     ]
                 else:

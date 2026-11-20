@@ -345,12 +345,19 @@ class ContractSelector:
                 chosen_lots = req_lots
                 advisory_msg = f"⚠️ Lot Sizing Advisory: Position scaled to {chosen_lots} lot{'s' if chosen_lots > 1 else ''} (₹{req_margin:,.2f} margin, {util_pct}% of capital). Safe within 50% ceiling."
         else:
-            # Strict 1-Lot Institutional Base Sizing (Ashwin Raghavan Risk Discipline):
-            # Never auto-scale to 3-5 lots on an unconfirmed entry; cap automated entries strictly at 1 base lot
-            chosen_lots = 1
+            # Infinite-Scaling Fixed Fractional Risk Sizing (Groww + Ashwin Raghavan):
+            # Zero hardcoded rupee limits or 1-lot caps — scales seamlessly from ₹1.5L to ₹10Cr+
+            risk_pct = getattr(config, "risk_per_trade_pct", 1.0) / 100.0
+            one_r_budget = max(1.0, available_capital * risk_pct)
+            est_sl_per_unit = min(max(structural_risk_pts * delta_est, estimated_premium * 0.05), estimated_premium * 0.10)
+            risk_per_lot = max(1.0, est_sl_per_unit * base_lot_size)
+            max_trade_alloc = available_capital * 0.30  # Max 30% margin per single trade
+            lots_by_risk = max(1, int(one_r_budget // risk_per_lot))
+            lots_by_alloc = max(1, int(max_trade_alloc // cost_per_lot)) if cost_per_lot > 0 else 1
+            chosen_lots = max(1, min(lots_by_risk, lots_by_alloc))
             chosen_margin = round(chosen_lots * cost_per_lot, 2)
             util_pct = round((chosen_margin / available_capital) * 100.0, 1) if available_capital > 0 else 100.0
-            advisory_msg = f"Strict 1-lot base sizing ({confluence_score}%): 1 lot (₹{chosen_margin:,.2f} margin, {util_pct}% of ₹{available_capital:,.0f} capital)."
+            advisory_msg = f"Fixed-Fractional {risk_pct*100:.1f}% Risk Sizing ({confluence_score}%): {chosen_lots} lot{'s' if chosen_lots > 1 else ''} (₹{chosen_margin:,.2f} margin, {util_pct}% of ₹{available_capital:,.0f} capital)."
 
         final_quantity = chosen_lots * base_lot_size
         total_margin = round(final_quantity * estimated_premium, 2)
@@ -359,16 +366,18 @@ class ContractSelector:
         hard_stop_premium = round(estimated_premium * 0.90, 2)
         emergency_loss_per_unit = estimated_premium - hard_stop_premium
 
-        # Primary planned risk based on Layer 1 Underlying Structural Stop (capped at max ₹650 risk)
-        planned_loss_per_unit = min(max(structural_risk_pts * delta_est, 5.0), emergency_loss_per_unit)
-        trade_risk_inr = round(min((planned_loss_per_unit * final_quantity) + 65.0, 650.0), 2)
+        # Primary planned risk based on 1R Fixed Fractional Risk (% of Active Capital, zero hardcoded rupee cap)
+        risk_pct = getattr(config, "risk_per_trade_pct", 1.0) / 100.0
+        one_r_budget = round(available_capital * risk_pct, 2)
+        planned_loss_per_unit = min(max(structural_risk_pts * delta_est, estimated_premium * 0.05), emergency_loss_per_unit)
+        trade_risk_inr = round(min(planned_loss_per_unit * final_quantity, one_r_budget), 2)
 
-        # Strict Capital Allocation & Dynamic Risk Budgeting:
-        # 1. Per-Trade Capital Commitment: Safe margin ceiling (max 20% of capital, capped at ₹3,00,000)
-        max_trade_capital_limit = max(15000.0, min(available_capital * 0.20, 300000.0))
+        # Strict Capital Allocation & Dynamic Risk Budgeting (100% Percentage-Based, Infinite Scaling):
+        # 1. Per-Trade Capital Commitment: Max 35% of active capital (no hardcoded ₹3L ceiling)
+        max_trade_capital_limit = round(available_capital * 0.35, 2)
         if total_margin > max_trade_capital_limit:
             rejection = (
-                f"Capital Allocation Shield: Margin of ₹{total_margin:,.2f} exceeds safe limit of ₹{max_trade_capital_limit:,.2f}. "
+                f"Capital Allocation Shield: Margin of ₹{total_margin:,.2f} exceeds 35% of active capital (₹{max_trade_capital_limit:,.2f}). "
                 f"Expensive contracts rejected to safeguard account capital."
             )
             return SelectedContract(
@@ -381,7 +390,7 @@ class ContractSelector:
                 lot_size=base_lot_size,
                 estimated_premium=estimated_premium,
                 estimated_delta=delta_est,
-                hard_stop_premium=round(estimated_premium * 0.80, 2),
+                hard_stop_premium=round(estimated_premium * 0.90, 2),
                 trade_risk_inr=trade_risk_inr,
                 risk_budget_approved=False,
                 rejection_reason=rejection,
@@ -393,9 +402,8 @@ class ContractSelector:
                 candle_timestamp=candle_ts
             )
 
-        # 2. Dynamic Rupee Risk Ceiling: Based on Risk Appetite % of Capital, capped strictly at max ₹650 per trade
-        risk_pct = getattr(config, "risk_per_trade_pct", 0.45) / 100.0
-        risk_ceiling = round(min(650.0, max(400.0, available_capital * risk_pct)), 2)
+        # 2. Dynamic Rupee Risk Ceiling: Pure % of Active Capital (1R = risk_per_trade_pct% of capital)
+        risk_ceiling = round(one_r_budget * 1.15, 2)
         if trade_risk_inr > risk_ceiling:
             rejection = (
                 f"Trade rejected by Risk Rules: Planned loss (₹{trade_risk_inr:.2f}) "

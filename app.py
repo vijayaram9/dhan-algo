@@ -2493,8 +2493,8 @@ def journal_page():
     total_gst = float(df["gst"].sum()) if (not df.empty and "gst" in df.columns) else 0.0
     total_stamp_duty = float(df["stamp_duty"].sum()) if (not df.empty and "stamp_duty" in df.columns) else 0.0
 
-    real_cash = float(engine.client.get_real_cash_balance())
     paper_cap = float(engine.client.paper_capital)
+    real_cash = float(engine.client.get_real_cash_balance()) if config.trading_mode == "LIVE" else 0.0
     active_cap = real_cash if config.trading_mode == "LIVE" else paper_cap
     daily_limit = float(engine.daily_loss_limit)
     net_drawdown = max(0.0, -net_takehome)
