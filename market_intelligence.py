@@ -663,14 +663,14 @@ class MarketIntelligenceEngine:
             "BANKNIFTY": ("25", "IDX_I", "INDEX"),
             "FINNIFTY": ("27", "IDX_I", "INDEX"),
             "SENSEX": ("51", "IDX_I", "INDEX"),
-            "CRUDEOILM": ("573423", "MCX_COMM", "FUTCOM"),
+            "CRUDEOILM": ("576265", "MCX_COMM", "FUTCOM"),
             "NATGASMINI": ("574320", "MCX_COMM", "FUTCOM"),
             "GOLDM": ("575011", "MCX_COMM", "FUTCOM"),
             "SILVERM": ("483080", "MCX_COMM", "FUTCOM"),
-            "CRUDEOIL": ("573422", "MCX_COMM", "FUTCOM"),
+            "CRUDEOIL": ("576264", "MCX_COMM", "FUTCOM"),
             "NATURALGAS": ("574319", "MCX_COMM", "FUTCOM"),
-            "GOLD": ("575010", "MCX_COMM", "FUTCOM"),
-            "SILVER": ("483079", "MCX_COMM", "FUTCOM"),
+            "GOLD": ("495213", "MCX_COMM", "FUTCOM"),
+            "SILVER": ("495214", "MCX_COMM", "FUTCOM"),
             "COPPER": ("578634", "MCX_COMM", "FUTCOM"),
             "ZINC": ("578638", "MCX_COMM", "FUTCOM"),
             "RELIANCE": ("2885", "NSE_EQ", "EQUITY"),
@@ -854,8 +854,8 @@ class MarketIntelligenceEngine:
                                 d = d["data"]
                             mapping_all = {
                                 "MCX_COMM": {
-                                    "573423": "CRUDEOILM", "574320": "NATGASMINI", "575011": "GOLDM", "483080": "SILVERM",
-                                    "573422": "CRUDEOIL", "574319": "NATURALGAS", "575010": "GOLD", "483079": "SILVER",
+                                    "576265": "CRUDEOILM", "574320": "NATGASMINI", "575011": "GOLDM", "483080": "SILVERM",
+                                    "576264": "CRUDEOIL", "574319": "NATURALGAS", "495213": "GOLD", "495214": "SILVER",
                                     "578634": "COPPER", "578638": "ZINC"
                                 },
                                 "IDX_I": {"13": "NIFTY", "25": "BANKNIFTY", "27": "FINNIFTY", "51": "SENSEX"},
@@ -935,8 +935,8 @@ class MarketIntelligenceEngine:
             client = get_dhan_client()
             sec_id_map = {
                 "GIFTNIFTY": "5024", "NIFTY": "13", "BANKNIFTY": "25", "FINNIFTY": "27", "SENSEX": "51",
-                "CRUDEOILM": "573423", "NATGASMINI": "574320", "GOLDM": "575011", "SILVERM": "483080",
-                "CRUDEOIL": "573422", "NATURALGAS": "574319", "GOLD": "575010", "SILVER": "483079",
+                "CRUDEOILM": "576265", "NATGASMINI": "574320", "GOLDM": "575011", "SILVERM": "483080",
+                "CRUDEOIL": "576264", "NATURALGAS": "574319", "GOLD": "495213", "SILVER": "495214",
                 "COPPER": "578634", "ZINC": "578638",
                 "RELIANCE": "2885", "TCS": "11536", "HDFCBANK": "1333", "ICICIBANK": "4963", "INFY": "1594", "SBIN": "3045"
             }
@@ -1566,9 +1566,9 @@ class MarketIntelligenceEngine:
         results = []
         weekday_idx = datetime.datetime.now().weekday()
         now_hm = datetime.datetime.now().strftime("%H:%M")
-        # Autonomous handover: When Indian equities conclude entries at 14:45 IST,
+        # Autonomous handover: When Indian equities conclude entries at 15:05 IST,
         # the priority list immediately puts all MCX Commodities at the top with zero delay!
-        is_evening = (now_hm >= "14:45" or now_hm < "09:15")
+        is_evening = (now_hm >= "15:05" or now_hm < "09:15")
 
         # Strict Session Universe:
         # Daytime (09:15 - 15:30 IST): Strictly prioritize high-beta, institutional Indian Indices and Equities.

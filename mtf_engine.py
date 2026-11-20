@@ -126,10 +126,16 @@ class MultiTimeframeEngine:
             "BAJFINANCE": ("317", "NSE_EQ", "EQUITY"),
             "MARUTI": ("10999", "NSE_EQ", "EQUITY"),
             "M&M": ("2031", "NSE_EQ", "EQUITY"),
-            "CRUDEOILM": ("573423", "MCX_COMM", "FUTCOM"),
+            "CRUDEOILM": ("576265", "MCX_COMM", "FUTCOM"),
+            "CRUDEOIL": ("576264", "MCX_COMM", "FUTCOM"),
             "NATGASMINI": ("574320", "MCX_COMM", "FUTCOM"),
+            "NATURALGAS": ("574319", "MCX_COMM", "FUTCOM"),
             "GOLDM": ("575011", "MCX_COMM", "FUTCOM"),
-            "SILVERM": ("483080", "MCX_COMM", "FUTCOM")
+            "GOLD": ("495213", "MCX_COMM", "FUTCOM"),
+            "SILVERM": ("483080", "MCX_COMM", "FUTCOM"),
+            "SILVER": ("495214", "MCX_COMM", "FUTCOM"),
+            "COPPER": ("578634", "MCX_COMM", "FUTCOM"),
+            "ZINC": ("578638", "MCX_COMM", "FUTCOM")
         }
         if asset_key not in dhan_meta:
             return None

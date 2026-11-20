@@ -1717,7 +1717,12 @@ class NiftySmartEdgeEngine:
             try:
                 from market_intelligence import market_intelligence
                 active_cap = self.client.get_real_cash_balance() if self.mode == "LIVE" else float(self.client.paper_capital)
-                # Dynamic House-Money Trailing Floor (Protects gains without hard shutdown):
+                now_hm_curr = now_dt.strftime("%H:%M")
+                is_equity_session = is_equity_open and ("09:25" <= now_hm_curr < "15:05")
+                is_commodity_session = ("15:05" <= now_hm_curr < "23:00") or (not is_equity_open and "09:15" <= now_hm_curr < "23:00")
+                is_evening_session = is_commodity_session
+
+                # Track peak daily P&L for telemetry only (NEVER halt or cap winning sessions — keep capturing opportunities!)
                 cur_net_d = float(getattr(self, "daily_net_pnl", 0.0) or 0.0)
                 running_peak, cum_net = 0.0, 0.0
                 for tr in getattr(self, "closed_trades_today", []):
@@ -1726,18 +1731,6 @@ class NiftySmartEdgeEngine:
                 peak_net_d = max(float(getattr(self, "_peak_daily_net_pnl", 0.0) or 0.0), running_peak, cur_net_d)
                 self._peak_daily_net_pnl = peak_net_d
 
-                # Pure R-Multiple House-Money Trailing Floor (Zero Hardcoded Rupees — Scales to Any Capital):
-                # 1R = active_cap * risk_per_trade_pct%
-                # - Peak >= 2.0R: Protect 60% of peak
-                # - Peak >= 4.0R: Protect 75% of peak
-                one_r_session = max(1.0, active_cap * (getattr(config, "risk_per_trade_pct", 1.0) / 100.0))
-                # Only apply daytime equity floor during equity hours; evening commodity session trades independently:
-                if not is_evening_session and peak_net_d >= (2.0 * one_r_session):
-                    lock_pct = 0.75 if peak_net_d >= (4.0 * one_r_session) else 0.60
-                    protected_floor = round(peak_net_d * lock_pct, 2)
-                    if cur_net_d <= protected_floor:
-                        self.waiting_reason = f"Green-Day Floor Protected: Secured ₹{cur_net_d:,.0f} ({int(lock_pct*100)}% floor ₹{protected_floor:,.0f} of ₹{peak_net_d:,.0f} peak)."
-                        return
                 all_opps = market_intelligence.scan_all_opportunities(capital=active_cap)
                 
                 # Seamless Multi-Session Multi-Asset Radar:
@@ -1763,30 +1756,16 @@ class NiftySmartEdgeEngine:
                     except Exception:
                         pass
 
-                now_hm_curr = now_dt.strftime("%H:%M")
                 mcx_keys = {"CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM", "CRUDEOIL", "NATURALGAS", "GOLD", "SILVER", "COPPER", "ZINC"}
                 index_keys = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "NIFTYIT"}
                 active_assets = {getattr(p, "asset_key", "") for p in self.active_positions}
                 active_index_count = sum(1 for p in self.active_positions if getattr(p, "asset_key", "") in index_keys)
 
-                # ---------------------------------------------------------------------
-                # AUTONOMOUS CONTINUOUS TRADING SYSTEM (ZERO BREAKS / ZERO DOWNTIME)
-                # ---------------------------------------------------------------------
-                # Shift 1: Indian Equities & Indices (09:25 to 14:45 IST)
-                # Shift 2: MCX Commodities (14:45 to 23:00 IST, plus full-day on equity holidays)
-                # Seamless handover: As soon as Indian equities close entries at 14:45,
-                # the engine instantly activates all 10 MCX Commodities with ZERO gap!
-                is_equity_session = is_equity_open and ("09:25" <= now_hm_curr < "14:45")
-                is_commodity_session = ("14:45" <= now_hm_curr < "23:00") or (not is_equity_open and "09:15" <= now_hm_curr < "23:00")
-                is_evening_session = is_commodity_session
-
-                # Multi-Slot Uncorrelated Auto-Pilot (09:25 - 14:45, or 15:00 on Expiry):
+                # Multi-Slot Uncorrelated Auto-Pilot (09:25 - 15:05 IST Equities, 15:05 - 23:00 IST Commodities):
                 # 1 Index slot + up to 2 uncorrelated High-RVOL/News F&O Stock slots (1 per sector max, <= 3 total)
                 from stock_scanner import stock_scanner
                 active_sectors = {stock_scanner.get_sector(getattr(p, "asset_key", "")) for p in self.active_positions if getattr(p, "asset_key", "") not in index_keys and getattr(p, "asset_key", "") not in mcx_keys}
                 active_stock_count = sum(1 for p in self.active_positions if getattr(p, "asset_key", "") not in index_keys and getattr(p, "asset_key", "") not in mcx_keys)
-                # Multi-Slot Portfolio-Heat Execution (Up to 3 Concurrent Trades = Max 3.0% Portfolio Heat):
-                # 1 Index slot (until 14:15, or 14:45 on expiry) + up to 2 different-sector High-RVOL/VCP F&O Stock slots (until 13:30 IST)
                 max_heat_inr = active_cap * (getattr(config, "max_portfolio_heat_pct", 3.0) / 100.0)
                 current_open_heat = sum(getattr(p, "trade_risk_inr", 0.0) or (active_cap * (getattr(config, "risk_per_trade_pct", 1.0) / 100.0)) for p in self.active_positions)
                 if len(self.active_positions) >= 3 or current_open_heat >= max_heat_inr:
@@ -1800,14 +1779,15 @@ class NiftySmartEdgeEngine:
                         and self.check_trading_schedule(o["key"])[0]
                     ]
                 elif is_equity_session:
+                    # Active Indian Equity & Index Session all the way until 15:05 IST!
                     valid_opps = [
                         o for o in all_opps
                         if o["key"] not in mcx_keys
                         and o["key"] not in active_assets
                         and (
-                            (o["key"] in index_keys and (now_hm_curr < "14:15" or o.get("is_expiry_today", False)) and active_index_count < 1)
+                            (o["key"] in index_keys and active_index_count < 1)
                             or
-                            (o["key"] not in index_keys and now_hm_curr < "13:30" and active_stock_count < 2 and stock_scanner.get_sector(o["key"]) not in active_sectors)
+                            (o["key"] not in index_keys and active_stock_count < 2 and stock_scanner.get_sector(o["key"]) not in active_sectors)
                         )
                         and self.check_trading_schedule(o["key"])[0]
                     ]
@@ -2159,6 +2139,7 @@ class NiftySmartEdgeEngine:
                 if skip_notes:
                     self.waiting_reason = "Radar filtered: " + ", ".join(skip_notes[:6])
             except Exception as e:
+                self.waiting_reason = f"Radar Exception: {e}"
                 print(f"[AutoPilot Radar Warning] {e}")
 
             # Legacy Local Chart Strategy fallback disabled during Auto-Pilot to prevent self-canceling CALL+PUT conflicts and unfiltered entries.
