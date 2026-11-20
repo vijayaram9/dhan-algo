@@ -87,19 +87,19 @@ class MultiTimeframeEngine:
         if self._candles_lock is None:
             self._candles_lock = threading.Lock()
         now_ts = time.time()
-        if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 120.0:
+        if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 180.0:
             return self._candles_cache[asset_key]
-        if (now_ts - self._candles_fail_time.get(asset_key, 0)) < 20.0:
-            if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 300.0:
+        if (now_ts - self._candles_fail_time.get(asset_key, 0)) < 35.0:
+            if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 600.0:
                 return self._candles_cache[asset_key]
             return None
 
         with self._candles_lock:
             now_ts = time.time()
-            if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 120.0:
+            if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 180.0:
                 return self._candles_cache[asset_key]
-            if (now_ts - self._candles_fail_time.get(asset_key, 0)) < 20.0:
-                if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 300.0:
+            if (now_ts - self._candles_fail_time.get(asset_key, 0)) < 35.0:
+                if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 600.0:
                     return self._candles_cache[asset_key]
                 return None
             return self._fetch_real_candles_locked(asset_key, now_ts)
@@ -145,13 +145,15 @@ class MultiTimeframeEngine:
             from datetime import timedelta
             from dhan_client import get_dhan_client, DhanTraderClient
             client = get_dhan_client()
-            DhanTraderClient.throttle_request(0.35)
+            DhanTraderClient.throttle_request(0.75)
             today_dt = date.today()
             today_str = today_dt.strftime("%Y-%m-%d")
             from_str = (today_dt - timedelta(days=5)).strftime("%Y-%m-%d")
             res = client.dhan.intraday_minute_data(sec_id, seg, itype, from_str, today_str, interval=5)
-            if not (isinstance(res, dict) and res.get("status") == "success" and res.get("data", {}).get("close")):
-                DhanTraderClient.throttle_request(0.35)
+            # If DH-904 rate limit was hit, do not immediately hammer the API with another request!
+            is_rate_limited = isinstance(res, dict) and "DH-904" in str(res)
+            if not (isinstance(res, dict) and res.get("status") == "success" and res.get("data", {}).get("close")) and not is_rate_limited:
+                DhanTraderClient.throttle_request(0.75)
                 res = client.dhan.intraday_minute_data(sec_id, seg, itype, today_str, today_str, interval=5)
             if isinstance(res, dict) and res.get("status") == "success":
                 d = res.get("data", {})
@@ -174,7 +176,9 @@ class MultiTimeframeEngine:
                     self._last_candle_err.pop(asset_key, None)
                     return df
             self._last_candle_err[asset_key] = str(res)[:180]
-            self._candles_fail_time[asset_key] = now_ts
+            # If rate limited, give Dhan API 45s to clear its rate-limit window
+            fail_backoff = 45.0 if is_rate_limited else 25.0
+            self._candles_fail_time[asset_key] = now_ts + (fail_backoff - 35.0)
         except Exception as e:
             self._last_candle_err[asset_key] = f"EXC: {e}"
             self._candles_fail_time[asset_key] = now_ts
