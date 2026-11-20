@@ -1923,18 +1923,24 @@ class NiftySmartEdgeEngine:
                     # Top-Down 15m + 1H Resampled MTF Alignment + Pullback Value-Zone Filter (<= 0.18% from EMA 9)
                     rs_trends = mtf_engine.get_resampled_trends(asset_key)
 
-                    # 1. GROWW 15m Supertrend (7, 3) Macro Direction Lock (prevents 5m PUT->CALL flip-flop!)
+                    # 1. GROWW 15m Supertrend Macro Direction Lock (7, 3 for Equities; 7, 2 + 5m ADX>=20 reversal agility for 14h MCX Commodities)
+                    is_mcx_asset = asset_key in mcx_keys
                     st_15m = {"direction": "NEUTRAL", "value": 0.0, "ready": False}
+                    st_5m = {"direction": "NEUTRAL", "value": 0.0, "ready": False}
                     try:
                         n_bars = len(df_bars)
+                        st_5m = IndicatorEngine.calculate_supertrend(df_bars, period=7, multiplier=2.5)
                         if n_bars >= 30:
                             grp = np.arange(n_bars) // 3
                             df_15m = df_bars.groupby(grp).agg({
                                 "open": "first", "high": "max", "low": "min", "close": "last"
                             }).reset_index(drop=True)
-                            st_15m = IndicatorEngine.calculate_supertrend(df_15m, period=7, multiplier=3.0)
+                            st_mult = 2.0 if is_mcx_asset else 3.0
+                            st_15m = IndicatorEngine.calculate_supertrend(df_15m, period=7, multiplier=st_mult)
                     except Exception:
                         pass
+                    mcx_5m_bull_ok = is_mcx_asset and st_5m.get("ready") and st_5m.get("direction") == "BULL" and adx_5m >= 20.0
+                    mcx_5m_bear_ok = is_mcx_asset and st_5m.get("ready") and st_5m.get("direction") == "BEAR" and adx_5m >= 20.0
 
                     # 2. DHANANJAY PAWAR (9-21 EMA Pullback) + TANISHA GARG (20 EMA Resting Bar)
                     # 3. DD NIFTY (Super Candle + RSI > 70 / < 30 Rocket Fuel)
@@ -1946,10 +1952,10 @@ class NiftySmartEdgeEngine:
                     is_pullback_trig = bool(pb_info.get("triggered", False))
 
                     if opp_action == "BUY_CE":
-                        if not is_sweep_ce and st_15m.get("ready") and st_15m.get("direction") == "BEAR":
+                        if not is_sweep_ce and not mcx_5m_bull_ok and st_15m.get("ready") and st_15m.get("direction") == "BEAR":
                             skip_notes.append(f"{asset_key}(15m_ST=BEAR)")
                             continue
-                        if not is_sweep_ce and not rs_trends.get("tf_15m_bull", True):
+                        if not is_sweep_ce and not mcx_5m_bull_ok and not rs_trends.get("tf_15m_bull", True):
                             skip_notes.append(f"{asset_key}(15m!=BULL)")
                             continue
                         # Anti-chasing guard: block CALLs at R1 only when NOT a DD Nifty Super Candle AND rejecting
@@ -1981,10 +1987,10 @@ class NiftySmartEdgeEngine:
                             skip_notes.append(f"{asset_key}(WAIT_PULLBACK)")
                             continue
                     elif opp_action == "BUY_PE":
-                        if not is_sweep_pe and st_15m.get("ready") and st_15m.get("direction") == "BULL":
+                        if not is_sweep_pe and not mcx_5m_bear_ok and st_15m.get("ready") and st_15m.get("direction") == "BULL":
                             skip_notes.append(f"{asset_key}(15m_ST=BULL)")
                             continue
-                        if not is_sweep_pe and not rs_trends.get("tf_15m_bear", True):
+                        if not is_sweep_pe and not mcx_5m_bear_ok and not rs_trends.get("tf_15m_bear", True):
                             skip_notes.append(f"{asset_key}(15m!=BEAR)")
                             continue
                         # Anti-chasing guard: block PUTs at S1 only when NOT a DD Nifty Super Candle AND bouncing

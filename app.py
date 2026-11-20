@@ -457,11 +457,17 @@ def api_chart_data():
             "BANKNIFTY": ("25", "IDX_I", "INDEX"),
             "FINNIFTY": ("27", "IDX_I", "INDEX"),
             "SENSEX": ("51", "IDX_I", "INDEX"),
-            # MCX Active Mini Commodities
-            "CRUDEOILM": ("573423", "MCX_COMM", "FUTCOM"),
+            # MCX Active Commodities (Mini + Standard + Metals)
+            "CRUDEOILM": ("576265", "MCX_COMM", "FUTCOM"),
+            "CRUDEOIL": ("576264", "MCX_COMM", "FUTCOM"),
             "NATGASMINI": ("574320", "MCX_COMM", "FUTCOM"),
+            "NATURALGAS": ("574319", "MCX_COMM", "FUTCOM"),
             "GOLDM": ("575011", "MCX_COMM", "FUTCOM"),
+            "GOLD": ("495213", "MCX_COMM", "FUTCOM"),
             "SILVERM": ("483080", "MCX_COMM", "FUTCOM"),
+            "SILVER": ("495214", "MCX_COMM", "FUTCOM"),
+            "COPPER": ("578634", "MCX_COMM", "FUTCOM"),
+            "ZINC": ("578638", "MCX_COMM", "FUTCOM"),
             # Top Bluechip Equities
             "RELIANCE": ("2885", "NSE_EQ", "EQUITY"),
             "TCS": ("11536", "NSE_EQ", "EQUITY"),

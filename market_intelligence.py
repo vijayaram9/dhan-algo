@@ -833,7 +833,7 @@ class MarketIntelligenceEngine:
             # Consolidated Batch Query for Indices, Commodities and Bluechip Equities
             batch_req = {}
             if "09:00" <= now_hm < "23:30":
-                batch_req["MCX_COMM"] = [573423, 574320, 575011, 483080]
+                batch_req["MCX_COMM"] = [576265, 574320, 575011, 483080, 576264, 574319, 495213, 495214, 578634, 578638]
             if "09:15" <= now_hm < "15:30":
                 batch_req["IDX_I"] = [13, 25, 27, 51]
                 batch_req["NSE_EQ"] = [2885, 11536, 1333, 4963, 1594, 3045]
