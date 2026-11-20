@@ -2,6 +2,7 @@ import sys
 import time
 import datetime
 import random
+import numpy as np
 from dataclasses import dataclass, asdict, field
 from typing import Optional, List, Dict, Tuple
 from colorama import init, Fore, Style
@@ -642,6 +643,15 @@ class NiftySmartEdgeEngine:
         elif pos.trade_style == "SWING":
             # 🌊 SWING WAVE RIDER: Structural Trend Trail & Multi-Stage Profit Lock
             # -----------------------------------------------------------------
+            # 0. 🛡️ DYNAMIC CAPITAL SHIELD (Strict ₹650 Loss Ceiling in Rupees):
+            # Never allow a 10% premium stop on a high-premium or multi-lot contract to bleed > ₹650!
+            swing_risk_cap = min(getattr(pos, "trade_risk_inr", 650.0) or 650.0, 650.0)
+            if pos.pnl <= -swing_risk_cap:
+                msg = f"🛡️ Swing Capital Shield Hit: Exited @ ₹{pos.current_premium:.2f} (Loss of ₹{abs(pos.pnl):.2f} capped strictly at ₹{swing_risk_cap:,.0f})."
+                self.log_sniper_event(msg, "STOP")
+                print(f"[SWING CAPITAL SHIELD] {msg}")
+                return True, msg
+
             # 1. Time Cutoff: 60 minutes holding cycle complete
             try:
                 entry_dt = datetime.datetime.strptime(pos.entry_time_iso[:19], "%Y-%m-%d %H:%M:%S")
@@ -1909,23 +1919,48 @@ class NiftySmartEdgeEngine:
                     # Top-Down 15m + 1H Resampled MTF Alignment + Pullback Value-Zone Filter (<= 0.18% from EMA 9)
                     rs_trends = mtf_engine.get_resampled_trends(asset_key)
 
+                    # 1. GROWW 15m Supertrend (7, 3) Macro Direction Lock (prevents 5m PUT->CALL flip-flop!)
+                    st_15m = {"direction": "NEUTRAL", "value": 0.0, "ready": False}
+                    try:
+                        n_bars = len(df_bars)
+                        if n_bars >= 30:
+                            grp = np.arange(n_bars) // 3
+                            df_15m = df_bars.groupby(grp).agg({
+                                "open": "first", "high": "max", "low": "min", "close": "last"
+                            }).reset_index(drop=True)
+                            st_15m = IndicatorEngine.calculate_supertrend(df_15m, period=7, multiplier=3.0)
+                    except Exception:
+                        pass
+
+                    # 2. DHANANJAY PAWAR (9-21 EMA Pullback) + TANISHA GARG (20 EMA Resting Bar)
+                    # 3. DD NIFTY (Super Candle + RSI > 70 / < 30 Rocket Fuel)
+                    # 4. ASHWIN RAGHAVAN (VCP Volatility Contraction Pattern)
+                    pb_info = IndicatorEngine.detect_pullback_breakout(df_bars, opp_action)
+                    sc_info = IndicatorEngine.detect_super_candle(df_bars, opp_action)
+                    vcp_info = IndicatorEngine.detect_vcp_squeeze(df_bars)
+                    is_super_candle = bool(sc_info.get("is_super_candle", False))
+                    is_pullback_trig = bool(pb_info.get("triggered", False))
+
                     if opp_action == "BUY_CE":
+                        if not is_sweep_ce and st_15m.get("ready") and st_15m.get("direction") == "BEAR":
+                            skip_notes.append(f"{asset_key}(15m_ST=BEAR)")
+                            continue
                         if not is_sweep_ce and not rs_trends.get("tf_15m_bull", True):
                             skip_notes.append(f"{asset_key}(15m!=BULL)")
                             continue
-                        # Anti-chasing guard: block CALLs at R1 only when overbought AND showing a red bar or upper rejection wick
-                        if r1_lvl > 0 and opp_spot >= (r1_lvl * 0.999) and rsi_5m >= 72.0 and (b_close < b_open or upper_wick > b_body):
+                        # Anti-chasing guard: block CALLs at R1 only when NOT a DD Nifty Super Candle AND rejecting
+                        if not is_super_candle and r1_lvl > 0 and opp_spot >= (r1_lvl * 0.999) and rsi_5m >= 72.0 and (b_close < b_open or upper_wick > b_body):
                             skip_notes.append(f"{asset_key}(R1_OB)")
                             continue
                         pdh_lvl = float(mtf_lvls.get("pdh", 0.0) or 0.0)
-                        if pdh_lvl > 0 and 0.0 < ((pdh_lvl - opp_spot) / pdh_lvl) <= 0.0012 and comp_close <= pdh_lvl and (b_close < b_open or upper_wick > b_body):
+                        if not is_super_candle and pdh_lvl > 0 and 0.0 < ((pdh_lvl - opp_spot) / pdh_lvl) <= 0.0012 and comp_close <= pdh_lvl and (b_close < b_open or upper_wick > b_body):
                             skip_notes.append(f"{asset_key}(BELOW_PDH_REJ)")
                             continue
                         if not is_demand_bounce_ce:
                             if opp_spot < real_vwap:
                                 skip_notes.append(f"{asset_key}(<VWAP)")
                                 continue
-                            if ema9_val > 0 and ((opp_spot - ema9_val) / ema9_val) > (0.0018 if asset_key in index_keys else 0.0065):
+                            if not is_super_candle and ema9_val > 0 and ((opp_spot - ema9_val) / ema9_val) > (0.0022 if asset_key in index_keys else 0.0065):
                                 skip_notes.append(f"{asset_key}(EMA9_EXT)")
                                 continue
                             if not (ema9_val > ema21_val and b_close > ema21_val):
@@ -1937,27 +1972,45 @@ class NiftySmartEdgeEngine:
                             if b_close < (prev_low - (opp_spot * 0.0005)):
                                 skip_notes.append(f"{asset_key}(<PREV_LOW)")
                                 continue
-                    elif opp_action == "BUY_PE":
-                        if not is_sweep_pe and not rs_trends.get("tf_15m_bear", True):
+                        # Require confirmed Pullback/Resting Bar Breakout OR DD Nifty Super Candle OR SMC Sweep
+                        if not (is_pullback_trig or is_super_candle or is_sweep_ce):
+                            skip_notes.append(f"{asset_key}(WAIT_PULLBACK)")
                             continue
-                        # Anti-chasing guard: block PUTs at S1 only when oversold AND showing a green bar or lower bounce wick
-                        if s1_lvl > 0 and opp_spot <= (s1_lvl * 1.001) and rsi_5m <= 28.0 and (b_close > b_open or lower_wick > b_body):
+                    elif opp_action == "BUY_PE":
+                        if not is_sweep_pe and st_15m.get("ready") and st_15m.get("direction") == "BULL":
+                            skip_notes.append(f"{asset_key}(15m_ST=BULL)")
+                            continue
+                        if not is_sweep_pe and not rs_trends.get("tf_15m_bear", True):
+                            skip_notes.append(f"{asset_key}(15m!=BEAR)")
+                            continue
+                        # Anti-chasing guard: block PUTs at S1 only when NOT a DD Nifty Super Candle AND bouncing
+                        if not is_super_candle and s1_lvl > 0 and opp_spot <= (s1_lvl * 1.001) and rsi_5m <= 28.0 and (b_close > b_open or lower_wick > b_body):
+                            skip_notes.append(f"{asset_key}(S1_OS)")
                             continue
                         pdl_lvl = float(mtf_lvls.get("pdl", 0.0) or 0.0)
-                        if pdl_lvl > 0 and 0.0 < ((opp_spot - pdl_lvl) / pdl_lvl) <= 0.0012 and comp_close >= pdl_lvl and (b_close > b_open or lower_wick > b_body):
+                        if not is_super_candle and pdl_lvl > 0 and 0.0 < ((opp_spot - pdl_lvl) / pdl_lvl) <= 0.0012 and comp_close >= pdl_lvl and (b_close > b_open or lower_wick > b_body):
                             skip_notes.append(f"{asset_key}(ABOVE_PDL_REJ)")
                             continue
                         if not is_supply_rejection_pe:
                             if opp_spot > real_vwap:
+                                skip_notes.append(f"{asset_key}(>VWAP)")
                                 continue
-                            if ema9_val > 0 and ((ema9_val - opp_spot) / ema9_val) > (0.0018 if asset_key in index_keys else 0.0065):
+                            if not is_super_candle and ema9_val > 0 and ((ema9_val - opp_spot) / ema9_val) > (0.0022 if asset_key in index_keys else 0.0065):
+                                skip_notes.append(f"{asset_key}(EMA9_EXT)")
                                 continue
                             if not (ema9_val < ema21_val and b_close < ema21_val):
+                                skip_notes.append(f"{asset_key}(EMA9>=21)")
                                 continue
                             if b_close > b_open and b_close > ema9_val:
+                                skip_notes.append(f"{asset_key}(GREEN>EMA9)")
                                 continue
                             if b_close > (prev_high + (opp_spot * 0.0005)):
+                                skip_notes.append(f"{asset_key}(>PREV_HIGH)")
                                 continue
+                        # Require confirmed Pullback/Resting Bar Breakdown OR DD Nifty Super Candle OR SMC Sweep
+                        if not (is_pullback_trig or is_super_candle or is_sweep_pe):
+                            skip_notes.append(f"{asset_key}(WAIT_PULLBACK)")
+                            continue
 
                     # Institutional Zone Confluence Boost (PDH/PDL, POC/VAH/VAL, Active FVG, Swing HH/HL or LH/LL)
                     poc_lvl = float(mtf_lvls.get("poc", 0.0) or 0.0)
@@ -1972,6 +2025,17 @@ class NiftySmartEdgeEngine:
 
                     zone_tags = []
                     eff_score = int(top_opp.get("confluence_score", 75))
+                    if is_pullback_trig:
+                        zone_tags.append(pb_info.get("trigger_type", "PAWAR_EMA_PULLBACK"))
+                        eff_score += 8
+                    if is_super_candle:
+                        zone_tags.append(f"DD_SUPER_CANDLE(RSI{sc_info.get('rsi', 0):.0f})")
+                        eff_score += 10
+                    if vcp_info.get("is_vcp"):
+                        zone_tags.append("ASHWIN_VCP_SQUEEZE")
+                        eff_score += 8
+                    if st_15m.get("ready"):
+                        zone_tags.append(f"GROWW_15mST_{st_15m.get('direction')}")
                     if opp_action == "BUY_CE":
                         if pdh_lvl > 0 and comp_close > pdh_lvl:
                             zone_tags.append("PDH_BREAKOUT")
@@ -2037,6 +2101,11 @@ class NiftySmartEdgeEngine:
                         if or_mid_sl > 0:
                             if (opp_action == "BUY_CE" and or_mid_sl < opp_spot) or (opp_action == "BUY_PE" and or_mid_sl > opp_spot):
                                 struct_sl = or_mid_sl
+                        # Anchor structural SL tightly to Dhananjay/Tanisha Pullback Candle wick when triggered!
+                        if is_pullback_trig and pb_info.get("pullback_sl", 0) > 0:
+                            pb_sl = float(pb_info["pullback_sl"])
+                            if (opp_action == "BUY_CE" and pb_sl < opp_spot) or (opp_action == "BUY_PE" and pb_sl > opp_spot):
+                                struct_sl = pb_sl
                         # Clamp Layer 1 structural SL to recent 10-bar 5m swing low/high so morning ORB SL doesn't sit 500+ pts away
                         if opp_action == "BUY_CE":
                             recent_swing_lo = float(df_bars["low"].tail(10).min())

@@ -345,27 +345,12 @@ class ContractSelector:
                 chosen_lots = req_lots
                 advisory_msg = f"⚠️ Lot Sizing Advisory: Position scaled to {chosen_lots} lot{'s' if chosen_lots > 1 else ''} (₹{req_margin:,.2f} margin, {util_pct}% of capital). Safe within 50% ceiling."
         else:
-            # Conviction-Tiered Capital-Scaled Optimal Lot Sizing:
-            # 60-69: 1 lot max (10% cap) | 70-84: 20% cap (up to 3 lots) | 85+: A+ 30% cap (up to 5 lots)
-            if confluence_score < 70:
-                alloc_pct = 0.10
-                max_lots_cap = 1
-            elif confluence_score < 85:
-                alloc_pct = 0.20
-                max_lots_cap = 3
-            else:
-                alloc_pct = 0.30
-                max_lots_cap = 5
-            target_alloc = available_capital * alloc_pct
-            # Match risk_per_lot to our actual 10% Swing SL so lots_by_risk doesn't choke 20-30% conviction sizing to 1 lot
-            max_risk_budget = available_capital * (0.030 if confluence_score >= 85 else 0.020)
-            risk_per_lot = max(1.0, cost_per_lot * 0.10)
-            lots_by_alloc = int(target_alloc // cost_per_lot) if cost_per_lot > 0 else 1
-            lots_by_risk = int(max_risk_budget // risk_per_lot) if risk_per_lot > 0 else 1
-            chosen_lots = max(1, min(max_lots_cap, lots_by_alloc, lots_by_risk))
+            # Strict 1-Lot Institutional Base Sizing (Ashwin Raghavan Risk Discipline):
+            # Never auto-scale to 3-5 lots on an unconfirmed entry; cap automated entries strictly at 1 base lot
+            chosen_lots = 1
             chosen_margin = round(chosen_lots * cost_per_lot, 2)
             util_pct = round((chosen_margin / available_capital) * 100.0, 1) if available_capital > 0 else 100.0
-            advisory_msg = f"Conviction-tiered sizing ({confluence_score}%): {chosen_lots} lot{'s' if chosen_lots > 1 else ''} (₹{chosen_margin:,.2f} margin, {util_pct}% of ₹{available_capital:,.0f} capital)."
+            advisory_msg = f"Strict 1-lot base sizing ({confluence_score}%): 1 lot (₹{chosen_margin:,.2f} margin, {util_pct}% of ₹{available_capital:,.0f} capital)."
 
         final_quantity = chosen_lots * base_lot_size
         total_margin = round(final_quantity * estimated_premium, 2)

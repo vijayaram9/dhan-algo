@@ -726,3 +726,162 @@ class IndicatorEngine:
                 "forecast_text": f"⏱️ [{tf_label}] • Market in consolidation: {e}",
                 "key_levels": {}
             }
+
+    @staticmethod
+    def calculate_supertrend(df: pd.DataFrame, period: int = 7, multiplier: float = 3.0) -> dict:
+        """
+        Groww Multi-Timeframe Supertrend (7, 3) Macro Trend Filter:
+        Returns {"direction": "BULL" | "BEAR", "value": float, "ready": bool}.
+        """
+        if df is None or len(df) < period + 2:
+            return {"direction": "NEUTRAL", "value": 0.0, "ready": False}
+        try:
+            high = df["high"].astype(float).values
+            low = df["low"].astype(float).values
+            close = df["close"].astype(float).values
+            n = len(close)
+            tr = np.zeros(n)
+            tr[0] = high[0] - low[0]
+            for i in range(1, n):
+                tr[i] = max(high[i] - low[i], abs(high[i] - close[i - 1]), abs(low[i] - close[i - 1]))
+            atr = pd.Series(tr).rolling(window=period, min_periods=period).mean().bfill().values
+            hl2 = (high + low) / 2.0
+            upper = hl2 + multiplier * atr
+            lower = hl2 - multiplier * atr
+            final_upper = upper.copy()
+            final_lower = lower.copy()
+            direction = np.ones(n, dtype=int)  # 1 = BULL, -1 = BEAR
+            for i in range(1, n):
+                if upper[i] < final_upper[i - 1] or close[i - 1] > final_upper[i - 1]:
+                    final_upper[i] = upper[i]
+                else:
+                    final_upper[i] = final_upper[i - 1]
+                if lower[i] > final_lower[i - 1] or close[i - 1] < final_lower[i - 1]:
+                    final_lower[i] = lower[i]
+                else:
+                    final_lower[i] = final_lower[i - 1]
+                if direction[i - 1] == 1:
+                    direction[i] = -1 if close[i] < final_lower[i] else 1
+                else:
+                    direction[i] = 1 if close[i] > final_upper[i] else -1
+            is_bull = direction[-1] == 1
+            st_val = float(final_lower[-1] if is_bull else final_upper[-1])
+            return {"direction": "BULL" if is_bull else "BEAR", "value": round(st_val, 2), "ready": True}
+        except Exception:
+            return {"direction": "NEUTRAL", "value": 0.0, "ready": False}
+
+    @staticmethod
+    def detect_pullback_breakout(df: pd.DataFrame, side: str) -> dict:
+        """
+        Dhananjay Pawar (9-21 EMA Pullback) + Tanisha Garg (20 EMA Resting Bar):
+        Never enter on raw crossover/expansion bar. Wait for a pullback/resting bar
+        (opposite-colored candle or EMA9/20 dip without opposite crossover) and trigger
+        ONLY when current price breaks the pullback bar's high (CE) or low (PE).
+        """
+        if df is None or len(df) < 22:
+            return {"triggered": False, "reason": "Insufficient bars"}
+        try:
+            closes = df["close"].astype(float)
+            ema9 = closes.ewm(span=9, adjust=False).mean()
+            ema20 = closes.ewm(span=20, adjust=False).mean()
+            ema21 = closes.ewm(span=21, adjust=False).mean()
+            cur = df.iloc[-1]
+            cur_c = float(cur["close"])
+            cur_o = float(cur["open"])
+            cur_h = float(cur["high"])
+            cur_l = float(cur["low"])
+            e9_now = float(ema9.iloc[-1])
+            e20_now = float(ema20.iloc[-1])
+            e21_now = float(ema21.iloc[-1])
+
+            if side == "BUY_CE":
+                if not (e9_now > e21_now and cur_c > e21_now):
+                    return {"triggered": False, "reason": "No 9>21 EMA alignment"}
+                # Scan last 3 completed candles for a Red resting bar OR EMA pullback bar
+                for idx in (-2, -3, -4):
+                    if abs(idx) > len(df):
+                        continue
+                    bar = df.iloc[idx]
+                    bo, bc, bh, bl = float(bar["open"]), float(bar["close"]), float(bar["high"]), float(bar["low"])
+                    e9_b, e20_b, e21_b = float(ema9.iloc[idx]), float(ema20.iloc[idx]), float(ema21.iloc[idx])
+                    is_red_rest = (bc < bo) and (bc >= e21_b * 0.999)
+                    is_ema_touch = (bl <= max(e9_b, e20_b) * 1.0012) and (bc >= e21_b * 0.999)
+                    if (is_red_rest or is_ema_touch) and (cur_c > bh or (cur_h > bh and cur_c >= cur_o)):
+                        return {
+                            "triggered": True,
+                            "trigger_type": "TANISHA_REST_BREAK" if is_red_rest else "PAWAR_EMA_PULLBACK",
+                            "pullback_sl": round(bl, 2),
+                            "pullback_high": round(bh, 2),
+                            "reason": f"Broke pullback bar high {bh:.1f} (SL {bl:.1f})"
+                        }
+                return {"triggered": False, "reason": "Awaiting pullback resting bar high break"}
+            else:
+                if not (e9_now < e21_now and cur_c < e21_now):
+                    return {"triggered": False, "reason": "No 9<21 EMA alignment"}
+                for idx in (-2, -3, -4):
+                    if abs(idx) > len(df):
+                        continue
+                    bar = df.iloc[idx]
+                    bo, bc, bh, bl = float(bar["open"]), float(bar["close"]), float(bar["high"]), float(bar["low"])
+                    e9_b, e20_b, e21_b = float(ema9.iloc[idx]), float(ema20.iloc[idx]), float(ema21.iloc[idx])
+                    is_green_rest = (bc > bo) and (bc <= e21_b * 1.001)
+                    is_ema_touch = (bh >= min(e9_b, e20_b) * 0.9988) and (bc <= e21_b * 1.001)
+                    if (is_green_rest or is_ema_touch) and (cur_c < bl or (cur_l < bl and cur_c <= cur_o)):
+                        return {
+                            "triggered": True,
+                            "trigger_type": "TANISHA_REST_BREAK" if is_green_rest else "PAWAR_EMA_PULLBACK",
+                            "pullback_sl": round(bh, 2),
+                            "pullback_low": round(bl, 2),
+                            "reason": f"Broke pullback bar low {bl:.1f} (SL {bh:.1f})"
+                        }
+                return {"triggered": False, "reason": "Awaiting pullback resting bar low break"}
+        except Exception as e:
+            return {"triggered": False, "reason": f"err: {e}"}
+
+    @staticmethod
+    def detect_super_candle(df: pd.DataFrame, side: str) -> dict:
+        """
+        DD Nifty 'Super Candle' + RSI > 70 / < 30 Momentum Rocket Fuel:
+        Detects explosive institutional expansion candles (Range >= 1.35x ATR, strong directional body,
+        and high-momentum RSI >= 65 for CE or <= 35 for PE).
+        """
+        if df is None or len(df) < 16:
+            return {"is_super_candle": False, "rsi": 50.0, "atr_mult": 0.0}
+        try:
+            atr = IndicatorEngine.calculate_atr(df, period=14)
+            rsi = IndicatorEngine.calculate_rsi(df["close"], period=14)
+            if atr <= 0:
+                return {"is_super_candle": False, "rsi": rsi, "atr_mult": 0.0}
+            for idx in (-1, -2):
+                bar = df.iloc[idx]
+                bo, bc, bh, bl = float(bar["open"]), float(bar["close"]), float(bar["high"]), float(bar["low"])
+                rng = max(0.01, bh - bl)
+                body = abs(bc - bo)
+                atr_mult = rng / atr
+                body_ratio = body / rng
+                if side == "BUY_CE" and bc > bo and atr_mult >= 1.35 and body_ratio >= 0.55 and rsi >= 65.0:
+                    return {"is_super_candle": True, "rsi": round(rsi, 1), "atr_mult": round(atr_mult, 2), "sl": round(bl, 2)}
+                if side == "BUY_PE" and bc < bo and atr_mult >= 1.35 and body_ratio >= 0.55 and rsi <= 35.0:
+                    return {"is_super_candle": True, "rsi": round(rsi, 1), "atr_mult": round(atr_mult, 2), "sl": round(bh, 2)}
+            return {"is_super_candle": False, "rsi": round(rsi, 1), "atr_mult": 0.0}
+        except Exception:
+            return {"is_super_candle": False, "rsi": 50.0, "atr_mult": 0.0}
+
+    @staticmethod
+    def detect_vcp_squeeze(df: pd.DataFrame) -> dict:
+        """
+        Ashwin Raghavan / Minervini Volatility Contraction Pattern (VCP):
+        Flags when recent 6-bar average range contracted <= 75% of the prior 12-bar range.
+        """
+        if df is None or len(df) < 20:
+            return {"is_vcp": False, "contraction_ratio": 1.0}
+        try:
+            ranges = (df["high"].astype(float) - df["low"].astype(float)).values
+            prior_avg = float(np.mean(ranges[-18:-6]))
+            recent_avg = float(np.mean(ranges[-7:-1]))
+            if prior_avg <= 0:
+                return {"is_vcp": False, "contraction_ratio": 1.0}
+            ratio = recent_avg / prior_avg
+            return {"is_vcp": ratio <= 0.75, "contraction_ratio": round(ratio, 2)}
+        except Exception:
+            return {"is_vcp": False, "contraction_ratio": 1.0}
