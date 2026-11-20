@@ -557,10 +557,9 @@ class NiftySmartEdgeEngine:
                 trail_buffer = 6.0
 
             # 🛡️ DYNAMIC CAPITAL SHIELD (Loss Ceiling in Rupees):
-            # Tied to planned risk budget for this position (e.g. 1.0% of Capital = ₹1,500 for ₹1.5L)
-            planned_risk_budget = getattr(pos, "trade_risk_inr", 0.0)
-            if planned_risk_budget <= 0.0:
-                planned_risk_budget = max(1200.0, self.account_capital * 0.01)
+            # Institutional Risk Ceiling: Hard stop at max ₹650 loss per trade (never allow ₹1,500 bleeds!)
+            raw_risk = getattr(pos, "trade_risk_inr", 0.0)
+            planned_risk_budget = min(raw_risk if raw_risk > 0 else 650.0, 650.0)
 
             if pos.pnl <= -planned_risk_budget:
                 msg = f"🛡️ Dynamic Capital Shield Hit: Exited @ ₹{pos.current_premium:.2f} (Loss of ₹{abs(pos.pnl):.2f} capped at planned risk budget ₹{planned_risk_budget:,.2f})."
@@ -1711,7 +1710,7 @@ class NiftySmartEdgeEngine:
             try:
                 from market_intelligence import market_intelligence
                 active_cap = self.client.get_real_cash_balance() if self.mode == "LIVE" else float(self.client.paper_capital)
-                # Capital-Percentage Peak-Profit Lock: Once daily net P&L >= +2.0% of capital, protect 50% of peak profit
+                # Dynamic House-Money Trailing Floor (Protects gains without hard shutdown):
                 cur_net_d = float(getattr(self, "daily_net_pnl", 0.0) or 0.0)
                 running_peak, cum_net = 0.0, 0.0
                 for tr in getattr(self, "closed_trades_today", []):
@@ -1719,9 +1718,22 @@ class NiftySmartEdgeEngine:
                     running_peak = max(running_peak, cum_net)
                 peak_net_d = max(float(getattr(self, "_peak_daily_net_pnl", 0.0) or 0.0), running_peak, cur_net_d)
                 self._peak_daily_net_pnl = peak_net_d
-                if active_cap > 0 and peak_net_d >= (active_cap * 0.02) and cur_net_d <= (peak_net_d * 0.50):
-                    self.waiting_reason = f"Green-Day Profit Lock: Protected ₹{cur_net_d:,.0f} (50% floor of ₹{peak_net_d:,.0f} peak)."
-                    return
+
+                # Dynamic Profit Protection Floor:
+                # - Peak >= ₹1,000: Floor = ₹600 (protect 60%)
+                # - Peak >= ₹2,000: Floor = 70% of peak
+                # - Peak >= ₹4,000: Floor = 75% of peak
+                if peak_net_d >= 1000.0:
+                    if peak_net_d < 2000.0:
+                        protected_floor = 600.0
+                    elif peak_net_d < 4000.0:
+                        protected_floor = round(peak_net_d * 0.70, 2)
+                    else:
+                        protected_floor = round(peak_net_d * 0.75, 2)
+
+                    if cur_net_d <= protected_floor:
+                        self.waiting_reason = f"Green-Day Floor Protected: Secured ₹{cur_net_d:,.0f} (Floor ₹{protected_floor:,.0f} of ₹{peak_net_d:,.0f} peak). Standing down."
+                        return
                 all_opps = market_intelligence.scan_all_opportunities(capital=active_cap)
                 
                 # Seamless Multi-Session Multi-Asset Radar:
@@ -1761,14 +1773,13 @@ class NiftySmartEdgeEngine:
                 active_stock_count = sum(1 for p in self.active_positions if getattr(p, "asset_key", "") not in index_keys and getattr(p, "asset_key", "") not in mcx_keys)
                 if is_evening_session:
                     valid_opps = []
-                elif is_equity_open and now_hm_curr < "15:00":
+                elif is_equity_open and now_hm_curr < "14:45":
                     valid_opps = [
                         o for o in all_opps
-                        if o["key"] not in mcx_keys
+                        if o["key"] in index_keys # STRICT INTRADAY: High-liquidity Index options only (NIFTY, BANKNIFTY, SENSEX, FINNIFTY)
                         and o["key"] not in active_assets
-                        and (now_hm_curr < "14:45" or o.get("is_expiry_today", False))
-                        and not (active_index_count >= 1 and o["key"] in index_keys)
-                        and not (o["key"] not in index_keys and (active_stock_count >= 2 or stock_scanner.get_sector(o["key"]) in active_sectors))
+                        and (now_hm_curr < "14:15" or o.get("is_expiry_today", False))
+                        and not (active_index_count >= 2)
                         and self.check_trading_schedule(o["key"])[0]
                     ]
                 else:

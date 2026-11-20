@@ -22,10 +22,10 @@ class TradingConfig:
     
     # RMS - Risk Management System (Configured for ₹1,50,000 Capital)
     account_capital: float = float(os.getenv("ACCOUNT_CAPITAL", "150000.0"))
-    risk_per_trade_pct: float = float(os.getenv("RISK_PER_TRADE_PCT", "1.0"))  # 1.0% of Capital per trade (₹1,500 on ₹1.5L)
-    max_daily_loss: float = float(os.getenv("MAX_DAILY_LOSS", "3000.0"))       # 2% of ₹1.5L = ₹3,000 risk ceiling
-    max_daily_profit: float = float(os.getenv("MAX_DAILY_PROFIT", "8000.0"))
-    max_trades_per_day: int = int(os.getenv("MAX_TRADES_PER_DAY", "8"))
+    risk_per_trade_pct: float = float(os.getenv("RISK_PER_TRADE_PCT", "0.45"))  # 0.45% of Capital per trade (₹650 max stop ceiling)
+    max_daily_loss: float = float(os.getenv("MAX_DAILY_LOSS", "2500.0"))       # Disciplined daily loss ceiling
+    max_daily_profit: float = float(os.getenv("MAX_DAILY_PROFIT", "10000.0"))
+    max_trades_per_day: int = int(os.getenv("MAX_TRADES_PER_DAY", "20"))
     max_consecutive_losses: int = 3
     
     # Multi-Instrument Execution & Concurrency Control
@@ -34,16 +34,16 @@ class TradingConfig:
     cooldown_seconds: int = int(os.getenv("COOLDOWN_SECONDS", "15"))  # 15s agile scalping cooldown per instrument
     
     # Quick 10-20 Points Scalp Parameters (Target fast 10-20 pts profit with tight risk defense)
-    quick_scalp_target_nifty: float = 14.0   # Target 12-16 pts in NIFTY options
-    quick_scalp_target_bn: float = 24.0      # Target 20-25 pts in BANKNIFTY / SENSEX
+    quick_scalp_target_nifty: float = 16.0   # Target 14-18 pts in NIFTY options
+    quick_scalp_target_bn: float = 25.0      # Target 20-30 pts in BANKNIFTY / SENSEX
     quick_scalp_target_mcx: float = 18.0     # Target 15-20 pts in CRUDEOILM / Commodities
     quick_scalp_sl_nifty: float = 7.0        # Controlled 7 pts SL for 1:2 R:R
-    quick_scalp_sl_bn: float = 13.0          # Controlled 13 pts SL for 1:2 R:R
+    quick_scalp_sl_bn: float = 12.0          # Controlled 12 pts SL for 1:2 R:R
     quick_scalp_sl_mcx: float = 9.0          # Controlled 9 pts SL for 1:2 R:R
     
     # Strategy Execution Rules (NIFTY SMART EDGE v1.0)
-    sl_percent: float = float(os.getenv("SL_PERCENT", "20.0"))        # 20% Hard Stop on premium
-    target_percent: float = float(os.getenv("TARGET_PERCENT", "30.0")) # 1.5R target
+    sl_percent: float = float(os.getenv("SL_PERCENT", "10.0"))        # Tight 10% Hard Stop on premium (never 20% bleed)
+    target_percent: float = float(os.getenv("TARGET_PERCENT", "25.0")) # 1:2.5R target expansion
     trailing_sl_percent: float = float(os.getenv("TRAILING_SL_PERCENT", "10.0"))
     
     # Market Timing (Section 8 Schedule)

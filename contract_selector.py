@@ -370,13 +370,13 @@ class ContractSelector:
         final_quantity = chosen_lots * base_lot_size
         total_margin = round(final_quantity * estimated_premium, 2)
 
-        # Layer 2: Hard premium stop: 20% below entry
-        hard_stop_premium = round(estimated_premium * 0.80, 2)
+        # Layer 2: Hard premium stop: tight 10% below entry (institutional day-trade stop)
+        hard_stop_premium = round(estimated_premium * 0.90, 2)
         emergency_loss_per_unit = estimated_premium - hard_stop_premium
 
-        # Primary planned risk based on Layer 1 Underlying Structural Stop
-        planned_loss_per_unit = max(structural_risk_pts * delta_est, 5.0)
-        trade_risk_inr = round((planned_loss_per_unit * final_quantity) + 65.0, 2)
+        # Primary planned risk based on Layer 1 Underlying Structural Stop (capped at max ₹650 risk)
+        planned_loss_per_unit = min(max(structural_risk_pts * delta_est, 5.0), emergency_loss_per_unit)
+        trade_risk_inr = round(min((planned_loss_per_unit * final_quantity) + 65.0, 650.0), 2)
 
         # Strict Capital Allocation & Dynamic Risk Budgeting:
         # 1. Per-Trade Capital Commitment: Safe margin ceiling (max 20% of capital, capped at ₹3,00,000)
@@ -408,9 +408,9 @@ class ContractSelector:
                 candle_timestamp=candle_ts
             )
 
-        # 2. Dynamic Rupee Risk Ceiling: Based on Risk Appetite % of Capital (e.g. 1.0% = ₹1,500 on ₹150,000)
-        risk_pct = getattr(config, "risk_per_trade_pct", 1.0) / 100.0
-        risk_ceiling = round(max(750.0, min(available_capital * risk_pct, getattr(config, "max_daily_loss", 3000.0) * 0.5)), 2)
+        # 2. Dynamic Rupee Risk Ceiling: Based on Risk Appetite % of Capital, capped strictly at max ₹650 per trade
+        risk_pct = getattr(config, "risk_per_trade_pct", 0.45) / 100.0
+        risk_ceiling = round(min(650.0, max(400.0, available_capital * risk_pct)), 2)
         if trade_risk_inr > risk_ceiling:
             rejection = (
                 f"Trade rejected by Risk Rules: Planned loss (₹{trade_risk_inr:.2f}) "
