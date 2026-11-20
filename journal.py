@@ -69,6 +69,32 @@ class TradingJournal:
         conn.commit()
         conn.close()
 
+    def delete_commodity_trades(self, trade_date: Optional[str] = None) -> int:
+        """Deletes ONLY MCX commodity journal entries (preserving all Indian equity/index trades)."""
+        mcx_prefixes = ("CRUDEOIL", "NATURALGAS", "NATGAS", "GOLD", "SILVER", "COPPER", "ZINC")
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        like_clauses = " OR ".join([f"UPPER(symbol) LIKE '{p}%'" for p in mcx_prefixes])
+        if trade_date:
+            sql = f"DELETE FROM trades WHERE trade_date = ? AND ({like_clauses})"
+            cursor.execute(sql, (trade_date,))
+        else:
+            sql = f"DELETE FROM trades WHERE ({like_clauses})"
+            cursor.execute(sql)
+        deleted = cursor.rowcount
+        conn.commit()
+        # Re-sync CSV from clean SQLite table
+        try:
+            df = pd.read_sql_query("SELECT * FROM trades ORDER BY id ASC", conn)
+            if not df.empty:
+                df.to_csv(CSV_PATH, index=False)
+            elif os.path.exists(CSV_PATH):
+                os.remove(CSV_PATH)
+        except Exception:
+            pass
+        conn.close()
+        return deleted
+
     def clear_all_trades(self):
         """Clears all historical and test trades to restart with a clean slate."""
         conn = sqlite3.connect(DB_PATH)
@@ -198,6 +224,32 @@ class TradingJournal:
         except Exception as e:
             print(f"[TradingJournal] Warning: Failed to archive journal: {e}")
             return None
+
+    def delete_commodity_trades(self, trade_date: Optional[str] = None) -> int:
+        """Deletes ONLY MCX commodity journal entries (preserving all Indian equity/index trades)."""
+        mcx_prefixes = ("CRUDEOIL", "NATURALGAS", "NATGAS", "GOLD", "SILVER", "COPPER", "ZINC")
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        like_clauses = " OR ".join([f"UPPER(symbol) LIKE '{p}%'" for p in mcx_prefixes])
+        if trade_date:
+            sql = f"DELETE FROM trades WHERE trade_date = ? AND ({like_clauses})"
+            cursor.execute(sql, (trade_date,))
+        else:
+            sql = f"DELETE FROM trades WHERE ({like_clauses})"
+            cursor.execute(sql)
+        deleted = cursor.rowcount
+        conn.commit()
+        # Re-sync CSV from clean SQLite table
+        try:
+            df = pd.read_sql_query("SELECT * FROM trades ORDER BY id ASC", conn)
+            if not df.empty:
+                df.to_csv(CSV_PATH, index=False)
+            elif os.path.exists(CSV_PATH):
+                os.remove(CSV_PATH)
+        except Exception:
+            pass
+        conn.close()
+        return deleted
 
     def clear_all_trades(self):
         """Safely archives current trade records to journal_archives, then resets the active ledger."""

@@ -2662,6 +2662,41 @@ def settings_page():
 
     return render_template("settings.html", config=config, current_capital=current_capital, message=message)
 
+@app.route("/api/admin/delete-commodity-trades", methods=["POST"])
+def api_admin_delete_commodity_trades():
+    """Deletes ONLY MCX commodity journal entries and clears any open MCX positions, preserving Indian equity trades."""
+    data = request.get_json(silent=True) or {}
+    trade_date = data.get("trade_date")
+    mcx_prefixes = ("CRUDEOIL", "NATURALGAS", "NATGAS", "GOLD", "SILVER", "COPPER", "ZINC")
+    with lock:
+        # Remove any open MCX positions without logging them
+        if hasattr(engine, "active_positions") and engine.active_positions:
+            kept = [p for p in engine.active_positions if not any(str(getattr(p, "symbol", "")).upper().startswith(px) for px in mcx_prefixes)]
+            engine.active_positions = kept
+            engine.active_position = kept[0] if kept else None
+            if not kept:
+                try:
+                    from global_trade_lock import global_trade_lock
+                    global_trade_lock.force_reset_lock("Cleaned MCX Positions")
+                except Exception:
+                    pass
+        deleted = journal.delete_commodity_trades(trade_date=trade_date)
+        engine.restore_daily_state()
+        engine.consecutive_losses = 0
+        if hasattr(engine, "closed_trades_today"):
+            engine.closed_trades_today = [
+                t for t in engine.closed_trades_today
+                if not any(str(t.get("symbol", "")).upper().startswith(px) for px in mcx_prefixes)
+            ]
+        summary = journal.get_today_summary()
+        return jsonify({
+            "success": True,
+            "deleted_commodity_rows": deleted,
+            "remaining_today_count": summary["count"],
+            "remaining_today_net_pnl": summary["net_pnl"],
+            "remaining_today_gross_pnl": summary["gross_pnl"]
+        })
+
 @app.route("/api/admin/sync-code", methods=["POST"])
 def api_admin_sync_code():
     """Admin endpoint to perform zero-downtime git pull on AWS directly and restart daemon."""
