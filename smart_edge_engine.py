@@ -1892,7 +1892,7 @@ class NiftySmartEdgeEngine:
                     if df_bars is None or len(df_bars) < 21:
                         n_b = 0 if df_bars is None else len(df_bars)
                         c_err = getattr(mtf_engine, "_last_candle_err", {}).get(asset_key, "")
-                        skip_notes.append(f"{asset_key}(Bars {n_b}<21 {c_err[:25]})")
+                        skip_notes.append(f"{asset_key}(Bars {n_b}<21 {c_err[:80]})")
                         continue
 
                     # -----------------------------------------------------------------
