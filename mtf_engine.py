@@ -205,6 +205,9 @@ class MultiTimeframeEngine:
                 import yfinance as yf
                 from market_intelligence import market_intelligence
                 live_spot = market_intelligence.get_asset_spot(asset_key)
+                if live_spot <= 0:
+                    base_k = asset_key.replace("MINI", "").rstrip("M")
+                    live_spot = market_intelligence.get_asset_spot(base_k)
                 if live_spot > 0:
                     df_yf = yf.Ticker(yf_map[asset_key]).history(period="2d", interval="5m")
                     if df_yf is not None and len(df_yf) >= 25:
