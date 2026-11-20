@@ -216,12 +216,16 @@ def evaluate_commodity_entry(
         return False, f"{asset_key}(MCX_SMA_NAN)", {}
 
     slope_pct = ((sma_now - sma_prev) / sma_prev) * 100.0
-    is_sma_rising = (slope_pct >= 0.03) and (opp_spot > sma_now)
-    is_sma_falling = (slope_pct <= -0.03) and (opp_spot < sma_now)
+    is_sma_rising = slope_pct >= 0.03
+    is_sma_falling = slope_pct <= -0.03
 
     # Reject flat sideways 66 SMA chop!
     if not (is_sma_rising or is_sma_falling):
         return False, f"{asset_key}(66SMA_FLAT {slope_pct:+.2f}%)", {}
+
+    # If action was not pre-determined, set it according to the 66 SMA slope trend
+    if opp_action in ("AUTO", None, ""):
+        opp_action = "BUY_CE" if is_sma_rising else "BUY_PE"
 
     # Siddharth Bhanushali Trend Lock: Only CALLs on rising 66 SMA, Only PUTs on falling 66 SMA
     if opp_action == "BUY_CE" and not is_sma_rising:
@@ -229,13 +233,23 @@ def evaluate_commodity_entry(
     if opp_action == "BUY_PE" and not is_sma_falling:
         return False, f"{asset_key}(66SMA_RISING)", {}
 
-    # 5m current candle confirmation (must match direction)
+    # Pullback Location Guard: Price must be in the pullback zone around 66 SMA
+    # (Allowing pullbacks to test or slightly overshoot 66 SMA, but reject if trend is broken)
+    if opp_action == "BUY_CE" and opp_spot < (sma_now * 0.985):
+        return False, f"{asset_key}(SMA_BROKEN_DN)", {}
+    if opp_action == "BUY_PE" and opp_spot > (sma_now * 1.015):
+        return False, f"{asset_key}(SMA_BROKEN_UP)", {}
+
+    # 5m candle confirmation: Reversal candle from pullback
+    # In uptrend (BUY_CE): reject only if BOTH current and previous bars are actively red
+    # In downtrend (BUY_PE): reject only if BOTH current and previous bars are actively green
     b_close = float(df_bars["close"].iloc[-1])
     b_open = float(df_bars["open"].iloc[-1])
     comp_close = float(df_bars["close"].iloc[-2])
-    if opp_action == "BUY_CE" and b_close <= b_open:
+    comp_open = float(df_bars["open"].iloc[-2])
+    if opp_action == "BUY_CE" and (b_close < b_open and comp_close < comp_open):
         return False, f"{asset_key}(MCX_RED_5m)", {}
-    if opp_action == "BUY_PE" and b_close >= b_open:
+    if opp_action == "BUY_PE" and (b_close > b_open and comp_close > comp_open):
         return False, f"{asset_key}(MCX_GREEN_5m)", {}
 
     # Compute Stochastic %K (14, 2) on 15m chart (Videos 1 & 5)
@@ -248,12 +262,12 @@ def evaluate_commodity_entry(
     # Setup A: Siddharth Bhanushali 66 SMA + Stochastic(14,2) [75 / 35] Pullback Trigger
     siddharth_triggered = False
     if opp_action == "BUY_CE":
-        # Dipped below 35 (oversold pullback) and crossing/turning UP above 35
-        if min_k_3 <= 35.0 and curr_k > prev_k and curr_k >= 35.0:
+        # Dipped below 35 (oversold pullback) and crossing/turning UP
+        if min_k_3 <= 35.0 and curr_k >= prev_k:
             siddharth_triggered = True
     elif opp_action == "BUY_PE":
-        # Bounced above 75 (overbought pullback) and crossing/turning DOWN below 75
-        if max_k_3 >= 75.0 and curr_k < prev_k and curr_k <= 75.0:
+        # Bounced above 75 (overbought pullback) and crossing/turning DOWN
+        if max_k_3 >= 75.0 and curr_k <= prev_k:
             siddharth_triggered = True
 
     # Setup B: Video 4 (5:45 PM Formula) + Video 3 (Ravindra Rokde Volume Influx >= 1.35x)
@@ -300,6 +314,7 @@ def evaluate_commodity_entry(
         "atr_sl_spot": atr_sl_spot,
         "atr_15m": atr_15m,
         "stoch_k": curr_k,
+        "action": opp_action,
     }
 
 

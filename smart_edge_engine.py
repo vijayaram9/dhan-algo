@@ -1817,45 +1817,56 @@ class NiftySmartEdgeEngine:
                 min_conf = getattr(self, "dynamic_min_confluence", 70)
                 skip_notes = []
                 for top_opp in valid_opps:
+                    asset_key = top_opp["key"]
+                    is_mcx = asset_key in mcx_keys
+
                     # Check global lock; directional same-side cooldown is checked after opp_action is determined (allowing immediate ChoCH opposite flips!)
-                    is_asset_cd, _ = global_trade_lock.is_cooldown_active(top_opp["key"])
+                    is_asset_cd, _ = global_trade_lock.is_cooldown_active(asset_key)
                     if is_asset_cd:
                         continue
 
-                    # Require high-conviction institutional confluence (60+ confirmed Index, 70+ Crude/NatGas, 85+ wide-spread Gold/Silver/Stocks)
-                    opp_regime = top_opp.get("mtf_analysis", {}).get("market_regime", "")
-                    if opp_regime == "UNCONFIRMED_DATA":
-                        continue
-                    if (top_opp["key"] in index_keys or top_opp["key"] in mcx_keys) and opp_regime in ("INSTITUTIONAL_ACCUMULATION", "INSTITUTIONAL_DISTRIBUTION"):
-                        eff_min_conf = min(min_conf, 60)
-                    elif (top_opp["key"] in index_keys) or (top_opp["key"] in mcx_keys):
-                        eff_min_conf = min_conf
+                    if not is_mcx:
+                        # -------------------------------------------------------------
+                        # INDIAN EQUITIES & INDICES (09:25 - 15:05 IST) - 100% UNCHANGED
+                        # -------------------------------------------------------------
+                        opp_regime = top_opp.get("mtf_analysis", {}).get("market_regime", "")
+                        if opp_regime == "UNCONFIRMED_DATA":
+                            continue
+                        if top_opp["key"] in index_keys and opp_regime in ("INSTITUTIONAL_ACCUMULATION", "INSTITUTIONAL_DISTRIBUTION"):
+                            eff_min_conf = min(min_conf, 60)
+                        elif top_opp["key"] in index_keys:
+                            eff_min_conf = min_conf
+                        else:
+                            # High-RVOL (>= 1.35x) or News-Catalyst F&O Stock Options only (75+ confluence)
+                            eff_min_conf = max(min_conf, 75)
+                        if not top_opp.get("is_actionable"):
+                            skip_notes.append(f"{top_opp['key']}(Not Actionable)")
+                            continue
+                        if top_opp.get("confluence_score", 0) < eff_min_conf:
+                            skip_notes.append(f"{top_opp['key']}(Conf {top_opp.get('confluence_score', 0)}<{eff_min_conf})")
+                            continue
+                        opp_action = "BUY_CE" if any(x in top_opp["action"].upper() for x in ["CE", "CALL", "BULLISH"]) else ("BUY_PE" if any(x in top_opp["action"].upper() for x in ["PE", "PUT", "BEARISH"]) else None)
+                        if not opp_action:
+                            continue
+                        dir_cd_until = getattr(self, "_asset_cooldowns", {}).get(f"{asset_key}:{opp_action}")
+                        if dir_cd_until is not None and datetime.datetime.now() < dir_cd_until:
+                            continue
+                        is_dir_cd_db, _ = global_trade_lock.is_cooldown_active(f"{asset_key}:{opp_action}")
+                        if is_dir_cd_db:
+                            continue
+                        if asset_key in index_keys:
+                            basket_cd_until = getattr(self, "_basket_cooldowns", {}).get(opp_action)
+                            if basket_cd_until is not None and datetime.datetime.now() < basket_cd_until:
+                                continue
+                            is_basket_cd_db, _ = global_trade_lock.is_cooldown_active(f"BASKET:{opp_action}")
+                            if is_basket_cd_db:
+                                continue
                     else:
-                        # High-RVOL (>= 1.35x) or News-Catalyst F&O Stock Options only (75+ confluence)
-                        eff_min_conf = max(min_conf, 75)
-                    if not top_opp.get("is_actionable"):
-                        skip_notes.append(f"{top_opp['key']}(Not Actionable)")
-                        continue
-                    if top_opp.get("confluence_score", 0) < eff_min_conf:
-                        skip_notes.append(f"{top_opp['key']}(Conf {top_opp.get('confluence_score', 0)}<{eff_min_conf})")
-                        continue
-                    asset_key = top_opp["key"]
-                    opp_action = "BUY_CE" if any(x in top_opp["action"].upper() for x in ["CE", "CALL", "BULLISH"]) else ("BUY_PE" if any(x in top_opp["action"].upper() for x in ["PE", "PUT", "BEARISH"]) else None)
-                    if not opp_action:
-                        continue
-                    dir_cd_until = getattr(self, "_asset_cooldowns", {}).get(f"{asset_key}:{opp_action}")
-                    if dir_cd_until is not None and datetime.datetime.now() < dir_cd_until:
-                        continue
-                    is_dir_cd_db, _ = global_trade_lock.is_cooldown_active(f"{asset_key}:{opp_action}")
-                    if is_dir_cd_db:
-                        continue
-                    if asset_key in index_keys:
-                        basket_cd_until = getattr(self, "_basket_cooldowns", {}).get(opp_action)
-                        if basket_cd_until is not None and datetime.datetime.now() < basket_cd_until:
-                            continue
-                        is_basket_cd_db, _ = global_trade_lock.is_cooldown_active(f"BASKET:{opp_action}")
-                        if is_basket_cd_db:
-                            continue
+                        # -------------------------------------------------------------
+                        # MCX COMMODITIES (15:05 - 23:00 IST) - DEDICATED 5-VIDEO ENGINE
+                        # -------------------------------------------------------------
+                        # Derive initial direction hint from opp action if present, or let commodity_strategy determine via 66 SMA
+                        opp_action = "BUY_CE" if any(x in top_opp.get("action", "").upper() for x in ["CE", "CALL", "BULLISH"]) else ("BUY_PE" if any(x in top_opp.get("action", "").upper() for x in ["PE", "PUT", "BEARISH"]) else "AUTO")
                     
                     # Institutional Trend Direction, Supply/Demand Zone & Candlestick Confirmation Filter:
                     opp_spot = top_opp["spot"]
@@ -1895,6 +1906,16 @@ class NiftySmartEdgeEngine:
                         if not mcx_ok:
                             skip_notes.append(mcx_reason)
                             continue
+                        opp_action = mcx_meta.get("action", opp_action)
+                        if opp_action not in ("BUY_CE", "BUY_PE"):
+                            skip_notes.append(f"{asset_key}(NO_DIR)")
+                            continue
+                        dir_cd_until = getattr(self, "_asset_cooldowns", {}).get(f"{asset_key}:{opp_action}")
+                        if dir_cd_until is not None and datetime.datetime.now() < dir_cd_until:
+                            continue
+                        is_dir_cd_db, _ = global_trade_lock.is_cooldown_active(f"{asset_key}:{opp_action}")
+                        if is_dir_cd_db:
+                            continue
                         opp_contract = contract_selector.select_contract(
                             spot_price=opp_spot,
                             action=opp_action,
@@ -1902,7 +1923,7 @@ class NiftySmartEdgeEngine:
                             strike_preference="ATM",
                             asset_key=asset_key,
                             available_capital=active_cap,
-                            confluence_score=int(top_opp.get("confluence_score", 70) or 70),
+                            confluence_score=85,
                         )
                         if not opp_contract.risk_budget_approved:
                             skip_notes.append(f"{asset_key}({str(opp_contract.rejection_reason or 'BUDGET')[:24]})")
