@@ -145,16 +145,19 @@ class MultiTimeframeEngine:
             from datetime import timedelta
             from dhan_client import get_dhan_client, DhanTraderClient
             client = get_dhan_client()
-            DhanTraderClient.throttle_request(0.75)
+            DhanTraderClient.throttle_request(0.50)
             today_dt = date.today()
             today_str = today_dt.strftime("%Y-%m-%d")
-            from_str = (today_dt - timedelta(days=5)).strftime("%Y-%m-%d")
-            res = client.dhan.intraday_minute_data(sec_id, seg, itype, from_str, today_str, interval=5)
-            # If DH-904 rate limit was hit, do not immediately hammer the API with another request!
-            is_rate_limited = isinstance(res, dict) and "DH-904" in str(res)
-            if not (isinstance(res, dict) and res.get("status") == "success" and res.get("data", {}).get("close")) and not is_rate_limited:
-                DhanTraderClient.throttle_request(0.75)
-                res = client.dhan.intraday_minute_data(sec_id, seg, itype, today_str, today_str, interval=5)
+            # Query today's intraday bars first (Dhan delivers today's 140+ bars with zero multi-day payload overhead)
+            res = client.dhan.intraday_minute_data(sec_id, seg, itype, today_str, today_str, interval=5)
+            d = res.get("data", {}) if isinstance(res, dict) else {}
+            # Fall back to 2 days only if today has < 21 bars (e.g. early morning opening)
+            if not (isinstance(res, dict) and res.get("status") == "success" and len(d.get("close", [])) >= 21):
+                is_rate_limited = isinstance(res, dict) and "DH-904" in str(res)
+                if not is_rate_limited:
+                    from_str = (today_dt - timedelta(days=2)).strftime("%Y-%m-%d")
+                    DhanTraderClient.throttle_request(0.50)
+                    res = client.dhan.intraday_minute_data(sec_id, seg, itype, from_str, today_str, interval=5)
             if isinstance(res, dict) and res.get("status") == "success":
                 d = res.get("data", {})
                 closes = d.get("close", [])
@@ -177,6 +180,7 @@ class MultiTimeframeEngine:
                     return df
             self._last_candle_err[asset_key] = str(res)[:180]
             # If rate limited, give Dhan API 65s to clear its rolling rate-limit window
+            is_rate_limited = isinstance(res, dict) and "DH-904" in str(res)
             fail_backoff = 65.0 if is_rate_limited else 25.0
             self._candles_fail_time[asset_key] = now_ts + (fail_backoff - 35.0)
         except Exception as e:
