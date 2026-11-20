@@ -281,11 +281,12 @@ def evaluate_commodity_entry(
     lvl_545 = _get_545_candle_levels(df_bars)
     if lvl_545 and now_hm_ist >= "18:00" and vol_ratio >= 1.35:
         if opp_action == "BUY_CE" and comp_close > lvl_545["high"] and opp_spot > lvl_545["high"]:
-            # Don't chase if stretched > 1.2% past the 5:45 high
-            if ((opp_spot - lvl_545["high"]) / lvl_545["high"]) <= 0.012:
+            # Don't chase if stretched > 1.2% past the 5:45 high, and ensure Stoch has headroom (not already overbought)
+            if ((opp_spot - lvl_545["high"]) / lvl_545["high"]) <= 0.012 and curr_k <= 65.0:
                 formula_545_triggered = True
         elif opp_action == "BUY_PE" and comp_close < lvl_545["low"] and opp_spot < lvl_545["low"]:
-            if ((lvl_545["low"] - opp_spot) / lvl_545["low"]) <= 0.012:
+            # Don't chase if stretched > 1.2% past the 5:45 low, and ensure Stoch has headroom (not already oversold)
+            if ((lvl_545["low"] - opp_spot) / lvl_545["low"]) <= 0.012 and curr_k >= 35.0:
                 formula_545_triggered = True
 
     if not (siddharth_triggered or formula_545_triggered):

@@ -143,8 +143,9 @@ class ScripMaster:
             if str(asset_key).upper() in mcx_set and len(active_expiries) > 1:
                 try:
                     exp0 = datetime.datetime.strptime(active_expiries[0][:10], "%Y-%m-%d").date()
-                    if (exp0 - datetime.date.today()).days < 2:
-                        print(f"[MCX EXPIRY PROTECTION] {asset_key} expiry {active_expiries[0]} is <2 days away. Rolling to {active_expiries[1]}.")
+                    days_left = (exp0 - datetime.date.today()).days
+                    if days_left < 5:
+                        print(f"[MCX EXPIRY PROTECTION] {asset_key} expiry {active_expiries[0]} is {days_left}d away (<5d liquidity buffer). Auto-rolling to {active_expiries[1]}.")
                         return active_expiries[1]
                 except Exception:
                     pass

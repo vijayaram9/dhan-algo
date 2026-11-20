@@ -538,22 +538,22 @@ class NiftySmartEdgeEngine:
             is_bn = p_asset in ["BANKNIFTY", "SENSEX"]
             is_comm = p_asset in ["CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"]
             qty = max(1, int(pos.quantity or 1))
-            # Round-trip brokerage (~₹40) + STT + GST + turnover buffer
-            fee_per_unit = round(60.0 / qty, 2)
+            # Round-trip brokerage (~₹40) + STT + GST + turnover buffer (approx ₹110 for MCX, ₹60 for NSE equity options)
+            fee_per_unit = round(110.0 / qty, 2) if is_comm else round(60.0 / qty, 2)
 
             # Dynamic breathing room: Let setups breathe through standard bid-ask tick noise
             if p_asset == "CRUDEOILM":
-                base_be = 12.0  # Crude Oil moves in 15-25 pt waves
+                base_be = 15.0  # Crude Oil moves in 15-25 pt waves
                 trail_buffer = 8.0
             elif p_asset == "NATGASMINI":
-                base_be = 1.5   # Natgas moves in 1-2 pt increments
-                trail_buffer = 0.8
+                base_be = 2.0   # Natgas moves in 1-2 pt increments
+                trail_buffer = 1.0
             elif is_bn:
                 base_be = 18.0  # BankNifty / Sensex wide swing zone
                 trail_buffer = 12.0
             elif is_comm:
-                base_be = round(pos.entry_premium * 0.05, 1)
-                trail_buffer = round(pos.entry_premium * 0.03, 1)
+                base_be = round(max(25.0, pos.entry_premium * 0.05), 1)
+                trail_buffer = round(max(15.0, pos.entry_premium * 0.03), 1)
             else: # NIFTY & Equity Options
                 base_be = 10.0  # Nifty expansion to cover spread + fee
                 trail_buffer = 6.0
@@ -590,7 +590,8 @@ class NiftySmartEdgeEngine:
 
             # 🔒 FEE-PROTECTED BREAKEVEN LOCK:
             # Only activate once premium expands enough to cover round-trip brokerage + guaranteed profit
-            required_be_expansion = max(base_be, fee_per_unit + 2.0)
+            min_profit_expansion = (900.0 / qty) if is_comm else 2.0
+            required_be_expansion = max(base_be, fee_per_unit + min_profit_expansion)
             be_lock_price = round(pos.entry_premium + fee_per_unit + 0.50, 2)
             if prem_gain >= required_be_expansion and pos.current_premium > be_lock_price:
                 if pos.hard_stop_premium < be_lock_price:
@@ -790,36 +791,45 @@ class NiftySmartEdgeEngine:
             elapsed_seconds = 60.0
 
         # LIVE MID-TRADE 5m REASSESSMENT (EMA-9 Thesis Break + VWAP ChoCH + 10m Dead-Money Cut):
-        if has_live_quote and pos.entry_premium > 0:
+        # Applied exclusively to 0DTE/1DTE intraday scalp equity options where rapid theta burn destroys stagnant capital.
+        # MCX Commodities and Multi-Timeframe Swing Trades are governed by their 1.2x 15m ATR structural stops (Groww Video 2)
+        # to allow high-conviction 15m trend waves to fully develop without premature micro-choking.
+        if not is_comm and getattr(pos, "trade_style", "") != "SWING":
+            if has_live_quote and pos.entry_premium > 0:
+                cur_ret_pct = (pos.current_premium - pos.entry_premium) / pos.entry_premium
+                if elapsed_seconds >= 180.0 and pos.pnl < -150.0 and cur_ret_pct <= -0.025:
+                    try:
+                        from mtf_engine import mtf_engine
+                        df_chk = mtf_engine.get_real_candles(pos_asset)
+                        lvls_chk = mtf_engine.calculate_institutional_levels(current_spot, pos_asset)
+                        vwap_chk = float(lvls_chk.get("vwap", 0.0) or 0.0)
+                        if df_chk is not None and len(df_chk) >= 21:
+                            e9_series = df_chk["close"].ewm(span=9, adjust=False).mean()
+                            e9_chk = float(e9_series.iloc[-1])
+                            e9_prev = float(e9_series.iloc[-2])
+                            e21_chk = float(df_chk["close"].ewm(span=21, adjust=False).mean().iloc[-1])
+                            comp_c = float(df_chk["close"].iloc[-2])
+                            comp_o = float(df_chk["open"].iloc[-2])
+                            if pos.option_type == "CE":
+                                if vwap_chk > 0 and current_spot < vwap_chk and e9_chk < e21_chk and comp_c < comp_o:
+                                    return True, f"⚡ Live ChoCH Reversal Cut: {pos_asset} flipped below VWAP (₹{vwap_chk:,.1f}) & EMA 9 < 21"
+                                if comp_c < comp_o and comp_c < e9_prev and current_spot < e9_chk:
+                                    return True, f"⚡ Live 5m Reassessment: {pos_asset} completed 5m bar closed below EMA 9 (₹{e9_chk:,.1f})"
+                            elif pos.option_type == "PE":
+                                if vwap_chk > 0 and current_spot > vwap_chk and e9_chk > e21_chk and comp_c > comp_o:
+                                    return True, f"⚡ Live ChoCH Reversal Cut: {pos_asset} flipped above VWAP (₹{vwap_chk:,.1f}) & EMA 9 > 21"
+                                if comp_c > comp_o and comp_c > e9_prev and current_spot > e9_chk:
+                                    return True, f"⚡ Live 5m Reassessment: {pos_asset} completed 5m bar closed above EMA 9 (₹{e9_chk:,.1f})"
+                    except Exception:
+                        pass
+                # 10-minute Dead-Money Theta Cut: exit flat options after 10m of zero momentum (-1.5% to +1.5%)
+                if elapsed_seconds >= 600.0 and -0.015 <= cur_ret_pct <= 0.015 and not pos.is_trailing_active:
+                    return True, f"⏱️ 10m Dead-Money Cut: {pos.symbol} flat ({cur_ret_pct*100:+.1f}%) after 10m — preserving theta & capital"
+        elif is_comm and has_live_quote and pos.entry_premium > 0:
             cur_ret_pct = (pos.current_premium - pos.entry_premium) / pos.entry_premium
-            if elapsed_seconds >= 180.0 and pos.pnl < -150.0 and cur_ret_pct <= -0.025:
-                try:
-                    from mtf_engine import mtf_engine
-                    df_chk = mtf_engine.get_real_candles(pos_asset)
-                    lvls_chk = mtf_engine.calculate_institutional_levels(current_spot, pos_asset)
-                    vwap_chk = float(lvls_chk.get("vwap", 0.0) or 0.0)
-                    if df_chk is not None and len(df_chk) >= 21:
-                        e9_series = df_chk["close"].ewm(span=9, adjust=False).mean()
-                        e9_chk = float(e9_series.iloc[-1])
-                        e9_prev = float(e9_series.iloc[-2])
-                        e21_chk = float(df_chk["close"].ewm(span=21, adjust=False).mean().iloc[-1])
-                        comp_c = float(df_chk["close"].iloc[-2])
-                        comp_o = float(df_chk["open"].iloc[-2])
-                        if pos.option_type == "CE":
-                            if vwap_chk > 0 and current_spot < vwap_chk and e9_chk < e21_chk and comp_c < comp_o:
-                                return True, f"⚡ Live ChoCH Reversal Cut: {pos_asset} flipped below VWAP (₹{vwap_chk:,.1f}) & EMA 9 < 21"
-                            if comp_c < comp_o and comp_c < e9_prev and current_spot < e9_chk:
-                                return True, f"⚡ Live 5m Reassessment: {pos_asset} completed 5m bar closed below EMA 9 (₹{e9_chk:,.1f})"
-                        elif pos.option_type == "PE":
-                            if vwap_chk > 0 and current_spot > vwap_chk and e9_chk > e21_chk and comp_c > comp_o:
-                                return True, f"⚡ Live ChoCH Reversal Cut: {pos_asset} flipped above VWAP (₹{vwap_chk:,.1f}) & EMA 9 > 21"
-                            if comp_c > comp_o and comp_c > e9_prev and current_spot > e9_chk:
-                                return True, f"⚡ Live 5m Reassessment: {pos_asset} completed 5m bar closed above EMA 9 (₹{e9_chk:,.1f})"
-                except Exception:
-                    pass
-            # 10-minute Dead-Money Theta Cut: exit flat options after 10m of zero momentum (-1.5% to +1.5%)
-            if elapsed_seconds >= 600.0 and -0.015 <= cur_ret_pct <= 0.015 and not pos.is_trailing_active:
-                return True, f"⏱️ 10m Dead-Money Cut: {pos.symbol} flat ({cur_ret_pct*100:+.1f}%) after 10m — preserving theta & capital"
+            # 45-minute Commodity Stagnation Cut (3 full 15m candles with zero momentum):
+            if elapsed_seconds >= 2700.0 and -0.02 <= cur_ret_pct <= 0.02 and not pos.is_trailing_active:
+                return True, f"⏱️ 45m Commodity Stagnation Exit: {pos.symbol} flat ({cur_ret_pct*100:+.1f}%) across 3 15m candles — re-allocating capital"
 
         # LAYER 1: Underlying-Based Structural Stop (with sanity guard against corrupted spot quotes)
         spot_is_sane = (current_spot > 0 and abs(current_spot - pos.underlying_entry_spot) / max(1.0, pos.underlying_entry_spot) < 0.50)
