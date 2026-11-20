@@ -176,8 +176,8 @@ class MultiTimeframeEngine:
                     self._last_candle_err.pop(asset_key, None)
                     return df
             self._last_candle_err[asset_key] = str(res)[:180]
-            # If rate limited, give Dhan API 45s to clear its rate-limit window
-            fail_backoff = 45.0 if is_rate_limited else 25.0
+            # If rate limited, give Dhan API 65s to clear its rolling rate-limit window
+            fail_backoff = 65.0 if is_rate_limited else 25.0
             self._candles_fail_time[asset_key] = now_ts + (fail_backoff - 35.0)
         except Exception as e:
             self._last_candle_err[asset_key] = f"EXC: {e}"

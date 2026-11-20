@@ -1887,6 +1887,8 @@ class NiftySmartEdgeEngine:
                     r1_lvl = float(mtf_lvls.get("r1", 0.0) or 0.0)
                     s1_lvl = float(mtf_lvls.get("s1", 0.0) or 0.0)
 
+                    # Throttle by 350ms to strictly respect DhanHQ's 5 req/s API rate limit
+                    time.sleep(0.35)
                     # Fail-Closed Candle & EMA 9/21 Alignment Check (Completed Bar + Volume + 15m ORB):
                     df_bars = mtf_engine.get_real_candles(asset_key)
                     if df_bars is None or len(df_bars) < 21:
