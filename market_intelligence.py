@@ -319,6 +319,78 @@ ASSET_CATALOG: Dict[str, AssetInfo] = {
         expiry_day_name="Last Trading Day",
         baseline_price=189500.0
     ),
+    "CRUDEOIL": AssetInfo(
+        key="CRUDEOIL",
+        display_name="Crude Oil (Standard)",
+        category="COMMODITY",
+        exchange="MCX",
+        tv_symbol="MCX:CRUDEOIL",
+        yfinance_symbol="CL=F",
+        lot_size=100,
+        strike_step=50,
+        expiry_day_name="Mid-Month Friday",
+        baseline_price=7850.0
+    ),
+    "NATURALGAS": AssetInfo(
+        key="NATURALGAS",
+        display_name="Natural Gas (Standard)",
+        category="COMMODITY",
+        exchange="MCX",
+        tv_symbol="MCX:NATURALGAS",
+        yfinance_symbol="NG=F",
+        lot_size=1250,
+        strike_step=5,
+        expiry_day_name="Monthly Tuesday",
+        baseline_price=295.0
+    ),
+    "GOLD": AssetInfo(
+        key="GOLD",
+        display_name="Gold (Standard)",
+        category="COMMODITY",
+        exchange="MCX",
+        tv_symbol="MCX:GOLD",
+        yfinance_symbol="GC=F",
+        lot_size=100,
+        strike_step=100,
+        expiry_day_name="5th of Month",
+        baseline_price=76000.0
+    ),
+    "SILVER": AssetInfo(
+        key="SILVER",
+        display_name="Silver (Standard)",
+        category="COMMODITY",
+        exchange="MCX",
+        tv_symbol="MCX:SILVER",
+        yfinance_symbol="SI=F",
+        lot_size=30,
+        strike_step=500,
+        expiry_day_name="Last Trading Day",
+        baseline_price=89000.0
+    ),
+    "COPPER": AssetInfo(
+        key="COPPER",
+        display_name="Copper",
+        category="COMMODITY",
+        exchange="MCX",
+        tv_symbol="MCX:COPPER",
+        yfinance_symbol="HG=F",
+        lot_size=2500,
+        strike_step=5,
+        expiry_day_name="Last Trading Day",
+        baseline_price=825.0
+    ),
+    "ZINC": AssetInfo(
+        key="ZINC",
+        display_name="Zinc",
+        category="COMMODITY",
+        exchange="MCX",
+        tv_symbol="MCX:ZINC",
+        yfinance_symbol="ZN=F",
+        lot_size=5000,
+        strike_step=5,
+        expiry_day_name="Last Trading Day",
+        baseline_price=275.0
+    ),
     # -------------------------------------------------------------------------
     # GLOBAL DEVELOPED BENCHMARKS (Heavy Influence on NIFTY & Indian Markets)
     # -------------------------------------------------------------------------
@@ -595,6 +667,12 @@ class MarketIntelligenceEngine:
             "NATGASMINI": ("574320", "MCX_COMM", "FUTCOM"),
             "GOLDM": ("575011", "MCX_COMM", "FUTCOM"),
             "SILVERM": ("483080", "MCX_COMM", "FUTCOM"),
+            "CRUDEOIL": ("573422", "MCX_COMM", "FUTCOM"),
+            "NATURALGAS": ("574319", "MCX_COMM", "FUTCOM"),
+            "GOLD": ("575010", "MCX_COMM", "FUTCOM"),
+            "SILVER": ("483079", "MCX_COMM", "FUTCOM"),
+            "COPPER": ("578634", "MCX_COMM", "FUTCOM"),
+            "ZINC": ("578638", "MCX_COMM", "FUTCOM"),
             "RELIANCE": ("2885", "NSE_EQ", "EQUITY"),
             "TCS": ("11536", "NSE_EQ", "EQUITY"),
             "HDFCBANK": ("1333", "NSE_EQ", "EQUITY"),
@@ -775,7 +853,11 @@ class MarketIntelligenceEngine:
                             if "data" in d and isinstance(d["data"], dict):
                                 d = d["data"]
                             mapping_all = {
-                                "MCX_COMM": {"573423": "CRUDEOILM", "574320": "NATGASMINI", "575011": "GOLDM", "483080": "SILVERM"},
+                                "MCX_COMM": {
+                                    "573423": "CRUDEOILM", "574320": "NATGASMINI", "575011": "GOLDM", "483080": "SILVERM",
+                                    "573422": "CRUDEOIL", "574319": "NATURALGAS", "575010": "GOLD", "483079": "SILVER",
+                                    "578634": "COPPER", "578638": "ZINC"
+                                },
                                 "IDX_I": {"13": "NIFTY", "25": "BANKNIFTY", "27": "FINNIFTY", "51": "SENSEX"},
                                 "NSE_EQ": {"2885": "RELIANCE", "11536": "TCS", "1333": "HDFCBANK", "4963": "ICICIBANK", "1594": "INFY", "3045": "SBIN"}
                             }
@@ -854,6 +936,8 @@ class MarketIntelligenceEngine:
             sec_id_map = {
                 "GIFTNIFTY": "5024", "NIFTY": "13", "BANKNIFTY": "25", "FINNIFTY": "27", "SENSEX": "51",
                 "CRUDEOILM": "573423", "NATGASMINI": "574320", "GOLDM": "575011", "SILVERM": "483080",
+                "CRUDEOIL": "573422", "NATURALGAS": "574319", "GOLD": "575010", "SILVER": "483079",
+                "COPPER": "578634", "ZINC": "578638",
                 "RELIANCE": "2885", "TCS": "11536", "HDFCBANK": "1333", "ICICIBANK": "4963", "INFY": "1594", "SBIN": "3045"
             }
             if asset_key in sec_id_map and client:
@@ -1489,7 +1573,8 @@ class MarketIntelligenceEngine:
         # Evening (15:30 - 23:30 IST): MCX Mini Commodities.
         if is_evening:
             priority_order = [
-                "CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM",
+                "CRUDEOILM", "NATGASMINI", "SILVERM", "GOLDM",
+                "COPPER", "ZINC", "CRUDEOIL", "NATURALGAS", "GOLD", "SILVER",
                 "NIFTY", "BANKNIFTY", "SENSEX", "FINNIFTY", "RELIANCE"
             ]
         else:

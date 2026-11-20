@@ -414,7 +414,8 @@ class NiftySmartEdgeEngine:
         # Check if asset or active position is an MCX Commodity
         active_pos_asset = getattr(self.active_position, "asset_key", "") if self.active_position else ""
         target_asset = asset_key or active_pos_asset
-        is_commodity = target_asset in ["CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"]
+        mcx_all = {"CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM", "CRUDEOIL", "NATURALGAS", "GOLD", "SILVER", "COPPER", "ZINC"}
+        is_commodity = target_asset in mcx_all
 
         now_hm = now.strftime("%H:%M")
 
@@ -440,7 +441,8 @@ class NiftySmartEdgeEngine:
             return False, reason
 
         now_time = get_ist_now().strftime("%H:%M")
-        is_commodity = (asset_key in ["CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"]) or (self.active_position and getattr(self.active_position, "asset_key", "") in ["CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"])
+        mcx_all = {"CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM", "CRUDEOIL", "NATURALGAS", "GOLD", "SILVER", "COPPER", "ZINC"}
+        is_commodity = (asset_key in mcx_all) or (self.active_position and getattr(self.active_position, "asset_key", "") in mcx_all)
 
         if is_commodity:
             if now_time < "09:15":
@@ -1097,14 +1099,14 @@ class NiftySmartEdgeEngine:
             verified_spot = market_intelligence.get_asset_spot(asset_k)
             if verified_spot > 0:
                 step_sz = 50.0
-                if asset_k in ["BANKNIFTY", "SENSEX", "NIFTYIT"]:
+                if asset_k in ["BANKNIFTY", "SENSEX", "NIFTYIT", "GOLD", "GOLDM"]:
                     step_sz = 100.0
-                elif asset_k == "GOLDM":
-                    step_sz = 250.0
-                elif asset_k == "SILVERM":
+                elif asset_k in ["SILVER", "SILVERM"]:
                     step_sz = 500.0
-                elif asset_k == "NATGASMINI":
+                elif asset_k in ["NATGASMINI", "NATURALGAS", "COPPER", "ZINC"]:
                     step_sz = 5.0
+                elif asset_k in ["CRUDEOIL", "CRUDEOILM"]:
+                    step_sz = 50.0
                 elif asset_k in ["RELIANCE", "INFY"]:
                     step_sz = 20.0
                 elif asset_k in ["HDFCBANK", "ICICIBANK", "SBIN"]:
@@ -1754,7 +1756,7 @@ class NiftySmartEdgeEngine:
                 now_hm_curr = now_dt.strftime("%H:%M")
                 is_evening_session = (now_hm_curr >= "15:30" or now_hm_curr < "09:15")
                 active_assets = {getattr(p, "asset_key", "") for p in self.active_positions}
-                mcx_keys = {"CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"}
+                mcx_keys = {"CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM", "CRUDEOIL", "NATURALGAS", "GOLD", "SILVER", "COPPER", "ZINC"}
                 index_keys = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "NIFTYIT"}
                 active_index_count = sum(1 for p in self.active_positions if getattr(p, "asset_key", "") in index_keys)
 
@@ -1808,10 +1810,9 @@ class NiftySmartEdgeEngine:
                     opp_regime = top_opp.get("mtf_analysis", {}).get("market_regime", "")
                     if opp_regime == "UNCONFIRMED_DATA":
                         continue
-                    liquid_mcx = {"CRUDEOILM", "NATGASMINI"}
-                    if (top_opp["key"] in index_keys or top_opp["key"] in liquid_mcx) and opp_regime in ("INSTITUTIONAL_ACCUMULATION", "INSTITUTIONAL_DISTRIBUTION"):
+                    if (top_opp["key"] in index_keys or top_opp["key"] in mcx_keys) and opp_regime in ("INSTITUTIONAL_ACCUMULATION", "INSTITUTIONAL_DISTRIBUTION"):
                         eff_min_conf = min(min_conf, 60)
-                    elif (top_opp["key"] in index_keys) or (top_opp["key"] in liquid_mcx):
+                    elif (top_opp["key"] in index_keys) or (top_opp["key"] in mcx_keys):
                         eff_min_conf = min_conf
                     else:
                         # High-RVOL (>= 1.35x) or News-Catalyst F&O Stock Options only (75+ confluence)

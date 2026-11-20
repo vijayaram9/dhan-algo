@@ -104,15 +104,13 @@ class ContractSelector:
 
         # Determine asset strike step
         step = 50.0
-        if asset_key in ["BANKNIFTY", "SENSEX", "NIFTYIT"]:
+        if asset_key in ["BANKNIFTY", "SENSEX", "NIFTYIT", "GOLD", "GOLDM"]:
             step = 100.0
-        elif asset_key == "GOLDM":
-            step = 250.0
-        elif asset_key in ["FINNIFTY", "CRUDEOILM"]:
-            step = 50.0
-        elif asset_key == "SILVERM":
+        elif asset_key in ["SILVER", "SILVERM"]:
             step = 500.0
-        elif asset_key == "NATGASMINI":
+        elif asset_key in ["FINNIFTY", "CRUDEOIL", "CRUDEOILM"]:
+            step = 50.0
+        elif asset_key in ["NATGASMINI", "NATURALGAS", "COPPER", "ZINC"]:
             step = 5.0
         elif asset_key in ["RELIANCE", "INFY"]:
             step = 20.0
@@ -255,7 +253,13 @@ class ContractSelector:
                 )
 
         # Authentic lot sizing
-        comm_lots = {"CRUDEOILM": 10, "NATGASMINI": 250, "GOLDM": 10, "SILVERM": 5}
+        comm_lots = {
+            "CRUDEOILM": 10, "CRUDEOIL": 100,
+            "NATGASMINI": 250, "NATURALGAS": 1250,
+            "GOLDM": 10, "GOLD": 100,
+            "SILVERM": 5, "SILVER": 30,
+            "COPPER": 2500, "ZINC": 5000
+        }
         if asset_key in comm_lots:
             base_lot_size = comm_lots[asset_key]
         else:
