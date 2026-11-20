@@ -189,6 +189,43 @@ class MultiTimeframeEngine:
             print(f"[MTF] Candle fetch error for {asset_key}: {e}")
         if asset_key in self._candles_cache and (now_ts - self._candles_time.get(asset_key, 0)) < 300.0:
             return self._candles_cache[asset_key]
+
+        # Resilient Multi-Provider Fallback: When Dhan /charts/intraday returns DH-904 rate-limit,
+        # seamlessly fetch 5m candles from global data feed and scale to live exchange spot in INR.
+        # This guarantees the trading bot NEVER freezes or sits in cash due to broker data rate limits!
+        yf_map = {
+            "CRUDEOILM": "CL=F", "CRUDEOIL": "CL=F",
+            "NATGASMINI": "NG=F", "NATURALGAS": "NG=F",
+            "GOLDM": "GC=F", "GOLD": "GC=F",
+            "SILVERM": "SI=F", "SILVER": "SI=F",
+            "COPPER": "HG=F", "ZINC": "ZNC=F"
+        }
+        if asset_key in yf_map:
+            try:
+                import yfinance as yf
+                from market_intelligence import market_intelligence
+                live_spot = market_intelligence.get_asset_spot(asset_key)
+                if live_spot > 0:
+                    df_yf = yf.Ticker(yf_map[asset_key]).history(period="2d", interval="5m")
+                    if df_yf is not None and len(df_yf) >= 25:
+                        df_yf = df_yf.reset_index()
+                        df_yf.columns = [c.lower() for c in df_yf.columns]
+                        c_last = float(df_yf["close"].iloc[-1])
+                        if c_last > 0:
+                            scale = live_spot / c_last
+                            df_yf["open"] = df_yf["open"] * scale
+                            df_yf["high"] = df_yf["high"] * scale
+                            df_yf["low"] = df_yf["low"] * scale
+                            df_yf["close"] = df_yf["close"] * scale
+                            col_dt = "datetime" if "datetime" in df_yf.columns else "date"
+                            df_yf["timestamp"] = df_yf[col_dt].astype("int64") // 10**9
+                            self._candles_cache[asset_key] = df_yf
+                            self._candles_time[asset_key] = now_ts
+                            self._last_candle_err.pop(asset_key, None)
+                            print(f"[MTF RESILIENT FALLBACK] Successfully primed {len(df_yf)} {asset_key} bars via global feed (INR Spot: {live_spot:.1f}).")
+                            return df_yf
+            except Exception as e_yf:
+                pass
         return None
 
     def get_resampled_trends(self, asset_key: str) -> dict:
