@@ -1389,7 +1389,7 @@ class NiftySmartEdgeEngine:
 
         hard_sl = contract.hard_stop_premium
         is_bn = (asset_k == "BANKNIFTY")
-        is_comm = asset_k in ["CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"]
+        is_comm = asset_k in {"CRUDEOILM", "CRUDEOIL", "NATGASMINI", "NATURALGAS", "GOLDM", "GOLD", "SILVERM", "SILVER", "COPPER", "ZINC"}
 
         # Multi-Timeframe Institutional Engine Context
         mtf_data = None
@@ -1434,13 +1434,14 @@ class NiftySmartEdgeEngine:
                     target_premium = round(contract.estimated_premium + (sl_distance * 1.8), 2)
             max_holding_seconds = 1800  # 30 minutes institutional trade window
         elif trade_style == "SWING":
-            # Keep structural -10% Swing SL intact (lot sizing in contract_selector fits risk budget; never squeeze SL to 3%!)
-            swing_pct_sl = round(contract.estimated_premium * 0.90, 2)
+            # Equities: -10% SL (untouched). MCX Commodities: -16% breathing stop (1R rupee shield still strictly enforced!)
+            sl_mult = 0.84 if is_comm else 0.90
+            swing_pct_sl = round(contract.estimated_premium * sl_mult, 2)
             hard_sl = max(hard_sl, swing_pct_sl)
             # Spread-survival guard: ensure hard_sl is at least 1% below fresh live quote
             hard_sl = min(hard_sl, round(contract.estimated_premium * 0.99, 2))
             if target_premium <= 0:
-                target_premium = round(contract.estimated_premium * 1.25, 2)
+                target_premium = round(contract.estimated_premium * (1.30 if is_comm else 1.25), 2)
             max_holding_seconds = 3600 # 60 minutes wave ride
         else:
             if target_premium <= 0:
@@ -1719,9 +1720,8 @@ class NiftySmartEdgeEngine:
                 active_cap = self.client.get_real_cash_balance() if self.mode == "LIVE" else float(self.client.paper_capital)
                 now_hm_curr = now_dt.strftime("%H:%M")
                 is_equity_session = is_equity_open and ("09:25" <= now_hm_curr < "15:05")
-                # MCX auto-entries temporarily paused pending dedicated Commodity Strategy approval (Indian equities 100% untouched)
-                is_commodity_session = False
-                is_evening_session = (now_hm_curr >= "15:05" or now_hm_curr < "09:15")
+                is_commodity_session = ("15:05" <= now_hm_curr < "23:00") or (not is_equity_open and "09:15" <= now_hm_curr < "23:00")
+                is_evening_session = is_commodity_session
 
                 # Track peak daily P&L for telemetry only (NEVER halt or cap winning sessions — keep capturing opportunities!)
                 cur_net_d = float(getattr(self, "daily_net_pnl", 0.0) or 0.0)
@@ -1772,13 +1772,15 @@ class NiftySmartEdgeEngine:
                 if len(self.active_positions) >= 3 or current_open_heat >= max_heat_inr:
                     valid_opps = []
                 elif is_commodity_session:
-                    # Active MCX Session: Trade all 10 liquid Commodities with ZERO gap!
+                    # Active MCX Session: Dedicated MCX Commodity Strategy (sorted by liquidity rank)
+                    from commodity_strategy import MCX_LIQUIDITY_RANK
                     valid_opps = [
                         o for o in all_opps
                         if o["key"] in mcx_keys
                         and o["key"] not in active_assets
                         and self.check_trading_schedule(o["key"])[0]
                     ]
+                    valid_opps.sort(key=lambda o: MCX_LIQUIDITY_RANK.get(o["key"], 99))
                 elif is_equity_session:
                     # Active Indian Equity & Index Session all the way until 15:05 IST!
                     valid_opps = [
@@ -1856,6 +1858,66 @@ class NiftySmartEdgeEngine:
                     if df_bars is None or len(df_bars) < 21:
                         n_b = 0 if df_bars is None else len(df_bars)
                         skip_notes.append(f"{asset_key}(Bars {n_b}<21)")
+                        continue
+
+                    # -----------------------------------------------------------------
+                    # ISOLATED DEDICATED MCX COMMODITY STRATEGY BRANCH
+                    # (Zero disturbance to the winning Indian Equity & Index engine below)
+                    # -----------------------------------------------------------------
+                    if asset_key in mcx_keys:
+                        from commodity_strategy import evaluate_commodity_entry, validate_commodity_contract
+                        rs_trends_mcx = mtf_engine.get_resampled_trends(asset_key)
+                        mcx_ok, mcx_reason, mcx_meta = evaluate_commodity_entry(
+                            asset_key=asset_key,
+                            opp_action=opp_action,
+                            opp_spot=opp_spot,
+                            confluence_score=float(top_opp.get("confluence_score", 0) or 0),
+                            df_bars=df_bars,
+                            real_vwap=real_vwap,
+                            rs_trends=rs_trends_mcx,
+                            now_hm_ist=now_hm_curr,
+                            active_positions=self.active_positions,
+                        )
+                        if not mcx_ok:
+                            skip_notes.append(mcx_reason)
+                            continue
+                        opp_contract = contract_selector.select_contract(
+                            spot_price=opp_spot,
+                            action=opp_action,
+                            estimated_premium=0.0,
+                            strike_preference="ATM",
+                            asset_key=asset_key,
+                            available_capital=active_cap,
+                            confluence_score=int(top_opp.get("confluence_score", 70) or 70),
+                        )
+                        if not opp_contract.risk_budget_approved:
+                            skip_notes.append(f"{asset_key}({str(opp_contract.rejection_reason or 'BUDGET')[:24]})")
+                            continue
+                        c_ok, c_reason = validate_commodity_contract(opp_contract, client=self.client)
+                        if not c_ok:
+                            skip_notes.append(f"{asset_key}({c_reason[:32]})")
+                            continue
+                        calc_levels = market_intelligence.calculate_levels_and_stops(
+                            opp_spot, asset_key, is_bear=(opp_action == "BUY_PE")
+                        )
+                        struct_sl = calc_levels.get("structural_sl_spot", calc_levels.get("sl", opp_spot - 25.0))
+                        pb_sl = float(mcx_meta.get("pullback_sl", 0.0) or 0.0)
+                        if pb_sl > 0 and ((opp_action == "BUY_CE" and pb_sl < opp_spot) or (opp_action == "BUY_PE" and pb_sl > opp_spot)):
+                            struct_sl = pb_sl
+                        mcx_tags = mcx_meta.get("tags", ["MCX_PRIME_ENGINE"])
+                        auto_sig = SmartEdgeSignal(
+                            action=opp_action,
+                            strategy_name=f"MCX Prime Strategy ({opp_action}) [{' + '.join(mcx_tags)}]",
+                            regime=top_opp.get("market_regime", "MOMENTUM_TREND"),
+                            spot_price=opp_spot,
+                            structural_sl_spot=struct_sl,
+                            target_1_spot=calc_levels.get("target_1_spot", calc_levels.get("target_1", opp_spot + 35.0)),
+                            target_2_spot=calc_levels.get("target_2_spot", calc_levels.get("target_2", opp_spot + 55.0)),
+                        )
+                        print(Fore.GREEN + f"\n[MCX PRIME RADAR] 🚀 Triggering validated MCX setup: {opp_contract.custom_symbol} ({mcx_tags})")
+                        if self.execute_entry(auto_sig, opp_contract, opp_spot, trade_style="SWING"):
+                            return
+                        skip_notes.append(f"{asset_key}({getattr(self, 'last_entry_error', 'BLOCKED')[:24]})")
                         continue
                     b_close = float(df_bars["close"].iloc[-1])
                     b_open = float(df_bars["open"].iloc[-1])

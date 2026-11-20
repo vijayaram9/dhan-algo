@@ -139,6 +139,15 @@ class ScripMaster:
             # Automatically roll forward to the NEXT weekly expiry date!
             now_hm = datetime.datetime.now().strftime("%H:%M")
             today_s = datetime.date.today().strftime("%Y-%m-%d")
+            mcx_set = {"CRUDEOILM", "CRUDEOIL", "NATGASMINI", "NATURALGAS", "GOLDM", "GOLD", "SILVERM", "SILVER", "COPPER", "ZINC"}
+            if str(asset_key).upper() in mcx_set and len(active_expiries) > 1:
+                try:
+                    exp0 = datetime.datetime.strptime(active_expiries[0][:10], "%Y-%m-%d").date()
+                    if (exp0 - datetime.date.today()).days < 2:
+                        print(f"[MCX EXPIRY PROTECTION] {asset_key} expiry {active_expiries[0]} is <2 days away. Rolling to {active_expiries[1]}.")
+                        return active_expiries[1]
+                except Exception:
+                    pass
             if len(active_expiries) > 1 and active_expiries[0].startswith(today_s) and now_hm >= "11:30":
                 print(f"[0DTE EXPIRY PROTECTION] Asset {asset_key} has 0DTE expiry today ({active_expiries[0]}). Past 11:30 AM IST: Rolling forward to Next Expiry ({active_expiries[1]}) to protect capital from theta decay.")
                 return active_expiries[1]
