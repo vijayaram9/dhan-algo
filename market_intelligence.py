@@ -680,6 +680,14 @@ class MarketIntelligenceEngine:
             "INFY": ("1594", "NSE_EQ", "EQUITY"),
             "SBIN": ("3045", "NSE_EQ", "EQUITY")
         }
+        # If equity market is closed, immediately return cached/baseline price to protect API rate limit
+        now_hm_spot = datetime.datetime.now().strftime("%H:%M")
+        is_eq_closed = (now_hm_spot >= "15:30" or now_hm_spot < "09:15")
+        if is_eq_closed and getattr(info, "category", "") != "COMMODITY":
+            cached_v = self.cached_spot_prices.get(asset_key, (getattr(info, "baseline_price", 0.0), 0))[0]
+            if cached_v > 0:
+                return cached_v
+
         if asset_key in dhan_asset_meta:
             sec_id, seg, itype = dhan_asset_meta[asset_key]
             try:
@@ -702,20 +710,21 @@ class MarketIntelligenceEngine:
                                 info.baseline_price = v
                                 return v
                     
-                    # If quote_data is 0 (e.g. market closed for equities), pull authentic close from Dhan intraday candles
-                    today_str = datetime.datetime.now().strftime("%Y-%m-%d")
-                    from_str = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
-                    res_c = dhan.intraday_minute_data(sec_id, seg, itype, from_str, today_str, interval=5)
-                    if isinstance(res_c, dict) and res_c.get("status") == "success":
-                        d_c = res_c.get("data", {})
-                        if isinstance(d_c, dict):
-                            closes = d_c.get("close", [])
-                            if closes:
-                                v = round(float(closes[-1]), 2)
-                                self.cached_spot_prices[asset_key] = (v, time.time())
-                                client.record_last_flashed_price(sec_id, v)
-                                info.baseline_price = v
-                                return v
+                    # For open commodities, pull authentic close from Dhan intraday candles only if quote returned 0
+                    if getattr(info, "category", "") == "COMMODITY":
+                        today_str = datetime.datetime.now().strftime("%Y-%m-%d")
+                        from_str = (datetime.datetime.now() - datetime.timedelta(days=4)).strftime("%Y-%m-%d")
+                        res_c = dhan.intraday_minute_data(sec_id, seg, itype, from_str, today_str, interval=5)
+                        if isinstance(res_c, dict) and res_c.get("status") == "success":
+                            d_c = res_c.get("data", {})
+                            if isinstance(d_c, dict):
+                                closes = d_c.get("close", [])
+                                if closes:
+                                    v = round(float(closes[-1]), 2)
+                                    self.cached_spot_prices[asset_key] = (v, time.time())
+                                    client.record_last_flashed_price(sec_id, v)
+                                    info.baseline_price = v
+                                    return v
             except Exception:
                 pass
 
@@ -875,11 +884,11 @@ class MarketIntelligenceEngine:
                 except Exception:
                     pass
             else:
-                # Outside Equity trading hours: Fetch authentic closing bars directly from DhanHQ
+                # Outside Equity trading hours: Cache closing prices for the evening (2-hour cache, zero rate limit burn)
                 today_str = datetime.datetime.now().strftime("%Y-%m-%d")
                 mapping_idx = {"13": "NIFTY", "25": "BANKNIFTY", "27": "FINNIFTY", "51": "SENSEX"}
                 for sid, akey in mapping_idx.items():
-                    if akey not in self.cached_spot_prices or (now_ts - self.cached_spot_prices[akey][1] > 300):
+                    if akey not in self.cached_spot_prices or (now_ts - self.cached_spot_prices[akey][1] > 7200):
                         try:
                             res_c = dhan.intraday_minute_data(sid, "IDX_I", "INDEX", today_str, today_str, interval=5)
                             if isinstance(res_c, dict) and res_c.get("status") == "success":
