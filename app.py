@@ -72,7 +72,7 @@ def inr_abs_format(value):
 engine = smart_edge_engine
 is_engine_active = True
 now_hm_init = datetime.datetime.now().strftime("%H:%M")
-selected_asset = "CRUDEOILM" if (now_hm_init >= "15:30" or now_hm_init < "09:15") else "NIFTY"
+selected_asset = "CRUDEOILM" if (now_hm_init >= "14:45" or now_hm_init < "09:15") else "NIFTY"
 current_capital = float(getattr(config, "account_capital", 15000.0))
 lock = threading.Lock()
 

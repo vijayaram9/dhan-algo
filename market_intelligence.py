@@ -1566,7 +1566,9 @@ class MarketIntelligenceEngine:
         results = []
         weekday_idx = datetime.datetime.now().weekday()
         now_hm = datetime.datetime.now().strftime("%H:%M")
-        is_evening = (now_hm >= "15:30" or now_hm < "09:15")
+        # Autonomous handover: When Indian equities conclude entries at 14:45 IST,
+        # the priority list immediately puts all MCX Commodities at the top with zero delay!
+        is_evening = (now_hm >= "14:45" or now_hm < "09:15")
 
         # Strict Session Universe:
         # Daytime (09:15 - 15:30 IST): Strictly prioritize high-beta, institutional Indian Indices and Equities.

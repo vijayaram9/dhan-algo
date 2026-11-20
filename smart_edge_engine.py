@@ -471,11 +471,12 @@ class NiftySmartEdgeEngine:
             return False, ""
 
         pos = target_pos
+        mcx_all = {"CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM", "CRUDEOIL", "NATURALGAS", "GOLD", "SILVER", "COPPER", "ZINC"}
         pos_asset = getattr(pos, "asset_key", "NIFTY")
         p_seg = getattr(pos, "segment", None)
         if not p_seg:
             p_seg = "BSE_FNO" if (pos_asset == "SENSEX" or "SENSEX" in pos.symbol) else (
-                "MCX_COMM" if pos_asset in ["CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM"] else "NSE_FNO"
+                "MCX_COMM" if pos_asset in mcx_all else "NSE_FNO"
             )
         strike_val = pos.strike_price if pos.strike_price > 0 else (round(current_spot / 50.0) * 50)
         refreshed_ltp = self.client.get_option_ltp(
@@ -1613,6 +1614,15 @@ class NiftySmartEdgeEngine:
         now_dt = get_ist_now()
         now_time = now_dt.strftime("%H:%M:%S")
 
+        # Autonomous Session Day Rollover (Ensures multi-day 24/7 continuous operation without restarts):
+        today_date_str = now_dt.strftime("%Y-%m-%d")
+        if getattr(self, "_last_session_date", None) != today_date_str:
+            self._last_session_date = today_date_str
+            self.restore_daily_state()
+            self._peak_daily_net_pnl = 0.0
+            self.closed_trades_today = []
+            print(Fore.GREEN + f"[AUTONOMOUS ROLLOVER] New trading session initialized for date {today_date_str}.")
+
         is_equity_open, _ = self.is_market_open("NIFTY")
         is_mcx_open, _ = self.is_market_open("CRUDEOILM")
         is_open = is_equity_open or is_mcx_open
@@ -1754,11 +1764,21 @@ class NiftySmartEdgeEngine:
                         pass
 
                 now_hm_curr = now_dt.strftime("%H:%M")
-                is_evening_session = (now_hm_curr >= "15:30" or now_hm_curr < "09:15")
-                active_assets = {getattr(p, "asset_key", "") for p in self.active_positions}
                 mcx_keys = {"CRUDEOILM", "NATGASMINI", "GOLDM", "SILVERM", "CRUDEOIL", "NATURALGAS", "GOLD", "SILVER", "COPPER", "ZINC"}
                 index_keys = {"NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "NIFTYIT"}
+                active_assets = {getattr(p, "asset_key", "") for p in self.active_positions}
                 active_index_count = sum(1 for p in self.active_positions if getattr(p, "asset_key", "") in index_keys)
+
+                # ---------------------------------------------------------------------
+                # AUTONOMOUS CONTINUOUS TRADING SYSTEM (ZERO BREAKS / ZERO DOWNTIME)
+                # ---------------------------------------------------------------------
+                # Shift 1: Indian Equities & Indices (09:25 to 14:45 IST)
+                # Shift 2: MCX Commodities (14:45 to 23:00 IST, plus full-day on equity holidays)
+                # Seamless handover: As soon as Indian equities close entries at 14:45,
+                # the engine instantly activates all 10 MCX Commodities with ZERO gap!
+                is_equity_session = is_equity_open and ("09:25" <= now_hm_curr < "14:45")
+                is_commodity_session = ("14:45" <= now_hm_curr < "23:00") or (not is_equity_open and "09:15" <= now_hm_curr < "23:00")
+                is_evening_session = is_commodity_session
 
                 # Multi-Slot Uncorrelated Auto-Pilot (09:25 - 14:45, or 15:00 on Expiry):
                 # 1 Index slot + up to 2 uncorrelated High-RVOL/News F&O Stock slots (1 per sector max, <= 3 total)
@@ -1771,15 +1791,15 @@ class NiftySmartEdgeEngine:
                 current_open_heat = sum(getattr(p, "trade_risk_inr", 0.0) or (active_cap * (getattr(config, "risk_per_trade_pct", 1.0) / 100.0)) for p in self.active_positions)
                 if len(self.active_positions) >= 3 or current_open_heat >= max_heat_inr:
                     valid_opps = []
-                elif is_evening_session:
-                    # Active Evening MCX Session (15:30 - 23:00 IST): Trade liquid MCX Mini Commodities!
+                elif is_commodity_session:
+                    # Active MCX Session: Trade all 10 liquid Commodities with ZERO gap!
                     valid_opps = [
                         o for o in all_opps
                         if o["key"] in mcx_keys
                         and o["key"] not in active_assets
                         and self.check_trading_schedule(o["key"])[0]
                     ]
-                elif is_equity_open and now_hm_curr < "14:45":
+                elif is_equity_session:
                     valid_opps = [
                         o for o in all_opps
                         if o["key"] not in mcx_keys
