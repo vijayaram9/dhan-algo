@@ -788,41 +788,14 @@ class MarketIntelligenceEngine:
         t.start()
 
     def _background_price_poller(self):
-        """Continuously refreshes live exchange prices in parallel across all assets in ASSET_CATALOG."""
-        from concurrent.futures import ThreadPoolExecutor
-        time.sleep(1.0)
-        executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="PriceFeedWorker")
-        secondary_keys = [k for k in ASSET_CATALOG.keys() if k not in self.priority_keys]
-        sec_idx = 0
-
+        """Continuously refreshes live exchange prices cleanly via consolidated batch quotes."""
+        time.sleep(2.0)
         while True:
             try:
-                # 1. Update priority assets in parallel every cycle
-                p_keys = list(self.priority_keys)
-                futures = {executor.submit(self._fetch_single_asset_price, k): k for k in p_keys}
-                for f in futures:
-                    try:
-                        f.result(timeout=3.0)
-                    except Exception:
-                        pass
-
-                # 2. Update a batch of secondary catalog assets (MCX, Nifty stocks, global cues)
-                all_catalog_keys = list(ASSET_CATALOG.keys())
-                secondary = [k for k in all_catalog_keys if k not in self.priority_keys]
-                if secondary:
-                    batch_size = 4
-                    batch = secondary[sec_idx:sec_idx + batch_size]
-                    sec_idx = (sec_idx + batch_size) % len(secondary) if len(secondary) > 0 else 0
-                    sec_futures = {executor.submit(self._fetch_single_asset_price, k): k for k in batch}
-                    for f in sec_futures:
-                        try:
-                            f.result(timeout=3.0)
-                        except Exception:
-                            pass
-
+                self._refresh_all_dhan_indices()
                 time.sleep(3.0)
             except Exception:
-                time.sleep(3.0)
+                time.sleep(5.0)
 
     def _refresh_all_dhan_indices(self):
         """Batch-fetches active instruments per open exchange segment, cached for 2.0 seconds."""
