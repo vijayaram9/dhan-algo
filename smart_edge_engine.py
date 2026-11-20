@@ -1720,8 +1720,9 @@ class NiftySmartEdgeEngine:
                 active_cap = self.client.get_real_cash_balance() if self.mode == "LIVE" else float(self.client.paper_capital)
                 now_hm_curr = now_dt.strftime("%H:%M")
                 is_equity_session = is_equity_open and ("09:25" <= now_hm_curr < "15:05")
-                is_commodity_session = ("15:05" <= now_hm_curr < "23:00") or (not is_equity_open and "09:15" <= now_hm_curr < "23:00")
-                is_evening_session = is_commodity_session
+                # MCX auto-entries paused while analyzing the 5 MCX YouTube strategies (Indian equities 100% untouched)
+                is_commodity_session = False
+                is_evening_session = (now_hm_curr >= "15:05" or now_hm_curr < "09:15")
 
                 # Track peak daily P&L for telemetry only (NEVER halt or cap winning sessions — keep capturing opportunities!)
                 cur_net_d = float(getattr(self, "daily_net_pnl", 0.0) or 0.0)
