@@ -1719,7 +1719,8 @@ class NiftySmartEdgeEngine:
                 # - Peak >= 2.0R: Protect 60% of peak
                 # - Peak >= 4.0R: Protect 75% of peak
                 one_r_session = max(1.0, active_cap * (getattr(config, "risk_per_trade_pct", 1.0) / 100.0))
-                if peak_net_d >= (2.0 * one_r_session):
+                # Only apply daytime equity floor during equity hours; evening commodity session trades independently:
+                if not is_evening_session and peak_net_d >= (2.0 * one_r_session):
                     lock_pct = 0.75 if peak_net_d >= (4.0 * one_r_session) else 0.60
                     protected_floor = round(peak_net_d * lock_pct, 2)
                     if cur_net_d <= protected_floor:
@@ -1766,8 +1767,16 @@ class NiftySmartEdgeEngine:
                 # 1 Index slot (until 14:15, or 14:45 on expiry) + up to 2 different-sector High-RVOL/VCP F&O Stock slots (until 13:30 IST)
                 max_heat_inr = active_cap * (getattr(config, "max_portfolio_heat_pct", 3.0) / 100.0)
                 current_open_heat = sum(getattr(p, "trade_risk_inr", 0.0) or (active_cap * (getattr(config, "risk_per_trade_pct", 1.0) / 100.0)) for p in self.active_positions)
-                if is_evening_session or len(self.active_positions) >= 3 or current_open_heat >= max_heat_inr:
+                if len(self.active_positions) >= 3 or current_open_heat >= max_heat_inr:
                     valid_opps = []
+                elif is_evening_session:
+                    # Active Evening MCX Session (15:30 - 23:00 IST): Trade liquid MCX Mini Commodities!
+                    valid_opps = [
+                        o for o in all_opps
+                        if o["key"] in mcx_keys
+                        and o["key"] not in active_assets
+                        and self.check_trading_schedule(o["key"])[0]
+                    ]
                 elif is_equity_open and now_hm_curr < "14:45":
                     valid_opps = [
                         o for o in all_opps
