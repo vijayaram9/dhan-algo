@@ -790,9 +790,25 @@ class MarketIntelligenceEngine:
     def _background_price_poller(self):
         """Continuously refreshes live exchange prices cleanly via consolidated batch quotes."""
         time.sleep(2.0)
+        sec_idx = 0
         while True:
             try:
                 self._refresh_all_dhan_indices()
+                # During daytime NSE hours only, gently refresh 2 secondary F&O stocks per cycle
+                now_dt = datetime.datetime.now()
+                now_hm = now_dt.strftime("%H:%M")
+                if now_dt.weekday() < 5 and "09:15" <= now_hm < "15:30":
+                    secondary = [
+                        k for k, v in ASSET_CATALOG.items()
+                        if k not in self.priority_keys and getattr(v, "category", "") != "COMMODITY"
+                    ]
+                    if secondary:
+                        for k in secondary[sec_idx:sec_idx + 2]:
+                            try:
+                                self._fetch_single_asset_price(k)
+                            except Exception:
+                                pass
+                        sec_idx = (sec_idx + 2) % len(secondary)
                 time.sleep(3.0)
             except Exception:
                 time.sleep(5.0)

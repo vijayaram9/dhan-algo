@@ -1874,8 +1874,9 @@ class NiftySmartEdgeEngine:
                         # -------------------------------------------------------------
                         # MCX COMMODITIES (15:05 - 23:00 IST) - DEDICATED 5-VIDEO ENGINE
                         # -------------------------------------------------------------
-                        # Derive initial direction hint from opp action if present, or let commodity_strategy determine via 66 SMA
-                        opp_action = "BUY_CE" if any(x in top_opp.get("action", "").upper() for x in ["CE", "CALL", "BULLISH"]) else ("BUY_PE" if any(x in top_opp.get("action", "").upper() for x in ["PE", "PUT", "BEARISH"]) else "AUTO")
+                        # Always let the 15m 66 SMA in commodity_strategy lock direction (BUY_CE vs BUY_PE)
+                        # so short-term 5m pullback bounces never conflict with the 15m trend.
+                        opp_action = "AUTO"
                     
                     # Institutional Trend Direction, Supply/Demand Zone & Candlestick Confirmation Filter:
                     opp_spot = top_opp["spot"]
